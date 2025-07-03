@@ -66,7 +66,6 @@ interface GridRow {
   quoteId: string;
   jobId: string;
   generatorRegionId: string;
-  generatorState: string;
   vendorId: string;
   containerSizeId: string;
   billingUomId: string;
@@ -93,7 +92,6 @@ const initialRow: Omit<GridRow, "id"> = {
   quoteId: "",
   jobId: "",
   generatorRegionId: "",
-  generatorState: "",
   vendorId: "",
   containerSizeId: "",
   billingUomId: "",
@@ -168,80 +166,64 @@ const columns: {
   key: keyof GridRow;
   label: string;
   width: string;
-  type: "text" | "number" | "select" | "dropdown";
-  required?: boolean; // Added required property
+  type: "text" | "number" | "select" | "dropdown" | "date";
+  required?: boolean;
 }[] = [
   {
     key: "productId",
-    label: "Product ID *",
+    label: "Product",
     width: "min-w-[120px]",
     type: "text",
     required: true,
   },
   {
     key: "regionId",
-    label: "Region ID *",
+    label: "Region",
     width: "min-w-[100px]",
     type: "dropdown",
     required: true,
   },
-  {
-    key: "profileId",
-    label: "Profile ID",
-    width: "min-w-[100px]",
-    type: "text",
-  },
+  { key: "profileId", label: "Profile", width: "min-w-[100px]", type: "text" },
   {
     key: "generatorId",
-    label: "Generator ID",
+    label: "Generator",
     width: "min-w-[120px]",
     type: "text",
   },
   {
     key: "contractId",
-    label: "Contract ID",
-    width: "min-w-[100px]",
-    type: "text",
-  },
-  { key: "quoteId", label: "Quote ID", width: "min-w-[100px]", type: "text" },
-  { key: "jobId", label: "Job ID", width: "min-w-[100px]", type: "text" },
-  {
-    key: "generatorRegionId",
-    label: "Gen Region ID",
+    label: "Gov. Contract",
     width: "min-w-[120px]",
     type: "text",
   },
-  {
-    key: "generatorState",
-    label: "Gen State",
-    width: "min-w-[100px]",
-    type: "dropdown",
-  },
-  { key: "vendorId", label: "Vendor ID", width: "min-w-[100px]", type: "text" },
+  { key: "quoteId", label: "Quote", width: "min-w-[100px]", type: "text" },
+  { key: "jobId", label: "Job", width: "min-w-[100px]", type: "text" },
+
+  { key: "vendorId", label: "Vendor", width: "min-w-[100px]", type: "text" },
   {
     key: "containerSizeId",
-    label: "Container Size *",
+    label: "Container Size",
     width: "min-w-[120px]",
     type: "dropdown",
     required: true,
   },
   {
     key: "billingUomId",
-    label: "Billing UOM *",
+    label: "UOM",
     width: "min-w-[120px]",
     type: "dropdown",
     required: true,
   },
   {
     key: "unitPrice",
-    label: "Unit Price *",
+    label: "Price",
     width: "min-w-[100px]",
     type: "number",
     required: true,
   },
   {
     key: "minimumPrice",
-    label: "Min Price",
+    label: "Minimum",
     width: "min-w-[100px]",
     type: "number",
   },
@@ -249,13 +231,13 @@ const columns: {
     key: "effectiveDate",
     label: "Effective Date",
     width: "min-w-[120px]",
-    type: "text",
+    type: "date",
   },
   {
     key: "expirationDate",
     label: "Expiration Date",
     width: "min-w-[120px]",
-    type: "text",
+    type: "date",
   },
 ];
 
@@ -301,15 +283,17 @@ export default function PricingEntry() {
   const [invoiceMinimum, setInvoiceMinimum] = useState("500.00");
   const [eiPercent, setEiPercent] = useState("2.5");
   const [eManifestFee, setEManifestFee] = useState("15.00");
+  const [ancillaryChargesModalOpen, setAncillaryChargesModalOpen] =
+    useState(false);
 
-  const [gridData, setGridData] = useState<GridRow[]>([
-    { id: "1", ...initialRow },
-  ]);
+  const [gridData, setGridData] = useState<GridRow[]>([]);
 
   // Enhanced cell selection and editing
   const [selectedCell, setSelectedCell] = useState<CellPosition | null>(null);
   const [editingCell, setEditingCell] = useState<CellPosition | null>(null);
   const [clipboardData, setClipboardData] = useState<string[][]>([]);
+  const [pasteModalOpen, setPasteModalOpen] = useState(false);
+  const [pastedData, setPastedData] = useState<string[][]>([]);
 
   const tableRef = useRef<HTMLTableElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -354,7 +338,7 @@ export default function PricingEntry() {
   );
 
   // Use a client-only incrementing counter for row IDs to avoid hydration mismatch
-  const nextRowId = useRef(2); // Start at 2 since initial row is id '1'
+  const nextRowId = useRef(1); // Start at 1 since we no longer have an initial row
 
   // Temporary custom conversions for Add Row dialog
   const [addRowCustomDraft, setAddRowCustomDraft] = useState(
@@ -415,6 +399,118 @@ export default function PricingEntry() {
     }
   };
 
+  // Enhanced keyboard navigation for Excel-like editing
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!selectedCell) return;
+    const { rowIndex, colKey } = selectedCell;
+    const colIndex = columns.findIndex((col) => col.key === colKey);
+    let nextRow = rowIndex;
+    let nextCol = colIndex;
+    let startEdit = false;
+
+    switch (e.key) {
+      case "ArrowUp":
+        e.preventDefault();
+        if (rowIndex > 0) nextRow--;
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        if (rowIndex < filteredGridData.length - 1) nextRow++;
+        break;
+      case "ArrowLeft":
+        e.preventDefault();
+        if (colIndex > 0) nextCol--;
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        if (colIndex < columns.length - 1) nextCol++;
+        break;
+      case "Tab":
+        e.preventDefault();
+        if (e.shiftKey) {
+          if (colIndex > 0) nextCol--;
+          else if (rowIndex > 0) {
+            nextRow--;
+            nextCol = columns.length - 1;
+          }
+        } else {
+          if (colIndex < columns.length - 1) nextCol++;
+          else if (rowIndex < filteredGridData.length - 1) {
+            nextRow++;
+            nextCol = 0;
+          }
+        }
+        startEdit = true;
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (e.shiftKey) {
+          if (rowIndex > 0) nextRow--;
+        } else {
+          if (rowIndex < filteredGridData.length - 1) nextRow++;
+        }
+        startEdit = true;
+        break;
+      case "F2":
+        e.preventDefault();
+        setEditingCell({ rowIndex, colKey });
+        return;
+      default:
+        // Start editing on any printable character
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          setEditingCell({ rowIndex, colKey });
+          return;
+        }
+        return;
+    }
+    setSelectedCell({ rowIndex: nextRow, colKey: columns[nextCol].key });
+    if (startEdit)
+      setEditingCell({ rowIndex: nextRow, colKey: columns[nextCol].key });
+  };
+
+  // Handle paste functionality
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const clipboardText = e.clipboardData.getData("text");
+    if (!clipboardText) return;
+
+    // Parse clipboard data (Excel format: tab-separated values, newline-separated rows)
+    const rows = clipboardText.trim().split("\n");
+    const parsedData = rows.map((row) => row.split("\t"));
+
+    setPastedData(parsedData);
+    setPasteModalOpen(true);
+  };
+
+  // Apply pasted data to grid
+  const applyPastedData = () => {
+    if (pastedData.length === 0) return;
+
+    const newRows: GridRow[] = [];
+
+    pastedData.forEach((rowData, rowIndex) => {
+      const newRow: GridRow = {
+        id: (nextRowId.current + rowIndex).toString(),
+        ...initialRow,
+      };
+
+      // Map pasted data to grid columns
+      rowData.forEach((cellValue, colIndex) => {
+        if (colIndex < columns.length) {
+          const colKey = columns[colIndex].key;
+          newRow[colKey] = cellValue.trim();
+        }
+      });
+
+      newRows.push(newRow);
+    });
+
+    nextRowId.current += pastedData.length;
+    setGridData((prev) => [...prev, ...newRows]);
+    setPasteModalOpen(false);
+    setPastedData([]);
+  };
+
   // Add renderCell after the handlers, before the return:
   const renderCell = (
     row: GridRow,
@@ -426,33 +522,133 @@ export default function PricingEntry() {
     const isSelected =
       selectedCell?.rowIndex === rowIndex && selectedCell?.colKey === col.key;
     const value = row[col.key] || "";
+
     if (isEditing) {
-      return (
-        <td key={col.key} className="px-3 py-2 border-r border-gray-200">
-          <Input
-            ref={inputRef}
-            value={value}
-            onChange={(e) => handleInputChange(e.target.value)}
-            onBlur={handleInputBlur}
-            onKeyDown={handleInputKeyDown}
-            className="border-0 p-0 h-8 focus:ring-0 text-sm"
-            type={col.type === "number" ? "number" : "text"}
-            step={col.type === "number" ? "0.01" : undefined}
-            autoFocus
-          />
-        </td>
-      );
+      if (col.type === "dropdown") {
+        let options: string[] = [];
+        if (col.key === "regionId") options = regions.map((r) => r.regionName);
+        else if (col.key === "containerSizeId")
+          options = containerSizes.map((c) => c.sizeName);
+        else if (col.key === "billingUomId")
+          options = billingUoms.map((u) => u.uomName);
+        return (
+          <td
+            key={col.key}
+            className="px-3 py-2 border-r border-gray-200 relative"
+          >
+            <div className="absolute inset-0 bg-white border-2 border-blue-500 rounded-sm">
+              <Select value={value} onValueChange={handleInputChange}>
+                <SelectTrigger className="border-0 p-0 h-full focus:ring-0 text-sm bg-transparent">
+                  <SelectValue
+                    placeholder={`Select ${col.label.toLowerCase()}`}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.map((opt) => (
+                    <SelectItem key={opt} value={opt}>
+                      {opt}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-sm opacity-0">{value}</div>
+          </td>
+        );
+      } else if (col.type === "date") {
+        return (
+          <td
+            key={col.key}
+            className="px-3 py-2 border-r border-gray-200 relative"
+          >
+            <div className="absolute inset-0 bg-white border-2 border-blue-500 rounded-sm">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-0 p-0 h-full w-full focus:ring-0 text-sm justify-start font-normal bg-transparent"
+                  >
+                    {value
+                      ? format(new Date(value), "MMM dd, yyyy")
+                      : `Pick a date`}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={value ? new Date(value) : undefined}
+                    onSelect={(date) =>
+                      handleInputChange(date ? format(date, "yyyy-MM-dd") : "")
+                    }
+                    initialFocus
+                    captionLayout="dropdown"
+                    fromYear={2000}
+                    toYear={2100}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="text-sm opacity-0">{value}</div>
+          </td>
+        );
+      } else if (col.type === "number") {
+        return (
+          <td
+            key={col.key}
+            className="px-3 py-2 border-r border-gray-200 relative"
+          >
+            <div className="absolute inset-0 bg-white border-2 border-blue-500 rounded-sm">
+              <Input
+                ref={inputRef}
+                value={value}
+                onChange={(e) => handleInputChange(e.target.value)}
+                onBlur={handleInputBlur}
+                onKeyDown={handleInputKeyDown}
+                className="border-0 p-0 h-full w-full focus:ring-0 text-sm bg-transparent"
+                type="number"
+                step="0.01"
+                autoFocus
+              />
+            </div>
+            <div className="text-sm opacity-0">{value}</div>
+          </td>
+        );
+      } else {
+        return (
+          <td
+            key={col.key}
+            className="px-3 py-2 border-r border-gray-200 relative"
+          >
+            <div className="absolute inset-0 bg-white border-2 border-blue-500 rounded-sm">
+              <Input
+                ref={inputRef}
+                value={value}
+                onChange={(e) => handleInputChange(e.target.value)}
+                onBlur={handleInputBlur}
+                onKeyDown={handleInputKeyDown}
+                className="border-0 p-0 h-full w-full focus:ring-0 text-sm bg-transparent"
+                type="text"
+                autoFocus
+              />
+            </div>
+            <div className="text-sm opacity-0">{value}</div>
+          </td>
+        );
+      }
     }
+
     return (
       <td
         key={col.key}
-        className={`px-3 py-2 border-r border-gray-200 ${
-          isSelected ? "ring-2 ring-blue-500" : ""
+        className={`px-3 py-2 border-r border-gray-200 cursor-pointer transition-colors ${
+          isSelected ? "bg-blue-50 ring-1 ring-blue-200" : "hover:bg-gray-50"
         }`}
         onClick={() => handleCellClick(rowIndex, col.key)}
         onDoubleClick={() => handleCellDoubleClick(rowIndex, col.key)}
       >
-        <div className="text-sm">{value}</div>
+        <div className="text-sm min-h-[20px] flex items-center">
+          {value || <span className="text-gray-400">-</span>}
+        </div>
       </td>
     );
   };
@@ -525,9 +721,14 @@ export default function PricingEntry() {
         {/* Top Bar */}
         <div className="px-6 py-3 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-semibold text-gray-900">
-              Pricing Entry
-            </h1>
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">
+                {customerName || "Pricing Entry"}
+              </h1>
+              {customerName && (
+                <p className="text-sm text-gray-600 mt-1">Pricing Entry</p>
+              )}
+            </div>
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md">
                 Draft
@@ -541,93 +742,70 @@ export default function PricingEntry() {
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPasteModalOpen(true)}
+            >
               <Upload className="h-4 w-4 mr-2" />
-              Import
+              Paste from Excel
             </Button>
           </div>
         </div>
         {/* Main Fields Row */}
-        <div className="px-6 py-6 grid grid-cols-1 md:grid-cols-12 gap-8">
-          {/* Left: Main Fields */}
-          <div className="md:col-span-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="px-6 py-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            {/* Left: Customer Info */}
+            <div className="flex-1">
               <div>
-                <Label
-                  htmlFor="customer"
-                  className="text-xs font-semibold text-gray-700"
-                >
-                  Customer Name *
-                </Label>
-                <Select value={customerName} onValueChange={setCustomerName}>
-                  <SelectTrigger className="h-9 mt-1">
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem
-                        key={customer.customerId}
-                        value={customer.customerName}
-                      >
-                        {customer.customerName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {customerName || "Customer Name"}
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">CN-1234</p>
+                <p className="text-sm text-gray-600">
+                  123 Main Street, Anytown, ST 12345
+                </p>
               </div>
             </div>
-          </div>
-          {/* Right: Financial Settings Card */}
-          <div className="md:col-span-4">
-            <div className="bg-gray-50 rounded-lg p-4 h-full flex flex-col justify-between border border-gray-100">
-              <h3 className="text-xs font-semibold text-gray-900 mb-3 tracking-wide uppercase">
-                Financial Settings
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <Label
-                    htmlFor="invoice-min"
-                    className="text-xs text-gray-600"
-                  >
+            {/* Right: Ancillary Charges */}
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 min-w-[280px]">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900 tracking-wide uppercase">
+                  Ancillary Charges
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAncillaryChargesModalOpen(true)}
+                  className="h-6 px-2 text-xs"
+                >
+                  Edit
+                </Button>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-xs font-medium text-gray-700 block mb-1">
                     Invoice Minimum
                   </Label>
-                  <Input
-                    id="invoice-min"
-                    type="number"
-                    step="0.01"
-                    value={invoiceMinimum}
-                    onChange={(e) => setInvoiceMinimum(e.target.value)}
-                    className="w-24 h-8 text-right text-xs"
-                  />
+                  <div className="h-8 flex items-center text-sm font-medium text-gray-900">
+                    ${invoiceMinimum}
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="ei-percent" className="text-xs text-gray-600">
+                <div>
+                  <Label className="text-xs font-medium text-gray-700 block mb-1">
                     E&I %
                   </Label>
-                  <Input
-                    id="ei-percent"
-                    type="number"
-                    step="0.1"
-                    value={eiPercent}
-                    onChange={(e) => setEiPercent(e.target.value)}
-                    className="w-24 h-8 text-right text-xs"
-                  />
+                  <div className="h-8 flex items-center text-sm font-medium text-gray-900">
+                    {eiPercent}%
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <Label
-                    htmlFor="emanifest-fee"
-                    className="text-xs text-gray-600"
-                  >
+                <div>
+                  <Label className="text-xs font-medium text-gray-700 block mb-1">
                     e-Manifest Fee
                   </Label>
-                  <Input
-                    id="emanifest-fee"
-                    type="number"
-                    step="0.01"
-                    value={eManifestFee}
-                    onChange={(e) => setEManifestFee(e.target.value)}
-                    className="w-24 h-8 text-right text-xs"
-                  />
+                  <div className="h-8 flex items-center text-sm font-medium text-gray-900">
+                    ${eManifestFee}
+                  </div>
                 </div>
               </div>
             </div>
@@ -670,7 +848,12 @@ export default function PricingEntry() {
         {/* Skipping filter bar for now */}
         {/* Data Table */}
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-          <div className="overflow-x-auto max-h-[65vh] overflow-y-auto">
+          <div
+            className="overflow-x-auto max-h-[65vh] overflow-y-auto"
+            tabIndex={0}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+          >
             <table className="w-full text-sm">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
@@ -785,39 +968,54 @@ export default function PricingEntry() {
                 </tr>
               </thead>
               <tbody>
-                {filteredGridData.map((row, rowIndex) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-3 py-2 border-r border-gray-200 bg-gray-25">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-gray-500 font-medium">
-                          {rowIndex + 1}
-                        </span>
-                        <span className="border-l border-gray-200 pl-2 flex items-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-5 w-5 p-0 text-gray-400 hover:text-red-600"
-                            disabled={gridData.length === 1}
-                            aria-label="Delete row"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </span>
-                      </div>
+                {filteredGridData.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={columns.length + 1}
+                      className="px-3 py-8 text-center text-gray-500"
+                    >
+                      No pricing rows found. Click "Add Row" to get started.
                     </td>
-                    {columns.map((col) => renderCell(row, rowIndex, col))}
                   </tr>
-                ))}
+                ) : (
+                  filteredGridData.map((row, rowIndex) => (
+                    <tr
+                      key={row.id}
+                      className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-3 py-2 border-r border-gray-200 bg-gray-25">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-gray-500 font-medium">
+                            {rowIndex + 1}
+                          </span>
+                          <span className="border-l border-gray-200 pl-2 flex items-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 w-5 p-0 text-gray-400 hover:text-red-600"
+                              disabled={gridData.length === 1}
+                              aria-label="Delete row"
+                              onClick={() => setRowToDelete(row.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </span>
+                        </div>
+                      </td>
+                      {columns.map((col) => renderCell(row, rowIndex, col))}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
         {/* Add Row Button */}
         <div className="mt-4 flex justify-center">
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+          <Button
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={() => setAddRowDialogOpen(true)}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Add Row
           </Button>
@@ -1204,8 +1402,274 @@ export default function PricingEntry() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Placeholder for rest of the component */}
-      <div>hello</div>
+      {/* Ancillary Charges Edit Modal */}
+      <Dialog
+        open={ancillaryChargesModalOpen}
+        onOpenChange={setAncillaryChargesModalOpen}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Ancillary Charges</DialogTitle>
+            <DialogDescription>
+              Adjust the ancillary charges for this pricing entry.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label
+                htmlFor="modal-invoice-min"
+                className="text-sm font-medium text-gray-700"
+              >
+                Invoice Minimum
+              </Label>
+              <Input
+                id="modal-invoice-min"
+                type="number"
+                step="0.01"
+                value={invoiceMinimum}
+                onChange={(e) => setInvoiceMinimum(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label
+                htmlFor="modal-ei-percent"
+                className="text-sm font-medium text-gray-700"
+              >
+                E&I %
+              </Label>
+              <Input
+                id="modal-ei-percent"
+                type="number"
+                step="0.1"
+                value={eiPercent}
+                onChange={(e) => setEiPercent(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label
+                htmlFor="modal-emanifest-fee"
+                className="text-sm font-medium text-gray-700"
+              >
+                e-Manifest Fee
+              </Label>
+              <Input
+                id="modal-emanifest-fee"
+                type="number"
+                step="0.01"
+                value={eManifestFee}
+                onChange={(e) => setEManifestFee(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAncillaryChargesModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => setAncillaryChargesModalOpen(false)}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Paste from Excel Modal */}
+      <Dialog open={pasteModalOpen} onOpenChange={setPasteModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Paste from Excel</DialogTitle>
+            <DialogDescription>
+              Paste your Excel data below. The data should match the column
+              structure of the grid.
+            </DialogDescription>
+          </DialogHeader>
+          {/* Conversion Type Selector */}
+          <div className="mb-4">
+            <Label className="text-sm font-medium text-gray-700 mb-2 block">
+              Conversion Type
+            </Label>
+            <ToggleGroup
+              type="single"
+              value={newRowConversionType}
+              onValueChange={(val) => {
+                if (val) setNewRowConversionType(val as "standard" | "custom");
+              }}
+              className="gap-2"
+            >
+              <ToggleGroupItem value="standard" className="flex-1">
+                <div className="text-center">
+                  <div className="font-medium">Standard</div>
+                  <div className="text-xs text-gray-500">
+                    Use default conversions
+                  </div>
+                </div>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="custom" className="flex-1">
+                <div className="text-center">
+                  <div className="font-medium">Custom</div>
+                  <div className="text-xs text-gray-500">
+                    Use custom conversions
+                  </div>
+                </div>
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+          {/* Custom Conversion Table if Custom is selected */}
+          {newRowConversionType === "custom" && (
+            <div className="mb-4 border rounded bg-yellow-50 p-3">
+              <div className="mb-2 text-sm text-yellow-800">
+                <strong>
+                  Custom conversion factors will apply to these imported rows
+                  only.
+                </strong>
+              </div>
+              <table className="w-full text-sm mb-2">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="py-1 px-2 text-left">Container Size</th>
+                    <th className="py-1 px-2 text-left">Conversion</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {addRowCustomDraft.map((row, idx) => (
+                    <tr key={row.size}>
+                      <td className="py-1 px-2">{row.size}</td>
+                      <td className="py-1 px-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={row.value}
+                          onChange={(e) => {
+                            const newVal = e.target.value;
+                            setAddRowCustomDraft((prev) =>
+                              prev.map((r, i) =>
+                                i === idx ? { ...r, value: newVal } : r
+                              )
+                            );
+                          }}
+                          className="w-24 h-7 text-right text-sm"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="space-y-4 py-4">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const text = await navigator.clipboard.readText();
+                    if (text) {
+                      const rows = text.trim().split("\n");
+                      const parsedData = rows.map((row) => row.split("\t"));
+                      setPastedData(parsedData);
+                    }
+                  } catch (err) {
+                    console.error("Failed to read clipboard:", err);
+                  }
+                }}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Get from Clipboard
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPastedData([])}
+              >
+                Clear
+              </Button>
+            </div>
+
+            {pastedData.length > 0 && (
+              <div
+                className="border rounded-lg bg-white"
+                style={{ maxWidth: "100%" }}
+              >
+                <div className="bg-gray-50 px-4 py-2 border-b">
+                  <h4 className="text-sm font-medium text-gray-900">
+                    Preview ({pastedData.length} rows)
+                  </h4>
+                </div>
+                <div
+                  className="max-h-96 overflow-x-auto overflow-y-auto"
+                  style={{ maxWidth: "100%" }}
+                >
+                  <table className="w-full min-w-max text-sm">
+                    <thead className="bg-gray-100 sticky top-0">
+                      <tr>
+                        {columns.map((col, index) => (
+                          <th
+                            key={col.key}
+                            className="px-3 py-2 text-left text-xs font-medium text-gray-700 border-r border-gray-200"
+                          >
+                            {col.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pastedData.map((row, rowIndex) => (
+                        <tr key={rowIndex} className="border-b border-gray-100">
+                          {columns.map((col, colIndex) => (
+                            <td
+                              key={col.key}
+                              className="px-3 py-2 text-xs border-r border-gray-200"
+                            >
+                              {row[colIndex] || "-"}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="text-xs text-gray-600">
+              <p>
+                <strong>Instructions:</strong>
+              </p>
+              <ul className="list-disc list-inside mt-1 space-y-1">
+                <li>Copy data from Excel (Ctrl+C)</li>
+                <li>Click "Get from Clipboard" or paste directly (Ctrl+V)</li>
+                <li>
+                  Review the preview to ensure data matches column structure
+                </li>
+                <li>Click "Add Rows" to import the data</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPasteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (newRowConversionType === "custom") {
+                  setCustomConversions(
+                    addRowCustomDraft.map((row) => ({ ...row }))
+                  );
+                }
+                applyPastedData();
+              }}
+              disabled={pastedData.length === 0}
+            >
+              Add Rows ({pastedData.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

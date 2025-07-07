@@ -719,93 +719,55 @@ export default function PricingEntry() {
       {/* Header Section */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         {/* Top Bar */}
-        <div className="px-6 py-3 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-          <div className="flex items-center gap-4">
+        <div className="px-6 py-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          {/* Left: Customer Info */}
+          <div className="flex-1 min-w-[260px]">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Pricing</h1>
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">
-                {customerName || "Pricing Entry"}
-              </h1>
-              {customerName && (
-                <p className="text-sm text-gray-600 mt-1">Pricing Entry</p>
-              )}
-            </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md">
-                Draft
-              </span>
-              <span>•</span>
-              <span>Last saved: Never</span>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Customer Name
+              </h2>
+              <p className="text-sm text-gray-700 mt-1">CN-10001</p>
+              <p className="text-sm text-gray-700">123 Main Street</p>
+              <p className="text-sm text-gray-700">Anytown, ST 12345</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPasteModalOpen(true)}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Paste from Excel
-            </Button>
-          </div>
-        </div>
-        {/* Main Fields Row */}
-        <div className="px-6 py-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            {/* Left: Customer Info */}
-            <div className="flex-1">
+          {/* Right: Ancillary Charges */}
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 min-w-[280px]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 tracking-wide uppercase">
+                ANCILLARY CHARGES
+              </h3>
+              <button
+                className="text-xs text-blue-700 hover:underline focus:outline-none"
+                onClick={() => setAncillaryChargesModalOpen(true)}
+              >
+                Edit
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {customerName || "Customer Name"}
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">CN-1234</p>
-                <p className="text-sm text-gray-600">
-                  123 Main Street, Anytown, ST 12345
-                </p>
-              </div>
-            </div>
-            {/* Right: Ancillary Charges */}
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 min-w-[280px]">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-gray-900 tracking-wide uppercase">
-                  Ancillary Charges
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setAncillaryChargesModalOpen(true)}
-                  className="h-6 px-2 text-xs"
-                >
-                  Edit
-                </Button>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label className="text-xs font-medium text-gray-700 block mb-1">
-                    Invoice Minimum
-                  </Label>
-                  <div className="h-8 flex items-center text-sm font-medium text-gray-900">
-                    ${invoiceMinimum}
-                  </div>
+                <Label className="text-xs font-medium text-gray-700 block mb-1">
+                  Invoice Minimum
+                </Label>
+                <div className="h-8 flex items-center text-sm font-medium text-gray-900">
+                  $500.00
                 </div>
-                <div>
-                  <Label className="text-xs font-medium text-gray-700 block mb-1">
-                    E&I %
-                  </Label>
-                  <div className="h-8 flex items-center text-sm font-medium text-gray-900">
-                    {eiPercent}%
-                  </div>
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-700 block mb-1">
+                  E&I %
+                </Label>
+                <div className="h-8 flex items-center text-sm font-medium text-gray-900">
+                  2.5%
                 </div>
-                <div>
-                  <Label className="text-xs font-medium text-gray-700 block mb-1">
-                    e-Manifest Fee
-                  </Label>
-                  <div className="h-8 flex items-center text-sm font-medium text-gray-900">
-                    ${eManifestFee}
-                  </div>
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-700 block mb-1">
+                  e-Manifest Fee
+                </Label>
+                <div className="h-8 flex items-center text-sm font-medium text-gray-900">
+                  $15.00
                 </div>
               </div>
             </div>
@@ -820,20 +782,10 @@ export default function PricingEntry() {
             <h2 className="text-lg font-medium text-gray-900">Line Items</h2>
             <div className="flex items-center gap-4 text-sm text-gray-600">
               <span>
-                Total:{" "}
-                <strong className="text-gray-900">{gridData.length}</strong>
+                Total: <strong className="text-gray-900">0</strong>
               </span>
               <span>
-                Valid:{" "}
-                <strong className="text-green-600">
-                  {/* validRows placeholder */}
-                </strong>
-              </span>
-              <span>
-                Missing:{" "}
-                <strong className="text-red-600">
-                  {/* missingRows placeholder */}
-                </strong>
+                Invalid: <strong className="text-gray-900">0</strong>
               </span>
             </div>
           </div>
@@ -844,15 +796,21 @@ export default function PricingEntry() {
             </Button>
           </div>
         </div>
-        {/* Add a filter bar above the grid */}
-        {/* Skipping filter bar for now */}
         {/* Data Table */}
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
           <div
             className="overflow-x-auto max-h-[65vh] overflow-y-auto"
             tabIndex={0}
             onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
+            onPaste={(e) => {
+              e.preventDefault();
+              const clipboardText = e.clipboardData.getData("text");
+              if (!clipboardText) return;
+              const rows = clipboardText.trim().split("\n");
+              const parsedData = rows.map((row) => row.split("\t"));
+              setPastedData(parsedData);
+              setPasteModalOpen(true);
+            }}
           >
             <table className="w-full text-sm">
               <thead className="bg-gray-50 sticky top-0 z-10">
@@ -869,99 +827,7 @@ export default function PricingEntry() {
                     >
                       <div className="flex items-center gap-1">
                         <span>{col.label}</span>
-                        <Popover
-                          open={filterPopoverOpen === col.key}
-                          onOpenChange={(open) =>
-                            setFilterPopoverOpen(open ? col.key : null)
-                          }
-                        >
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              className={
-                                activeFilters[col.key]
-                                  ? "text-blue-600"
-                                  : "text-gray-400 hover:text-gray-700"
-                              }
-                            >
-                              <Filter className="h-4 w-4" />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-56 p-3">
-                            <div className="mb-2 text-xs font-semibold text-gray-700">
-                              Filter {col.label}
-                            </div>
-                            {col.type === "dropdown" ? (
-                              <div className="max-h-40 overflow-y-auto flex flex-col gap-1">
-                                {getUniqueValues(col.key as keyof GridRow).map(
-                                  (val) => (
-                                    <label
-                                      key={val as string}
-                                      className="flex items-center gap-2 text-xs"
-                                    >
-                                      <UICheckbox
-                                        checked={
-                                          Array.isArray(activeFilters[col.key])
-                                            ? (
-                                                activeFilters[
-                                                  col.key
-                                                ] as string[]
-                                              ).includes(val as string)
-                                            : false
-                                        }
-                                        onCheckedChange={(checked) => {
-                                          let arr = Array.isArray(
-                                            activeFilters[col.key]
-                                          )
-                                            ? [
-                                                ...(activeFilters[
-                                                  col.key
-                                                ] as string[]),
-                                              ]
-                                            : [];
-                                          if (checked) arr.push(val as string);
-                                          else
-                                            arr = arr.filter((v) => v !== val);
-                                          setFilter(col.key, arr);
-                                        }}
-                                      />
-                                      {val as string}
-                                    </label>
-                                  )
-                                )}
-                              </div>
-                            ) : (
-                              <Input
-                                autoFocus
-                                value={
-                                  typeof activeFilters[col.key] === "string"
-                                    ? (activeFilters[col.key] as string)
-                                    : ""
-                                }
-                                onChange={(e) =>
-                                  setFilter(col.key, e.target.value)
-                                }
-                                placeholder={`Filter by ${col.label.toLowerCase()}`}
-                                className="h-8 text-xs mt-1"
-                              />
-                            )}
-                            <div className="mt-3 flex gap-2 justify-end">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setFilter(col.key, "")}
-                              >
-                                Clear
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => setFilterPopoverOpen(null)}
-                              >
-                                Done
-                              </Button>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
+                        <Filter className="h-4 w-4 text-gray-400" />
                       </div>
                     </th>
                   ))}
@@ -979,28 +845,16 @@ export default function PricingEntry() {
                   </tr>
                 ) : (
                   filteredGridData.map((row, rowIndex) => (
-                    <tr
-                      key={row.id}
-                      className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="px-3 py-2 border-r border-gray-200 bg-gray-25">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs text-gray-500 font-medium">
-                            {rowIndex + 1}
-                          </span>
-                          <span className="border-l border-gray-200 pl-2 flex items-center">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-5 w-5 p-0 text-gray-400 hover:text-red-600"
-                              disabled={gridData.length === 1}
-                              aria-label="Delete row"
-                              onClick={() => setRowToDelete(row.id)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </span>
-                        </div>
+                    <tr key={row.id}>
+                      <td className="px-3 py-2 border-r border-gray-200 text-sm text-gray-700 flex items-center gap-2">
+                        {rowIndex + 1}
+                        <button
+                          className="ml-2 text-red-500 hover:text-red-700 focus:outline-none"
+                          onClick={() => setRowToDelete(row.id)}
+                          aria-label="Delete row"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </td>
                       {columns.map((col) => renderCell(row, rowIndex, col))}
                     </tr>
@@ -1014,7 +868,25 @@ export default function PricingEntry() {
         <div className="mt-4 flex justify-center">
           <Button
             className="bg-blue-600 hover:bg-blue-700 text-white"
-            onClick={() => setAddRowDialogOpen(true)}
+            onClick={() => {
+              // Add a new row and immediately start editing the first cell
+              const newRow = {
+                id: nextRowId.current.toString(),
+                ...initialRow,
+              };
+              nextRowId.current++;
+              setGridData((prev) => [...prev, newRow]);
+              setTimeout(() => {
+                setSelectedCell({
+                  rowIndex: gridData.length,
+                  colKey: columns[0].key,
+                });
+                setEditingCell({
+                  rowIndex: gridData.length,
+                  colKey: columns[0].key,
+                });
+              }, 0);
+            }}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Row
@@ -1024,49 +896,15 @@ export default function PricingEntry() {
       {/* Sticky Footer */}
       <div className="sticky bottom-0 bg-white border-t border-gray-200 shadow-lg">
         <div className="px-6 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-6">
-              <div className="flex gap-4 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>
-                    Valid:{" "}
-                    <strong className="text-green-600">
-                      {/* validRows placeholder */}
-                    </strong>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span>
-                    Missing:{" "}
-                    <strong className="text-red-600">
-                      {/* missingRows placeholder */}
-                    </strong>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span>
-                    Total:{" "}
-                    <strong className="text-blue-600">{gridData.length}</strong>
-                  </span>
-                </div>
-              </div>
-              <div className="text-xs text-gray-500">
-                Price Range: {/* minPrice and maxPrice placeholder */}
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" className="min-w-[120px]">
-                <Save className="h-4 w-4 mr-2" />
-                Save Draft
-              </Button>
-              <Button className="min-w-[120px]">
-                <Send className="h-4 w-4 mr-2" />
-                Submit
-              </Button>
-            </div>
+          <div className="flex justify-end items-center gap-3">
+            <Button variant="outline" className="min-w-[120px]">
+              <Save className="h-4 w-4 mr-2" />
+              Save Draft
+            </Button>
+            <Button className="min-w-[120px]">
+              <Send className="h-4 w-4 mr-2" />
+              Submit
+            </Button>
           </div>
         </div>
       </div>
@@ -1392,14 +1230,22 @@ export default function PricingEntry() {
               undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={cancelDeleteRow}>
+          <div className="flex justify-end gap-4 mt-6">
+            <Button variant="outline" onClick={() => setRowToDelete(null)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={confirmDeleteRow}>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setGridData((prev) =>
+                  prev.filter((row) => row.id !== rowToDelete)
+                );
+                setRowToDelete(null);
+              }}
+            >
               Delete
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
       {/* Ancillary Charges Edit Modal */}
@@ -1479,88 +1325,106 @@ export default function PricingEntry() {
       </Dialog>
       {/* Paste from Excel Modal */}
       <Dialog open={pasteModalOpen} onOpenChange={setPasteModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>Paste from Excel</DialogTitle>
-            <DialogDescription>
-              Paste your Excel data below. The data should match the column
-              structure of the grid.
-            </DialogDescription>
-          </DialogHeader>
-          {/* Conversion Type Selector */}
-          <div className="mb-4">
-            <Label className="text-sm font-medium text-gray-700 mb-2 block">
-              Conversion Type
-            </Label>
-            <ToggleGroup
-              type="single"
-              value={newRowConversionType}
-              onValueChange={(val) => {
-                if (val) setNewRowConversionType(val as "standard" | "custom");
-              }}
-              className="gap-2"
-            >
-              <ToggleGroupItem value="standard" className="flex-1">
-                <div className="text-center">
-                  <div className="font-medium">Standard</div>
-                  <div className="text-xs text-gray-500">
-                    Use default conversions
-                  </div>
-                </div>
-              </ToggleGroupItem>
-              <ToggleGroupItem value="custom" className="flex-1">
-                <div className="text-center">
-                  <div className="font-medium">Custom</div>
-                  <div className="text-xs text-gray-500">
-                    Use custom conversions
-                  </div>
-                </div>
-              </ToggleGroupItem>
-            </ToggleGroup>
-          </div>
-          {/* Custom Conversion Table if Custom is selected */}
-          {newRowConversionType === "custom" && (
-            <div className="mb-4 border rounded bg-yellow-50 p-3">
-              <div className="mb-2 text-sm text-yellow-800">
-                <strong>
-                  Custom conversion factors will apply to these imported rows
-                  only.
-                </strong>
-              </div>
-              <table className="w-full text-sm mb-2">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="py-1 px-2 text-left">Container Size</th>
-                    <th className="py-1 px-2 text-left">Conversion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {addRowCustomDraft.map((row, idx) => (
-                    <tr key={row.size}>
-                      <td className="py-1 px-2">{row.size}</td>
-                      <td className="py-1 px-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={row.value}
-                          onChange={(e) => {
-                            const newVal = e.target.value;
-                            setAddRowCustomDraft((prev) =>
-                              prev.map((r, i) =>
-                                i === idx ? { ...r, value: newVal } : r
-                              )
-                            );
-                          }}
-                          className="w-24 h-7 text-right text-sm"
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <DialogContent
+          className="absolute inset-0 w-full h-full p-0 flex flex-col bg-white z-50"
+          style={{ transform: "none", left: 0, top: 0 }}
+        >
+          {/* Header */}
+          <div className="fixed top-0 left-0 w-full bg-white border-b px-6 py-4 flex items-center justify-between z-20">
+            <div>
+              <DialogTitle className="text-2xl font-semibold">
+                Paste from Excel
+              </DialogTitle>
+              <DialogDescription className="mt-1 text-base text-gray-600">
+                Paste your Excel data below. The data should match the column
+                structure of the grid.
+              </DialogDescription>
             </div>
-          )}
-          <div className="space-y-4 py-4">
+            <button
+              className="text-gray-400 hover:text-gray-700 text-2xl font-bold focus:outline-none"
+              onClick={() => setPasteModalOpen(false)}
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+          {/* Main Content Scrollable Area */}
+          <div className="flex-1 min-h-0 overflow-auto flex flex-col gap-6 px-6 py-4 mt-[80px] mb-[80px]">
+            {/* Conversion Type Selector */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                Conversion Type
+              </Label>
+              <ToggleGroup
+                type="single"
+                value={newRowConversionType}
+                onValueChange={(val) => {
+                  if (val)
+                    setNewRowConversionType(val as "standard" | "custom");
+                }}
+                className="gap-2"
+              >
+                <ToggleGroupItem value="standard" className="flex-1">
+                  <div className="text-center">
+                    <div className="font-medium">Standard</div>
+                    <div className="text-xs text-gray-500">
+                      Use default conversions
+                    </div>
+                  </div>
+                </ToggleGroupItem>
+                <ToggleGroupItem value="custom" className="flex-1">
+                  <div className="text-center">
+                    <div className="font-medium">Custom</div>
+                    <div className="text-xs text-gray-500">
+                      Use custom conversions
+                    </div>
+                  </div>
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+            {/* Custom Conversion Table if Custom is selected */}
+            {newRowConversionType === "custom" && (
+              <div className="border rounded bg-yellow-50 p-3">
+                <div className="mb-2 text-sm text-yellow-800">
+                  <strong>
+                    Custom conversion factors will apply to these imported rows
+                    only.
+                  </strong>
+                </div>
+                <table className="w-full text-sm mb-2">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="py-1 px-2 text-left">Container Size</th>
+                      <th className="py-1 px-2 text-left">Conversion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {addRowCustomDraft.map((row, idx) => (
+                      <tr key={row.size}>
+                        <td className="py-1 px-2">{row.size}</td>
+                        <td className="py-1 px-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={row.value}
+                            onChange={(e) => {
+                              const newVal = e.target.value;
+                              setAddRowCustomDraft((prev) =>
+                                prev.map((r, i) =>
+                                  i === idx ? { ...r, value: newVal } : r
+                                )
+                              );
+                            }}
+                            className="w-24 h-7 text-right text-sm"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {/* Clipboard Controls */}
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -1589,21 +1453,15 @@ export default function PricingEntry() {
                 Clear
               </Button>
             </div>
-
+            {/* Preview Table */}
             {pastedData.length > 0 && (
-              <div
-                className="border rounded-lg bg-white"
-                style={{ maxWidth: "100%" }}
-              >
+              <div className="border rounded-lg bg-white flex-1 flex flex-col overflow-hidden">
                 <div className="bg-gray-50 px-4 py-2 border-b">
                   <h4 className="text-sm font-medium text-gray-900">
                     Preview ({pastedData.length} rows)
                   </h4>
                 </div>
-                <div
-                  className="max-h-96 overflow-x-auto overflow-y-auto"
-                  style={{ maxWidth: "100%" }}
-                >
+                <div className="flex-1 overflow-x-auto overflow-y-auto">
                   <table className="w-full min-w-max text-sm">
                     <thead className="bg-gray-100 sticky top-0">
                       <tr>
@@ -1635,7 +1493,7 @@ export default function PricingEntry() {
                 </div>
               </div>
             )}
-
+            {/* Instructions */}
             <div className="text-xs text-gray-600">
               <p>
                 <strong>Instructions:</strong>
@@ -1650,7 +1508,8 @@ export default function PricingEntry() {
               </ul>
             </div>
           </div>
-          <DialogFooter>
+          {/* Footer */}
+          <div className="fixed bottom-0 left-0 w-full bg-white border-t px-6 py-4 flex items-center justify-end gap-4 z-20">
             <Button variant="outline" onClick={() => setPasteModalOpen(false)}>
               Cancel
             </Button>
@@ -1667,7 +1526,7 @@ export default function PricingEntry() {
             >
               Add Rows ({pastedData.length})
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

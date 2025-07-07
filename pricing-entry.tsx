@@ -1,7 +1,6 @@
 "use client";
 
-import type React from "react";
-import { useState, useRef, useCallback, useEffect } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +35,7 @@ import {
   Filter,
   Check,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, addYears, parseISO, isValid, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { usePricingService } from "./hooks/usePricingService";
 import { toast } from "sonner";
@@ -52,6 +51,11 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox as UICheckbox } from "@/components/ui/checkbox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+// @ts-ignore: No types for react-date-range
+import { DateRange } from "react-date-range";
+import "react-date-range/dist/styles.css";
+import "react-date-range/dist/theme/default.css";
+import { createPortal } from "react-dom";
 
 interface GridRow {
   id: string;
@@ -71,8 +75,7 @@ interface GridRow {
   billingUomId: string;
   unitPrice: string;
   minimumPrice: string;
-  effectiveDate: string;
-  expirationDate: string;
+  activeDates: { from: string; to: string };
 }
 
 interface CellPosition {
@@ -97,8 +100,7 @@ const initialRow: Omit<GridRow, "id"> = {
   billingUomId: "",
   unitPrice: "",
   minimumPrice: "",
-  effectiveDate: "",
-  expirationDate: "",
+  activeDates: { from: "", to: "" },
 };
 
 const pricingTypes = [
@@ -166,7 +168,7 @@ const columns: {
   key: keyof GridRow;
   label: string;
   width: string;
-  type: "text" | "number" | "select" | "dropdown" | "date";
+  type: "text" | "number" | "select" | "dropdown" | "date" | "daterange";
   required?: boolean;
 }[] = [
   {
@@ -228,16 +230,11 @@ const columns: {
     type: "number",
   },
   {
-    key: "effectiveDate",
-    label: "Effective Date",
-    width: "min-w-[120px]",
-    type: "date",
-  },
-  {
-    key: "expirationDate",
-    label: "Expiration Date",
-    width: "min-w-[120px]",
-    type: "date",
+    key: "activeDates",
+    label: "Active Dates",
+    width: "min-w-[220px]",
+    type: "daterange",
+    required: true,
   },
 ];
 
@@ -258,6 +255,79 @@ const getStandardValue = (size: string) => {
   const found = STANDARD_CONVERSIONS.find((row) => row.size === size);
   return found ? parseFloat(found.value) : 0;
 };
+
+interface DateInputProps {
+  value: { from: string; to: string };
+  onChange: (range: { from: string; to: string }) => void;
+}
+
+function DateInput({ value, onChange }: DateInputProps): React.ReactElement {
+  const [startDate, setStartDate] = React.useState(value?.from || "");
+  const [endDate, setEndDate] = React.useState(value?.to || "");
+
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newStartDate = e.target.value;
+    setStartDate(newStartDate);
+
+    // If we have a valid start date, set end date to 1 year later
+    if (newStartDate && newStartDate.length >= 4) {
+      try {
+        const startDateObj = new Date(newStartDate);
+        if (isValid(startDateObj)) {
+          const endDateObj = addYears(startDateObj, 1);
+          const endDateString = format(endDateObj, "yyyy-MM-dd");
+          setEndDate(endDateString);
+
+          // Update the parent component
+          onChange({
+            from: newStartDate,
+            to: endDateString,
+          });
+          return;
+        }
+      } catch (e) {
+        // Invalid date, continue without updating end date
+      }
+    }
+
+    // Update parent with current values
+    onChange({
+      from: newStartDate,
+      to: endDate,
+    });
+  };
+
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEndDate = e.target.value;
+    setEndDate(newEndDate);
+
+    // Update the parent component
+    onChange({
+      from: startDate,
+      to: newEndDate,
+    });
+  };
+
+  return (
+    <div className="flex gap-2 items-center">
+      <input
+        type="text"
+        value={startDate}
+        onChange={handleStartDateChange}
+        placeholder="Start date"
+        className="w-24 text-sm border-0 p-0 h-full focus:ring-0 bg-transparent"
+      />
+      <span className="text-gray-400 text-sm">-</span>
+      <input
+        type="text"
+        value={endDate}
+        onChange={handleEndDateChange}
+        placeholder="End date"
+        className="w-24 text-sm border-0 p-0 h-full focus:ring-0 bg-transparent"
+      />
+    </div>
+  );
+}
 
 export default function PricingEntry() {
   // All hooks must be declared before any return!
@@ -313,9 +383,6 @@ export default function PricingEntry() {
 
   // Add Row Dialog State
   const [addRowDialogOpen, setAddRowDialogOpen] = useState(false);
-  const [newRowConversionType, setNewRowConversionType] = useState<
-    "standard" | "custom"
-  >("standard");
 
   // Filter state
   const [filterQuote, setFilterQuote] = useState("");
@@ -346,6 +413,10 @@ export default function PricingEntry() {
   );
 
   const [rowToDelete, setRowToDelete] = useState<string | null>(null);
+  const [conversionTypeModalOpen, setConversionTypeModalOpen] = useState(false);
+  const [newRowConversionType, setNewRowConversionType] = useState<
+    "standard" | "custom" | null
+  >(null);
 
   // Add these inside the component, above the return:
   const cancelDeleteRow = () => setRowToDelete(null);
@@ -354,6 +425,65 @@ export default function PricingEntry() {
       setGridData((prev) => prev.filter((row) => row.id !== rowToDelete));
       setRowToDelete(null);
     }
+  };
+
+  const handleAddRow = () => {
+    setConversionTypeModalOpen(true);
+  };
+
+  const handleConversionTypeSelect = (type: "standard" | "custom") => {
+    setNewRowConversionType(type);
+    if (type === "custom") {
+      // Reset custom conversions to standard values
+      setCustomConversions(STANDARD_CONVERSIONS.map((row) => ({ ...row })));
+    }
+  };
+
+  const handleAddRowWithConversion = () => {
+    if (!newRowConversionType) return;
+
+    // Prefill new row with filter values for relevant columns
+    const newRow = {
+      id: nextRowId.current.toString(),
+      ...initialRow,
+      ...Object.fromEntries(
+        Object.entries(activeFilters)
+          .filter(([colKey]) => columns.some((col) => col.key === colKey))
+          .map(([colKey, val]) =>
+            colKey === "activeDates" &&
+            typeof val === "object" &&
+            val &&
+            "from" in val &&
+            "to" in val
+              ? [colKey, val]
+              : [colKey, typeof val === "string" ? val : ""]
+          )
+      ),
+    };
+    nextRowId.current++;
+    setGridData((prev) => [...prev, newRow]);
+
+    // Close modal and reset
+    setConversionTypeModalOpen(false);
+    setNewRowConversionType(null);
+
+    // Focus the new row
+    setTimeout(() => {
+      setSelectedCell({
+        rowIndex: gridData.length,
+        colKey: columns[0].key,
+      });
+      setEditingCell({
+        rowIndex: gridData.length,
+        colKey: columns[0].key,
+      });
+    }, 0);
+  };
+
+  const handleCustomConversionChange = (index: number, value: string) => {
+    setCustomConversions((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, value } : item))
+    );
   };
 
   // Add grid handlers inside the component, above the return:
@@ -498,7 +628,19 @@ export default function PricingEntry() {
       rowData.forEach((cellValue, colIndex) => {
         if (colIndex < columns.length) {
           const colKey = columns[colIndex].key;
-          newRow[colKey] = cellValue.trim();
+          if (colKey === "activeDates") {
+            // Try to parse as date range (e.g. '2024-01-01 - 2024-01-31')
+            const match = cellValue.match(
+              /(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/
+            );
+            if (match) {
+              newRow[colKey] = { from: match[1], to: match[2] };
+            } else {
+              newRow[colKey] = { from: "", to: "" };
+            }
+          } else {
+            newRow[colKey] = cellValue.trim();
+          }
         }
       });
 
@@ -521,7 +663,17 @@ export default function PricingEntry() {
       editingCell?.rowIndex === rowIndex && editingCell?.colKey === col.key;
     const isSelected =
       selectedCell?.rowIndex === rowIndex && selectedCell?.colKey === col.key;
-    const value = row[col.key] || "";
+    const value =
+      col.key === "activeDates"
+        ? row[col.key] &&
+          typeof row[col.key] === "object" &&
+          "from" in row[col.key] &&
+          "to" in row[col.key]
+          ? (row[col.key] as { from: string; to: string })
+          : { from: "", to: "" }
+        : typeof row[col.key] === "string"
+        ? row[col.key]
+        : "";
 
     if (isEditing) {
       if (col.type === "dropdown") {
@@ -537,7 +689,10 @@ export default function PricingEntry() {
             className="px-3 py-2 border-r border-gray-200 relative"
           >
             <div className="absolute inset-0 bg-white border-2 border-blue-500 rounded-sm">
-              <Select value={value} onValueChange={handleInputChange}>
+              <Select
+                value={typeof value === "string" ? value : ""}
+                onValueChange={handleInputChange}
+              >
                 <SelectTrigger className="border-0 p-0 h-full focus:ring-0 text-sm bg-transparent">
                   <SelectValue
                     placeholder={`Select ${col.label.toLowerCase()}`}
@@ -552,43 +707,38 @@ export default function PricingEntry() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="text-sm opacity-0">{value}</div>
+            <div className="text-sm opacity-0">
+              {typeof value === "string" ? value : ""}
+            </div>
           </td>
         );
-      } else if (col.type === "date") {
+      } else if (col.type === "daterange") {
+        const dateValue = value as { from: string; to: string };
         return (
           <td
             key={col.key}
             className="px-3 py-2 border-r border-gray-200 relative"
           >
             <div className="absolute inset-0 bg-white border-2 border-blue-500 rounded-sm">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="border-0 p-0 h-full w-full focus:ring-0 text-sm justify-start font-normal bg-transparent"
-                  >
-                    {value
-                      ? format(new Date(value), "MMM dd, yyyy")
-                      : `Pick a date`}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={value ? new Date(value) : undefined}
-                    onSelect={(date) =>
-                      handleInputChange(date ? format(date, "yyyy-MM-dd") : "")
-                    }
-                    initialFocus
-                    captionLayout="dropdown"
-                    fromYear={2000}
-                    toYear={2100}
-                  />
-                </PopoverContent>
-              </Popover>
+              <DateInput
+                value={dateValue}
+                onChange={(range) => {
+                  setGridData((prev) => {
+                    const updated = [...prev];
+                    updated[rowIndex] = {
+                      ...updated[rowIndex],
+                      [col.key]: range,
+                    };
+                    return updated;
+                  });
+                }}
+              />
             </div>
-            <div className="text-sm opacity-0">{value}</div>
+            <div className="text-sm opacity-0">
+              {dateValue.from && dateValue.to
+                ? `${dateValue.from} - ${dateValue.to}`
+                : ""}
+            </div>
           </td>
         );
       } else if (col.type === "number") {
@@ -600,7 +750,7 @@ export default function PricingEntry() {
             <div className="absolute inset-0 bg-white border-2 border-blue-500 rounded-sm">
               <Input
                 ref={inputRef}
-                value={value}
+                value={typeof value === "string" ? value : ""}
                 onChange={(e) => handleInputChange(e.target.value)}
                 onBlur={handleInputBlur}
                 onKeyDown={handleInputKeyDown}
@@ -610,7 +760,9 @@ export default function PricingEntry() {
                 autoFocus
               />
             </div>
-            <div className="text-sm opacity-0">{value}</div>
+            <div className="text-sm opacity-0">
+              {typeof value === "string" ? value : ""}
+            </div>
           </td>
         );
       } else {
@@ -622,7 +774,7 @@ export default function PricingEntry() {
             <div className="absolute inset-0 bg-white border-2 border-blue-500 rounded-sm">
               <Input
                 ref={inputRef}
-                value={value}
+                value={typeof value === "string" ? value : ""}
                 onChange={(e) => handleInputChange(e.target.value)}
                 onBlur={handleInputBlur}
                 onKeyDown={handleInputKeyDown}
@@ -631,10 +783,40 @@ export default function PricingEntry() {
                 autoFocus
               />
             </div>
-            <div className="text-sm opacity-0">{value}</div>
+            <div className="text-sm opacity-0">
+              {typeof value === "string" ? value : ""}
+            </div>
           </td>
         );
       }
+    }
+
+    if (col.type === "daterange") {
+      const dateValue = value as { from: string; to: string };
+      return (
+        <td
+          key={col.key}
+          className={`px-3 py-2 border-r border-gray-200 cursor-pointer transition-colors ${
+            isSelected ? "bg-blue-50 ring-1 ring-blue-200" : "hover:bg-gray-50"
+          }`}
+          onClick={() => handleCellClick(rowIndex, col.key)}
+          onDoubleClick={() => handleCellDoubleClick(rowIndex, col.key)}
+        >
+          <div className="text-sm min-h-[20px] flex items-center">
+            {dateValue.from &&
+            dateValue.to &&
+            isValid(parseISO(dateValue.from)) &&
+            isValid(parseISO(dateValue.to)) ? (
+              `${format(parseISO(dateValue.from), "MMM dd, yyyy")} - ${format(
+                parseISO(dateValue.to),
+                "MMM dd, yyyy"
+              )}`
+            ) : (
+              <span className="text-gray-400">-</span>
+            )}
+          </div>
+        </td>
+      );
     }
 
     return (
@@ -647,7 +829,11 @@ export default function PricingEntry() {
         onDoubleClick={() => handleCellDoubleClick(rowIndex, col.key)}
       >
         <div className="text-sm min-h-[20px] flex items-center">
-          {value || <span className="text-gray-400">-</span>}
+          {typeof value === "string" ? (
+            value
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
         </div>
       </td>
     );
@@ -682,12 +868,11 @@ export default function PricingEntry() {
 
   // Helper to get unique values for dropdown columns
   const getUniqueValues = (colKey: keyof GridRow) => {
-    const values = Array.from(
-      new Set(
-        gridData.map((row) => row[colKey as keyof GridRow]).filter(Boolean)
-      )
+    const values = gridData.map((row) => row[colKey]);
+    // Only return string values
+    return Array.from(
+      new Set(values.filter((v): v is string => typeof v === "string"))
     );
-    return values;
   };
 
   // All hooks above! Now safe to return early:
@@ -792,16 +977,77 @@ export default function PricingEntry() {
           <div className="flex gap-2">
             <Button variant="outline" size="sm">
               <Download className="h-4 w-4 mr-2" />
-              Export Grid
+              Export Pricing
             </Button>
           </div>
         </div>
+        {/* Applied Filters Section above the grid */}
+        {Object.keys(activeFilters).length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-gray-700 mr-2">
+              Applied Filters:
+            </span>
+            {Object.entries(activeFilters).map(([colKey, value]) => {
+              if (
+                colKey === "activeDates" &&
+                value &&
+                typeof value === "object" &&
+                "from" in value &&
+                "to" in value
+              ) {
+                return (
+                  <span
+                    key={colKey}
+                    className="inline-flex items-center bg-blue-100 text-blue-800 rounded-full px-3 py-1 text-xs font-medium"
+                  >
+                    Active Dates:{" "}
+                    {value.from && value.to
+                      ? `${format(
+                          parseISO(value.from),
+                          "MMM dd, yyyy"
+                        )} - ${format(parseISO(value.to), "MMM dd, yyyy")}`
+                      : "-"}
+                    <button
+                      className="ml-2 text-blue-500 hover:text-blue-700 focus:outline-none"
+                      onClick={() => setFilter(colKey, { from: "", to: "" })}
+                      aria-label={`Remove filter for ${colKey}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                );
+              }
+              return (
+                <span
+                  key={colKey}
+                  className="inline-flex items-center bg-blue-100 text-blue-800 rounded-full px-3 py-1 text-xs font-medium"
+                >
+                  {columns.find((c) => c.key === colKey)?.label}:{" "}
+                  {typeof value === "string" ? value : "-"}
+                  <button
+                    className="ml-2 text-blue-500 hover:text-blue-700 focus:outline-none"
+                    onClick={() => setFilter(colKey, "")}
+                    aria-label={`Remove filter for ${colKey}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+            <button
+              className="ml-2 text-xs text-red-500 hover:text-red-700 underline"
+              onClick={() => setActiveFilters({})}
+            >
+              Clear All
+            </button>
+          </div>
+        )}
         {/* Data Table */}
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
           <div
             className="overflow-x-auto max-h-[65vh] overflow-y-auto"
             tabIndex={0}
-            onKeyDown={handleKeyDown}
+            onKeyDown={filterPopoverOpen ? undefined : handleKeyDown}
             onPaste={(e) => {
               e.preventDefault();
               const clipboardText = e.clipboardData.getData("text");
@@ -827,7 +1073,68 @@ export default function PricingEntry() {
                     >
                       <div className="flex items-center gap-1">
                         <span>{col.label}</span>
-                        <Filter className="h-4 w-4 text-gray-400" />
+                        <Popover
+                          open={filterPopoverOpen === col.key}
+                          onOpenChange={(open) =>
+                            setFilterPopoverOpen(open ? col.key : null)
+                          }
+                        >
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className={
+                                activeFilters[col.key]
+                                  ? "text-blue-600"
+                                  : "text-gray-400 hover:text-gray-700"
+                              }
+                              aria-label={`Filter ${col.label}`}
+                            >
+                              <Filter className="h-4 w-4" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64 p-3">
+                            <div className="mb-2 text-xs font-semibold text-gray-700">
+                              Filter {col.label}
+                            </div>
+                            {col.type === "dropdown" ? (
+                              <DropdownFilter
+                                colKey={col.key}
+                                values={getUniqueValues(
+                                  col.key as keyof GridRow
+                                )}
+                                active={
+                                  Array.isArray(activeFilters[col.key])
+                                    ? (activeFilters[col.key] as string[])
+                                    : []
+                                }
+                                onApply={(selected: string[]) => {
+                                  setFilter(col.key, selected);
+                                  setFilterPopoverOpen(null);
+                                }}
+                                onClear={() => {
+                                  setFilter(col.key, []);
+                                  setFilterPopoverOpen(null);
+                                }}
+                              />
+                            ) : (
+                              <TextFilter
+                                value={
+                                  typeof activeFilters[col.key] === "string"
+                                    ? (activeFilters[col.key] as string)
+                                    : ""
+                                }
+                                onApply={(val: string) => {
+                                  setFilter(col.key, val);
+                                  setFilterPopoverOpen(null);
+                                }}
+                                onClear={() => {
+                                  setFilter(col.key, "");
+                                  setFilterPopoverOpen(null);
+                                }}
+                              />
+                            )}
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </th>
                   ))}
@@ -868,359 +1175,25 @@ export default function PricingEntry() {
         <div className="mt-4 flex justify-center">
           <Button
             className="bg-blue-600 hover:bg-blue-700 text-white"
-            onClick={() => {
-              // Add a new row and immediately start editing the first cell
-              const newRow = {
-                id: nextRowId.current.toString(),
-                ...initialRow,
-              };
-              nextRowId.current++;
-              setGridData((prev) => [...prev, newRow]);
-              setTimeout(() => {
-                setSelectedCell({
-                  rowIndex: gridData.length,
-                  colKey: columns[0].key,
-                });
-                setEditingCell({
-                  rowIndex: gridData.length,
-                  colKey: columns[0].key,
-                });
-              }, 0);
-            }}
+            onClick={handleAddRow}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Row
           </Button>
         </div>
       </div>
+
       {/* Sticky Footer */}
-      <div className="sticky bottom-0 bg-white border-t border-gray-200 shadow-lg">
-        <div className="px-6 py-4">
-          <div className="flex justify-end items-center gap-3">
-            <Button variant="outline" className="min-w-[120px]">
-              <Save className="h-4 w-4 mr-2" />
-              Save Draft
-            </Button>
-            <Button className="min-w-[120px]">
-              <Send className="h-4 w-4 mr-2" />
-              Submit
-            </Button>
-          </div>
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-20">
+        <div className="px-6 py-4 flex items-end justify-end">
+          <Button size="sm" className="bg-black text-white">
+            <Save className="h-4 w-4 mr-2" />
+            Save Pricing
+          </Button>
         </div>
       </div>
-      {/* Dialogs and Modals */}
-      <Dialog open={conversionModalOpen} onOpenChange={setConversionModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {conversionType === "standard"
-                ? "Container Conversion Table (Standard)"
-                : "Container Conversion Table (Custom)"}
-            </DialogTitle>
-          </DialogHeader>
-          {conversionType === "standard" ? (
-            <div>
-              <table className="w-full text-sm mb-2">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="py-1 px-2 text-left">Container Size</th>
-                    <th className="py-1 px-2 text-left">Conversion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {STANDARD_CONVERSIONS.map((row) => (
-                    <tr key={row.size}>
-                      <td className="py-1 px-2">{row.size}</td>
-                      <td className="py-1 px-2">{row.value}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <ul className="mt-3 text-xs text-gray-600 list-disc list-inside">
-                <li>
-                  These conversions apply to all disposal and transportation
-                  items priced per container unless quoted separately.
-                </li>
-                <li>
-                  Numbers are a factor of a 55-gallon drum (e.g., 55-gallon
-                  price × factor = sell price).
-                </li>
-                <li>
-                  The greater of the conversion factor or $40 minimum applies
-                  unless quoted otherwise.
-                </li>
-                <li>
-                  Some waste may have a different minimum, see Non-Standard
-                  Minimum table.
-                </li>
-              </ul>
-            </div>
-          ) : (
-            <div>
-              {customEditMode && (
-                <div className="mb-3 p-2 bg-yellow-100 border-l-4 border-yellow-400 text-yellow-900 rounded">
-                  <strong>Custom Mode:</strong> You are editing conversion
-                  multipliers. Changes will apply to this pricing entry only.
-                </div>
-              )}
-              <table className="w-full text-sm mb-2">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="py-1 px-2 text-left">Container Size</th>
-                    <th className="py-1 px-2 text-left">Conversion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(customEditMode ? customDraft : customConversions).map(
-                    (row, idx) => {
-                      const standard = getStandardValue(row.size);
-                      const custom = parseFloat(row.value);
-                      const diff = custom - standard;
-                      let diffDisplay = null;
-                      if (Math.abs(diff) > 0.0001) {
-                        diffDisplay = (
-                          <span
-                            className={
-                              diff > 0
-                                ? "text-green-600 ml-2 text-xs"
-                                : "text-red-600 ml-2 text-xs"
-                            }
-                          >
-                            {diff > 0 ? "+" : ""}
-                            {diff.toFixed(2)}
-                          </span>
-                        );
-                      }
-                      return (
-                        <tr key={row.size}>
-                          <td className="py-1 px-2">{row.size}</td>
-                          <td className="py-1 px-2 flex items-center">
-                            {customEditMode ? (
-                              <>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  value={row.value}
-                                  onChange={(e) => {
-                                    const newVal = e.target.value;
-                                    setCustomDraft((prev) =>
-                                      prev.map((r, i) =>
-                                        i === idx ? { ...r, value: newVal } : r
-                                      )
-                                    );
-                                  }}
-                                  className="w-24 h-7 text-right text-sm"
-                                />
-                                {diffDisplay}
-                              </>
-                            ) : (
-                              <>
-                                {row.value}
-                                {diffDisplay}
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    }
-                  )}
-                </tbody>
-              </table>
-              <ul className="mt-3 text-xs text-gray-600 list-disc list-inside">
-                <li>
-                  These conversions apply to all disposal and transportation
-                  items priced per container unless quoted separately.
-                </li>
-                <li>
-                  Numbers are a factor of a 55-gallon drum (e.g., 55-gallon
-                  price × factor = sell price).
-                </li>
-                <li>
-                  The greater of the conversion factor or $40 minimum applies
-                  unless quoted otherwise.
-                </li>
-                <li>
-                  Some waste may have a different minimum, see Non-Standard
-                  Minimum table.
-                </li>
-              </ul>
-              <DialogFooter className="mt-4 flex gap-2">
-                {customEditMode ? (
-                  <>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setCustomConversions(
-                          customDraft.map((row) => ({ ...row }))
-                        );
-                        setCustomEditMode(false);
-                        setConversionModalOpen(false);
-                      }}
-                    >
-                      Save
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setCustomEditMode(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setCustomEditMode(true)}
-                  >
-                    Edit
-                  </Button>
-                )}
-                <DialogClose asChild>
-                  <Button size="sm" variant="ghost">
-                    Close
-                  </Button>
-                </DialogClose>
-              </DialogFooter>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={addRowDialogOpen} onOpenChange={setAddRowDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Add New Pricing Row</DialogTitle>
-            <DialogDescription>
-              Select the conversion type for this new pricing row. This will
-              determine how container size conversions are calculated.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div>
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                Conversion Type
-              </Label>
-              <ToggleGroup
-                type="single"
-                value={newRowConversionType}
-                onValueChange={(val) => {
-                  if (val)
-                    setNewRowConversionType(val as "standard" | "custom");
-                }}
-                className="gap-2"
-              >
-                <ToggleGroupItem value="standard" className="flex-1">
-                  <div className="text-center">
-                    <div className="font-medium">Standard</div>
-                    <div className="text-xs text-gray-500">
-                      Use default conversions
-                    </div>
-                  </div>
-                </ToggleGroupItem>
-                <ToggleGroupItem value="custom" className="flex-1">
-                  <div className="text-center">
-                    <div className="font-medium">Custom</div>
-                    <div className="text-xs text-gray-500">
-                      Use custom conversions
-                    </div>
-                  </div>
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-            {newRowConversionType === "custom" && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md mb-2">
-                <div className="text-sm text-yellow-800">
-                  <strong>Note:</strong> Custom conversion factors will apply to
-                  this pricing entry only.
-                </div>
-              </div>
-            )}
-            {/* Conversion Table */}
-            <div>
-              <h4 className="text-xs font-semibold text-gray-700 mb-2">
-                {newRowConversionType === "standard"
-                  ? "Container Conversion Table (Standard)"
-                  : "Container Conversion Table (Custom)"}
-              </h4>
-              <table className="w-full text-sm mb-2">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="py-1 px-2 text-left">Container Size</th>
-                    <th className="py-1 px-2 text-left">Conversion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(newRowConversionType === "standard"
-                    ? STANDARD_CONVERSIONS
-                    : addRowCustomDraft
-                  ).map((row, idx) => (
-                    <tr key={row.size}>
-                      <td className="py-1 px-2">{row.size}</td>
-                      <td className="py-1 px-2">
-                        {newRowConversionType === "custom" ? (
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={row.value}
-                            onChange={(e) => {
-                              const newVal = e.target.value;
-                              setAddRowCustomDraft((prev) =>
-                                prev.map((r, i) =>
-                                  i === idx ? { ...r, value: newVal } : r
-                                )
-                              );
-                            }}
-                            className="w-24 h-7 text-right text-sm"
-                          />
-                        ) : (
-                          row.value
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setAddRowDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (newRowConversionType === "custom") {
-                  setCustomConversions(
-                    addRowCustomDraft.map((row) => ({ ...row }))
-                  );
-                }
-                // Add row logic
-                const newRow: GridRow = {
-                  id: nextRowId.current.toString(),
-                  ...initialRow,
-                  quoteId: filterQuote || "",
-                  generatorId: filterGenerator || "",
-                  contractId: filterContract || "",
-                  jobId: filterJob || "",
-                  effectiveDate: filterEffectiveDate
-                    ? format(filterEffectiveDate, "yyyy-MM-dd")
-                    : "",
-                  expirationDate: filterExpirationDate
-                    ? format(filterExpirationDate, "yyyy-MM-dd")
-                    : "",
-                };
-                nextRowId.current++;
-                setGridData([...gridData, newRow]);
-                setAddRowDialogOpen(false);
-              }}
-            >
-              Add Row
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+      {/* Delete Row Confirmation Dialog */}
       <Dialog open={!!rowToDelete} onOpenChange={() => setRowToDelete(null)}>
         <DialogContent>
           <DialogHeader>
@@ -1230,275 +1203,125 @@ export default function PricingEntry() {
               undone.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end gap-4 mt-6">
-            <Button variant="outline" onClick={() => setRowToDelete(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setGridData((prev) =>
-                  prev.filter((row) => row.id !== rowToDelete)
-                );
-                setRowToDelete(null);
-              }}
-            >
-              Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {/* Ancillary Charges Edit Modal */}
-      <Dialog
-        open={ancillaryChargesModalOpen}
-        onOpenChange={setAncillaryChargesModalOpen}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Ancillary Charges</DialogTitle>
-            <DialogDescription>
-              Adjust the ancillary charges for this pricing entry.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label
-                htmlFor="modal-invoice-min"
-                className="text-sm font-medium text-gray-700"
-              >
-                Invoice Minimum
-              </Label>
-              <Input
-                id="modal-invoice-min"
-                type="number"
-                step="0.01"
-                value={invoiceMinimum}
-                onChange={(e) => setInvoiceMinimum(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label
-                htmlFor="modal-ei-percent"
-                className="text-sm font-medium text-gray-700"
-              >
-                E&I %
-              </Label>
-              <Input
-                id="modal-ei-percent"
-                type="number"
-                step="0.1"
-                value={eiPercent}
-                onChange={(e) => setEiPercent(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label
-                htmlFor="modal-emanifest-fee"
-                className="text-sm font-medium text-gray-700"
-              >
-                e-Manifest Fee
-              </Label>
-              <Input
-                id="modal-emanifest-fee"
-                type="number"
-                step="0.01"
-                value={eManifestFee}
-                onChange={(e) => setEManifestFee(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-          </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setAncillaryChargesModalOpen(false)}
-            >
+            <Button variant="outline" onClick={cancelDeleteRow}>
               Cancel
             </Button>
-            <Button onClick={() => setAncillaryChargesModalOpen(false)}>
-              Save Changes
+            <Button variant="destructive" onClick={confirmDeleteRow}>
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Paste from Excel Modal */}
+
+      {/* Paste Modal */}
       <Dialog open={pasteModalOpen} onOpenChange={setPasteModalOpen}>
-        <DialogContent
-          className="absolute inset-0 w-full h-full p-0 flex flex-col bg-white z-50"
-          style={{ transform: "none", left: 0, top: 0 }}
-        >
-          {/* Header */}
-          <div className="fixed top-0 left-0 w-full bg-white border-b px-6 py-4 flex items-center justify-between z-20">
-            <div>
-              <DialogTitle className="text-2xl font-semibold">
-                Paste from Excel
-              </DialogTitle>
-              <DialogDescription className="mt-1 text-base text-gray-600">
-                Paste your Excel data below. The data should match the column
-                structure of the grid.
-              </DialogDescription>
-            </div>
-            <button
-              className="text-gray-400 hover:text-gray-700 text-2xl font-bold focus:outline-none"
-              onClick={() => setPasteModalOpen(false)}
-              aria-label="Close"
-            >
-              ×
-            </button>
-          </div>
-          {/* Main Content Scrollable Area */}
-          <div className="flex-1 min-h-0 overflow-auto flex flex-col gap-6 px-6 py-4 mt-[80px] mb-[80px]">
+        <DialogContent className="fixed inset-0 w-full h-full max-w-none max-h-none flex flex-col bg-white z-50 rounded-none shadow-none p-0 overflow-auto">
+          <DialogHeader className="px-8 pt-8 pb-4 border-b">
+            <DialogTitle>Paste from Excel</DialogTitle>
+            <DialogDescription>
+              Paste your Excel data below. The data should match the column
+              structure of the grid.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 flex flex-col px-8 py-6 overflow-auto">
             {/* Conversion Type Selector */}
-            <div>
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                Conversion Type
-              </Label>
-              <ToggleGroup
-                type="single"
-                value={newRowConversionType}
-                onValueChange={(val) => {
-                  if (val)
-                    setNewRowConversionType(val as "standard" | "custom");
-                }}
-                className="gap-2"
-              >
-                <ToggleGroupItem value="standard" className="flex-1">
-                  <div className="text-center">
-                    <div className="font-medium">Standard</div>
-                    <div className="text-xs text-gray-500">
-                      Use default conversions
-                    </div>
+            <div className="flex gap-8 mb-4">
+              <div className="flex-1">
+                <button
+                  className={`w-full p-3 rounded-lg border text-left ${
+                    newRowConversionType === "standard"
+                      ? "bg-gray-100 border-gray-300 font-semibold"
+                      : "border-transparent bg-gray-50 text-gray-500"
+                  }`}
+                  onClick={() => setNewRowConversionType("standard")}
+                >
+                  Standard
+                  <div className="text-xs text-gray-500 font-normal">
+                    Use default conversions
                   </div>
-                </ToggleGroupItem>
-                <ToggleGroupItem value="custom" className="flex-1">
-                  <div className="text-center">
-                    <div className="font-medium">Custom</div>
-                    <div className="text-xs text-gray-500">
-                      Use custom conversions
-                    </div>
+                </button>
+              </div>
+              <div className="flex-1">
+                <button
+                  className={`w-full p-3 rounded-lg border text-left ${
+                    newRowConversionType === "custom"
+                      ? "bg-gray-100 border-gray-300 font-semibold"
+                      : "border-transparent bg-gray-50 text-gray-500"
+                  }`}
+                  onClick={() => setNewRowConversionType("custom")}
+                >
+                  Custom
+                  <div className="text-xs text-gray-500 font-normal">
+                    Use custom conversions
                   </div>
-                </ToggleGroupItem>
-              </ToggleGroup>
+                </button>
+              </div>
             </div>
-            {/* Custom Conversion Table if Custom is selected */}
-            {newRowConversionType === "custom" && (
-              <div className="border rounded bg-yellow-50 p-3">
-                <div className="mb-2 text-sm text-yellow-800">
-                  <strong>
-                    Custom conversion factors will apply to these imported rows
-                    only.
-                  </strong>
-                </div>
-                <table className="w-full text-sm mb-2">
+
+            {/* Paste Controls */}
+            <div className="flex gap-2 mb-4">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  const text = await navigator.clipboard.readText();
+                  const rows = text.trim().split("\n");
+                  const parsedData = rows.map((row) => row.split("\t"));
+                  setPastedData(parsedData);
+                }}
+              >
+                <span className="mr-2">📋</span> Get from Clipboard
+              </Button>
+              <Button variant="outline" onClick={() => setPastedData([[]])}>
+                Clear
+              </Button>
+            </div>
+
+            {/* Preview Table */}
+            <div className="mb-4 border rounded-lg bg-gray-50 flex-1 overflow-auto">
+              <div className="px-4 py-2 border-b text-xs font-semibold text-gray-700 bg-gray-100">
+                Preview ({pastedData.length} row
+                {pastedData.length !== 1 ? "s" : ""})
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="py-1 px-2 text-left">Container Size</th>
-                      <th className="py-1 px-2 text-left">Conversion</th>
+                    <tr>
+                      {columns.map((col) => (
+                        <th
+                          key={col.key}
+                          className="px-3 py-2 text-left font-medium text-gray-700 border-r border-gray-200 whitespace-nowrap"
+                        >
+                          {col.label}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {addRowCustomDraft.map((row, idx) => (
-                      <tr key={row.size}>
-                        <td className="py-1 px-2">{row.size}</td>
-                        <td className="py-1 px-2">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={row.value}
-                            onChange={(e) => {
-                              const newVal = e.target.value;
-                              setAddRowCustomDraft((prev) =>
-                                prev.map((r, i) =>
-                                  i === idx ? { ...r, value: newVal } : r
-                                )
-                              );
-                            }}
-                            className="w-24 h-7 text-right text-sm"
-                          />
-                        </td>
+                    {pastedData.map((row, rowIndex) => (
+                      <tr key={rowIndex}>
+                        {columns.map((col, colIndex) => (
+                          <td
+                            key={col.key}
+                            className="px-3 py-2 border-r border-gray-200 text-gray-900 whitespace-nowrap"
+                          >
+                            {row[colIndex] || (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
-            {/* Clipboard Controls */}
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    const text = await navigator.clipboard.readText();
-                    if (text) {
-                      const rows = text.trim().split("\n");
-                      const parsedData = rows.map((row) => row.split("\t"));
-                      setPastedData(parsedData);
-                    }
-                  } catch (err) {
-                    console.error("Failed to read clipboard:", err);
-                  }
-                }}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Get from Clipboard
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPastedData([])}
-              >
-                Clear
-              </Button>
             </div>
-            {/* Preview Table */}
-            {pastedData.length > 0 && (
-              <div className="border rounded-lg bg-white flex-1 flex flex-col overflow-hidden">
-                <div className="bg-gray-50 px-4 py-2 border-b">
-                  <h4 className="text-sm font-medium text-gray-900">
-                    Preview ({pastedData.length} rows)
-                  </h4>
-                </div>
-                <div className="flex-1 overflow-x-auto overflow-y-auto">
-                  <table className="w-full min-w-max text-sm">
-                    <thead className="bg-gray-100 sticky top-0">
-                      <tr>
-                        {columns.map((col, index) => (
-                          <th
-                            key={col.key}
-                            className="px-3 py-2 text-left text-xs font-medium text-gray-700 border-r border-gray-200"
-                          >
-                            {col.label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pastedData.map((row, rowIndex) => (
-                        <tr key={rowIndex} className="border-b border-gray-100">
-                          {columns.map((col, colIndex) => (
-                            <td
-                              key={col.key}
-                              className="px-3 py-2 text-xs border-r border-gray-200"
-                            >
-                              {row[colIndex] || "-"}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+
             {/* Instructions */}
-            <div className="text-xs text-gray-600">
-              <p>
-                <strong>Instructions:</strong>
-              </p>
-              <ul className="list-disc list-inside mt-1 space-y-1">
+            <div className="text-xs text-gray-700 mb-2 mt-4">
+              <div className="font-semibold mb-1">Instructions:</div>
+              <ul className="list-disc pl-5 space-y-1">
                 <li>Copy data from Excel (Ctrl+C)</li>
                 <li>Click "Get from Clipboard" or paste directly (Ctrl+V)</li>
                 <li>
@@ -1508,27 +1331,210 @@ export default function PricingEntry() {
               </ul>
             </div>
           </div>
+
           {/* Footer */}
-          <div className="fixed bottom-0 left-0 w-full bg-white border-t px-6 py-4 flex items-center justify-end gap-4 z-20">
+          <DialogFooter className="flex justify-end gap-2 px-8 pb-8 border-t pt-4 bg-white sticky bottom-0">
             <Button variant="outline" onClick={() => setPasteModalOpen(false)}>
               Cancel
             </Button>
             <Button
-              onClick={() => {
-                if (newRowConversionType === "custom") {
-                  setCustomConversions(
-                    addRowCustomDraft.map((row) => ({ ...row }))
-                  );
-                }
-                applyPastedData();
-              }}
-              disabled={pastedData.length === 0}
+              onClick={applyPastedData}
+              disabled={
+                pastedData.length === 0 ||
+                (pastedData.length === 1 && pastedData[0].length === 0)
+              }
             >
               Add Rows ({pastedData.length})
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Conversion Type Selection Modal */}
+      <Dialog
+        open={conversionTypeModalOpen}
+        onOpenChange={setConversionTypeModalOpen}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Conversion Type</DialogTitle>
+            <DialogDescription>
+              Choose how you want to handle container size conversions for this
+              row.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex gap-4">
+              <button
+                onClick={() => handleConversionTypeSelect("standard")}
+                className={`flex-1 p-4 border rounded-lg text-left transition-colors ${
+                  newRowConversionType === "standard"
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <div className="font-medium text-gray-900">Standard</div>
+                <div className="text-sm text-gray-600 mt-1">
+                  Use predefined conversion factors
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleConversionTypeSelect("custom")}
+                className={`flex-1 p-4 border rounded-lg text-left transition-colors ${
+                  newRowConversionType === "custom"
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <div className="font-medium text-gray-900">Custom</div>
+                <div className="text-sm text-gray-600 mt-1">
+                  Override conversion factors
+                </div>
+              </button>
+            </div>
+
+            {newRowConversionType === "custom" && (
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <h4 className="font-medium text-gray-900 mb-3">
+                  Custom Conversion Factors
+                </h4>
+                <div className="space-y-2">
+                  {customConversions.map((conversion, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <span className="text-sm text-gray-700 min-w-[120px]">
+                        {conversion.size}
+                      </span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={conversion.value}
+                        onChange={(e) =>
+                          handleCustomConversionChange(index, e.target.value)
+                        }
+                        className="w-20 h-8 text-sm"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConversionTypeModalOpen(false);
+                setNewRowConversionType(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddRowWithConversion}
+              disabled={!newRowConversionType}
+            >
+              Add Row
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+interface DropdownFilterProps {
+  colKey: string;
+  values: string[];
+  active: string[];
+  onApply: (selected: string[]) => void;
+  onClear: () => void;
+}
+
+function DropdownFilter({
+  colKey,
+  values,
+  active,
+  onApply,
+  onClear,
+}: DropdownFilterProps): React.ReactElement {
+  // Only allow string values in active
+  const filteredActive = active.filter(
+    (v): v is string => typeof v === "string"
+  );
+  return (
+    <div>
+      <div className="mb-2 flex flex-wrap gap-1">
+        {values.map((val) => (
+          <button
+            key={val}
+            className={`px-2 py-1 rounded text-xs border ${
+              filteredActive.includes(val)
+                ? "bg-blue-100 border-blue-400 text-blue-700"
+                : "border-gray-300 text-gray-700"
+            }`}
+            onClick={() => {
+              if (filteredActive.includes(val)) {
+                onApply(filteredActive.filter((v) => v !== val));
+              } else {
+                onApply([...filteredActive, val]);
+              }
+            }}
+          >
+            {val}
+          </button>
+        ))}
+      </div>
+      <button className="text-xs text-gray-500 underline" onClick={onClear}>
+        Clear
+      </button>
+    </div>
+  );
+}
+
+interface TextFilterProps {
+  value: string;
+  onApply: (val: string) => void;
+  onClear: () => void;
+}
+
+function TextFilter({
+  value,
+  onApply,
+  onClear,
+}: TextFilterProps): React.ReactElement {
+  const [inputValue, setInputValue] = React.useState(value);
+
+  return (
+    <div className="space-y-2">
+      <Input
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        placeholder="Enter filter value..."
+        className="text-sm"
+      />
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          onClick={() => onApply(inputValue)}
+          className="flex-1"
+        >
+          Apply
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            setInputValue("");
+            onClear();
+          }}
+        >
+          Clear
+        </Button>
+      </div>
     </div>
   );
 }

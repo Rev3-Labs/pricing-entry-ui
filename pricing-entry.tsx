@@ -34,6 +34,7 @@ import {
   ArrowRight,
   Filter,
   Check,
+  Filter as FilterIcon,
 } from "lucide-react";
 import { format, addYears, parseISO, isValid, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -827,6 +828,11 @@ export default function PricingEntry() {
         }`}
         onClick={() => handleCellClick(rowIndex, col.key)}
         onDoubleClick={() => handleCellDoubleClick(rowIndex, col.key)}
+        onContextMenu={
+          typeof value === "string" && value.trim() !== ""
+            ? (e) => handleCellContextMenu(e, col.key, value)
+            : undefined
+        }
       >
         <div className="text-sm min-h-[20px] flex items-center">
           {typeof value === "string" ? (
@@ -874,6 +880,55 @@ export default function PricingEntry() {
       new Set(values.filter((v): v is string => typeof v === "string"))
     );
   };
+
+  // Add this handler inside the component
+  const handleFilterByRow = (row: GridRow) => {
+    const newFilters: { [key: string]: any } = {};
+    columns.forEach((col) => {
+      const val = row[col.key];
+      if (col.key === "activeDates") {
+        if (val && typeof val === "object" && val.from && val.to) {
+          newFilters[col.key] = val;
+        }
+      } else if (typeof val === "string" && val.trim() !== "") {
+        newFilters[col.key] = val;
+      }
+    });
+    setActiveFilters(newFilters);
+  };
+
+  // Add state for context menu
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    colKey: keyof GridRow | null;
+    value: string | null;
+  } | null>(null);
+
+  // Handler to open context menu
+  const handleCellContextMenu = (
+    e: React.MouseEvent,
+    colKey: keyof GridRow,
+    value: string | null
+  ) => {
+    e.preventDefault();
+    if (value && value.trim() !== "") {
+      setContextMenu({ x: e.clientX, y: e.clientY, colKey, value });
+    } else {
+      setContextMenu(null);
+    }
+  };
+
+  // Handler to apply filter from context menu
+  const handleApplyFilterFromMenu = () => {
+    if (contextMenu && contextMenu.colKey && contextMenu.value) {
+      setFilter(contextMenu.colKey, contextMenu.value);
+    }
+    setContextMenu(null);
+  };
+
+  // Handler to close context menu
+  const handleCloseContextMenu = () => setContextMenu(null);
 
   // All hooks above! Now safe to return early:
   if (loading && !customers.length) {
@@ -1226,40 +1281,6 @@ export default function PricingEntry() {
           </DialogHeader>
 
           <div className="flex-1 flex flex-col px-8 py-6 overflow-auto">
-            {/* Conversion Type Selector */}
-            <div className="flex gap-8 mb-4">
-              <div className="flex-1">
-                <button
-                  className={`w-full p-3 rounded-lg border text-left ${
-                    newRowConversionType === "standard"
-                      ? "bg-gray-100 border-gray-300 font-semibold"
-                      : "border-transparent bg-gray-50 text-gray-500"
-                  }`}
-                  onClick={() => setNewRowConversionType("standard")}
-                >
-                  Standard
-                  <div className="text-xs text-gray-500 font-normal">
-                    Use default conversions
-                  </div>
-                </button>
-              </div>
-              <div className="flex-1">
-                <button
-                  className={`w-full p-3 rounded-lg border text-left ${
-                    newRowConversionType === "custom"
-                      ? "bg-gray-100 border-gray-300 font-semibold"
-                      : "border-transparent bg-gray-50 text-gray-500"
-                  }`}
-                  onClick={() => setNewRowConversionType("custom")}
-                >
-                  Custom
-                  <div className="text-xs text-gray-500 font-normal">
-                    Use custom conversions
-                  </div>
-                </button>
-              </div>
-            </div>
-
             {/* Paste Controls */}
             <div className="flex gap-2 mb-4">
               <Button
@@ -1442,6 +1463,86 @@ export default function PricingEntry() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Ancillary Charges Edit Modal */}
+      <Dialog
+        open={ancillaryChargesModalOpen}
+        onOpenChange={setAncillaryChargesModalOpen}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Ancillary Charges</DialogTitle>
+            <DialogDescription>
+              Update the ancillary charges for this customer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="block mb-1">Invoice Minimum</Label>
+              <Input
+                type="text"
+                value={invoiceMinimum}
+                onChange={(e) => setInvoiceMinimum(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <Label className="block mb-1">E&amp;I %</Label>
+              <Input
+                type="text"
+                value={eiPercent}
+                onChange={(e) => setEiPercent(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <Label className="block mb-1">e-Manifest Fee</Label>
+              <Input
+                type="text"
+                value={eManifestFee}
+                onChange={(e) => setEManifestFee(e.target.value)}
+                className="w-full"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAncillaryChargesModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => setAncillaryChargesModalOpen(false)}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {contextMenu && (
+        <div
+          style={{
+            position: "fixed",
+            top: contextMenu.y,
+            left: contextMenu.x,
+            zIndex: 10000,
+            background: "white",
+            border: "1px solid #e5e7eb",
+            borderRadius: 6,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+            minWidth: 140,
+            padding: 0,
+          }}
+          onClick={handleCloseContextMenu}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <button
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+            onClick={handleApplyFilterFromMenu}
+          >
+            Apply Filter
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -369,19 +369,6 @@ export default function PricingEntry() {
   const tableRef = useRef<HTMLTableElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [conversionType, setConversionType] = useState<"standard" | "custom">(
-    "standard"
-  );
-  const [customEditMode, setCustomEditMode] = useState(false);
-  const [customConversions, setCustomConversions] = useState(
-    STANDARD_CONVERSIONS.map((row) => ({ ...row }))
-  );
-  const [customDraft, setCustomDraft] = useState(
-    STANDARD_CONVERSIONS.map((row) => ({ ...row }))
-  );
-
-  const [conversionModalOpen, setConversionModalOpen] = useState(false);
-
   // Add Row Dialog State
   const [addRowDialogOpen, setAddRowDialogOpen] = useState(false);
 
@@ -408,16 +395,7 @@ export default function PricingEntry() {
   // Use a client-only incrementing counter for row IDs to avoid hydration mismatch
   const nextRowId = useRef(1); // Start at 1 since we no longer have an initial row
 
-  // Temporary custom conversions for Add Row dialog
-  const [addRowCustomDraft, setAddRowCustomDraft] = useState(
-    STANDARD_CONVERSIONS.map((row) => ({ ...row }))
-  );
-
   const [rowToDelete, setRowToDelete] = useState<string | null>(null);
-  const [conversionTypeModalOpen, setConversionTypeModalOpen] = useState(false);
-  const [newRowConversionType, setNewRowConversionType] = useState<
-    "standard" | "custom" | null
-  >(null);
 
   // Add these inside the component, above the return:
   const cancelDeleteRow = () => setRowToDelete(null);
@@ -429,20 +407,6 @@ export default function PricingEntry() {
   };
 
   const handleAddRow = () => {
-    setConversionTypeModalOpen(true);
-  };
-
-  const handleConversionTypeSelect = (type: "standard" | "custom") => {
-    setNewRowConversionType(type);
-    if (type === "custom") {
-      // Reset custom conversions to standard values
-      setCustomConversions(STANDARD_CONVERSIONS.map((row) => ({ ...row })));
-    }
-  };
-
-  const handleAddRowWithConversion = () => {
-    if (!newRowConversionType) return;
-
     // Prefill new row with filter values for relevant columns
     const newRow = {
       id: nextRowId.current.toString(),
@@ -464,10 +428,6 @@ export default function PricingEntry() {
     nextRowId.current++;
     setGridData((prev) => [...prev, newRow]);
 
-    // Close modal and reset
-    setConversionTypeModalOpen(false);
-    setNewRowConversionType(null);
-
     // Focus the new row
     setTimeout(() => {
       setSelectedCell({
@@ -479,12 +439,6 @@ export default function PricingEntry() {
         colKey: columns[0].key,
       });
     }, 0);
-  };
-
-  const handleCustomConversionChange = (index: number, value: string) => {
-    setCustomConversions((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, value } : item))
-    );
   };
 
   // Add grid handlers inside the component, above the return:
@@ -1058,9 +1012,12 @@ export default function PricingEntry() {
                     Active Dates:{" "}
                     {value.from && value.to
                       ? `${format(
-                          parseISO(value.from),
+                          parseISO(value.from as string),
                           "MMM dd, yyyy"
-                        )} - ${format(parseISO(value.to), "MMM dd, yyyy")}`
+                        )} - ${format(
+                          parseISO(value.to as string),
+                          "MMM dd, yyyy"
+                        )}`
                       : "-"}
                     <button
                       className="ml-2 text-blue-500 hover:text-blue-700 focus:outline-none"
@@ -1366,99 +1323,6 @@ export default function PricingEntry() {
               }
             >
               Add Rows ({pastedData.length})
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Conversion Type Selection Modal */}
-      <Dialog
-        open={conversionTypeModalOpen}
-        onOpenChange={setConversionTypeModalOpen}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Select Conversion Type</DialogTitle>
-            <DialogDescription>
-              Choose how you want to handle container size conversions for this
-              row.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="flex gap-4">
-              <button
-                onClick={() => handleConversionTypeSelect("standard")}
-                className={`flex-1 p-4 border rounded-lg text-left transition-colors ${
-                  newRowConversionType === "standard"
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <div className="font-medium text-gray-900">Standard</div>
-                <div className="text-sm text-gray-600 mt-1">
-                  Use predefined conversion factors
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleConversionTypeSelect("custom")}
-                className={`flex-1 p-4 border rounded-lg text-left transition-colors ${
-                  newRowConversionType === "custom"
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <div className="font-medium text-gray-900">Custom</div>
-                <div className="text-sm text-gray-600 mt-1">
-                  Override conversion factors
-                </div>
-              </button>
-            </div>
-
-            {newRowConversionType === "custom" && (
-              <div className="border rounded-lg p-4 bg-gray-50">
-                <h4 className="font-medium text-gray-900 mb-3">
-                  Custom Conversion Factors
-                </h4>
-                <div className="space-y-2">
-                  {customConversions.map((conversion, index) => (
-                    <div key={index} className="flex items-center gap-3">
-                      <span className="text-sm text-gray-700 min-w-[120px]">
-                        {conversion.size}
-                      </span>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={conversion.value}
-                        onChange={(e) =>
-                          handleCustomConversionChange(index, e.target.value)
-                        }
-                        className="w-20 h-8 text-sm"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setConversionTypeModalOpen(false);
-                setNewRowConversionType(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAddRowWithConversion}
-              disabled={!newRowConversionType}
-            >
-              Add Row
             </Button>
           </DialogFooter>
         </DialogContent>

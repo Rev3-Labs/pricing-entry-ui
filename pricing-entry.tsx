@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +36,8 @@ import {
   Filter,
   Check,
   Filter as FilterIcon,
+  FileSpreadsheet,
+  Search,
 } from "lucide-react";
 import { format, addYears, parseISO, isValid, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -57,6 +60,10 @@ import { DateRange } from "react-date-range";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 import { createPortal } from "react-dom";
+import * as XLSX from "xlsx";
+import { useParams } from "next/navigation";
+import { customerService } from "@/services/customer.service";
+import { PricingUploadDialog } from "@/components/PricingUploadDialog";
 
 interface GridRow {
   id: string;
@@ -331,6 +338,54 @@ function DateInput({ value, onChange }: DateInputProps): React.ReactElement {
 }
 
 export default function PricingEntry() {
+  const router = useRouter();
+  const params = useParams();
+  const customerId = params.customerId as string | undefined;
+  const priceHeaderId = params.priceHeaderId as string | undefined;
+  const [headerName, setHeaderName] = useState<string>("");
+  const [headerLoading, setHeaderLoading] = useState(false);
+
+  useEffect(() => {
+    if (customerId && priceHeaderId) {
+      setHeaderLoading(true);
+      fetch(`/api/customers/${customerId}/pricing/groups/${priceHeaderId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.data) {
+            setHeaderName(data.data.headerName || "");
+            // Map items to gridData format if needed
+            setGridData(
+              (data.data.items || []).map((item: any, idx: number) => ({
+                id: item.priceItemId || String(idx + 1),
+                pricingType: item.pricingType || "",
+                pricePriority: item.pricePriority || "",
+                customerId: item.customerId || customerId || "",
+                productId: item.productId || "",
+                regionId: item.regionId || "",
+                profileId: item.profileId || "",
+                generatorId: item.generatorId || "",
+                contractId: item.contractId || "",
+                quoteId: item.quoteId || "",
+                jobId: item.jobId || "",
+                generatorRegionId: item.generatorRegionId || "",
+                vendorId: item.vendorId || "",
+                containerSizeId: item.containerSizeId || "",
+                billingUomId: item.billingUomId || "",
+                unitPrice: String(item.unitPrice ?? ""),
+                minimumPrice: String(item.minimumPrice ?? ""),
+                activeDates: {
+                  from: item.effectiveDate || "",
+                  to: item.expirationDate || "",
+                },
+              }))
+            );
+          }
+          setHeaderLoading(false);
+        })
+        .catch(() => setHeaderLoading(false));
+    }
+  }, [customerId, priceHeaderId]);
+
   // All hooks must be declared before any return!
   const {
     customers,
@@ -365,6 +420,11 @@ export default function PricingEntry() {
   const [clipboardData, setClipboardData] = useState<string[][]>([]);
   const [pasteModalOpen, setPasteModalOpen] = useState(false);
   const [pastedData, setPastedData] = useState<string[][]>([]);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadedData, setUploadedData] = useState<string[][]>([]);
+  const [uploadFileName, setUploadFileName] = useState<string>("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragActive, setIsDragActive] = useState(false);
 
   const tableRef = useRef<HTMLTableElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -606,6 +666,125 @@ export default function PricingEntry() {
     setGridData((prev) => [...prev, ...newRows]);
     setPasteModalOpen(false);
     setPastedData([]);
+  };
+
+  // Apply uploaded data to grid
+  const applyUploadedData = () => {
+    if (uploadedData.length === 0) return;
+
+    const newRows: GridRow[] = [];
+
+    // Skip the first row (header) and process data rows
+    uploadedData.slice(1).forEach((rowData, rowIndex) => {
+      const newRow: GridRow = {
+        id: (nextRowId.current + rowIndex).toString(),
+        ...initialRow,
+      };
+
+      // Map uploaded data to grid columns
+      rowData.forEach((cellValue, colIndex) => {
+        if (colIndex < columns.length) {
+          const colKey = columns[colIndex].key;
+          if (colKey === "activeDates") {
+            // Try to parse as date range (e.g. '2024-01-01 - 2024-01-31')
+            const match =
+              cellValue &&
+              typeof cellValue === "string" &&
+              cellValue.match(/(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/);
+            if (match) {
+              newRow[colKey] = { from: match[1], to: match[2] };
+            } else {
+              newRow[colKey] = { from: "", to: "" };
+            }
+          } else {
+            newRow[colKey] = cellValue != null ? String(cellValue).trim() : "";
+          }
+        }
+      });
+
+      newRows.push(newRow);
+    });
+
+    nextRowId.current += newRows.length;
+    setGridData((prev) => [...prev, ...newRows]);
+    setUploadModalOpen(false);
+    setUploadedData([]);
+    setUploadFileName("");
+
+    // Show success message
+    toast.success(`Successfully added ${newRows.length} new pricing entries`);
+  };
+
+  // Handle Excel file upload
+  const handleFileUpload = async (file: File) => {
+    if (!file) return;
+
+    // Check file type
+    const validTypes = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+      "application/vnd.ms-excel", // .xls
+      "text/csv", // .csv
+    ];
+
+    if (!validTypes.includes(file.type)) {
+      toast.error("Please upload a valid Excel file (.xlsx, .xls) or CSV file");
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadFileName(file.name);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/parse-excel", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to parse Excel file");
+      }
+
+      const data = await response.json();
+      setUploadedData(data.rows || []);
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      toast.error("Failed to upload Excel file. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Handle file input change
+  const handleFileInputChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+  };
+
+  // Handle drag and drop
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragActive(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragActive(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragActive(false);
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      handleFileUpload(file);
+    }
   };
 
   // Add renderCell after the handlers, before the return:
@@ -884,6 +1063,15 @@ export default function PricingEntry() {
   // Handler to close context menu
   const handleCloseContextMenu = () => setContextMenu(null);
 
+  // Download Excel template with correct headers
+  const handleDownloadTemplate = () => {
+    const headerRow = columns.map((col) => col.label);
+    const worksheet = XLSX.utils.aoa_to_sheet([headerRow]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "PricingTemplate");
+    XLSX.writeFile(workbook, "pricing-template.xlsx");
+  };
+
   // All hooks above! Now safe to return early:
   if (loading && !customers.length) {
     return (
@@ -916,7 +1104,18 @@ export default function PricingEntry() {
         <div className="px-6 py-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           {/* Left: Customer Info */}
           <div className="flex-1 min-w-[260px]">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Pricing</h1>
+            <div className="flex items-center justify-between mb-2">
+              <h1 className="text-2xl font-bold text-gray-900">Pricing</h1>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/customer-search")}
+                className="flex items-center space-x-2"
+              >
+                <Search className="h-4 w-4" />
+                <span>Search Customers</span>
+              </Button>
+            </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
                 Customer Name
@@ -930,7 +1129,7 @@ export default function PricingEntry() {
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 min-w-[280px]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-gray-900 tracking-wide uppercase">
-                ANCILLARY CHARGES
+                PRICING HEADER
               </h3>
               <button
                 className="text-xs text-blue-700 hover:underline focus:outline-none"
@@ -988,8 +1187,27 @@ export default function PricingEntry() {
               <Download className="h-4 w-4 mr-2" />
               Export Pricing
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setUploadModalOpen(true)}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Upload Excel
+            </Button>
           </div>
         </div>
+        {priceHeaderId && (
+          <div className="mb-6">
+            {headerLoading ? (
+              <div className="text-lg font-semibold text-gray-700">
+                Loading price group...
+              </div>
+            ) : (
+              <h2 className="text-2xl font-bold text-gray-900">{headerName}</h2>
+            )}
+          </div>
+        )}
         {/* Applied Filters Section above the grid */}
         {Object.keys(activeFilters).length > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -1328,16 +1546,16 @@ export default function PricingEntry() {
         </DialogContent>
       </Dialog>
 
-      {/* Ancillary Charges Edit Modal */}
+      {/* Pricing Header Edit Modal */}
       <Dialog
         open={ancillaryChargesModalOpen}
         onOpenChange={setAncillaryChargesModalOpen}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Ancillary Charges</DialogTitle>
+            <DialogTitle>Edit Pricing Header</DialogTitle>
             <DialogDescription>
-              Update the ancillary charges for this customer.
+              Update pricing header details for this customer.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

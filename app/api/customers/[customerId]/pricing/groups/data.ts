@@ -3,7 +3,7 @@ let groups: any[] = [
   {
     priceHeaderId: "PH-001",
     customerId: "1",
-    headerName: "Standard Pricing 2024",
+    headerName: "Q-2025-07-10",
     description: "Standard pricing for Acme Corporation",
     effectiveDate: "2024-01-01",
     expirationDate: "2024-12-31",

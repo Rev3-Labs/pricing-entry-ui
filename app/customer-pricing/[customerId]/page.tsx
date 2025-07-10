@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,15 @@ import {
   customerService,
 } from "@/services/customer.service";
 import { PricingSlideover } from "@/components/PricingSlideover";
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+  SheetClose,
+} from "@/components/ui/sheet";
 
 interface FilterState {
   productName: string;
@@ -69,9 +78,18 @@ interface FilterState {
   uom: string;
   quoteName: string;
   projectName: string;
+  generator?: string;
+  facility?: string;
+  contractNumber?: string;
+  containerSize?: string;
+  pricingTier?: string;
+  profileId?: string;
+  createdBy?: string;
+  salesRep?: string;
 }
 
 export default function CustomerPricingPage() {
+  const sheetCloseRef = React.useRef<HTMLButtonElement>(null);
   const params = useParams();
   const router = useRouter();
   const customerId = params.customerId as string;
@@ -177,19 +195,62 @@ export default function CustomerPricingPage() {
         !filters.region ||
         item.region.toLowerCase().includes(filters.region.toLowerCase());
       const matchesStatus =
-        filters.status === "all" || item.status === filters.status;
+        filters.status === "all" ||
+        !filters.status ||
+        item.status.toLowerCase() === filters.status.toLowerCase();
       const matchesUom =
         filters.uom === "all" ||
         !filters.uom ||
-        item.uom?.toLowerCase().includes(filters.uom.toLowerCase());
+        (item.uom &&
+          item.uom.toLowerCase().includes(filters.uom.toLowerCase()));
       const matchesQuote =
         !filters.quoteName ||
-        item.quoteName?.toLowerCase().includes(filters.quoteName.toLowerCase());
+        (item.quoteName &&
+          item.quoteName
+            .toLowerCase()
+            .includes(filters.quoteName.toLowerCase()));
       const matchesProject =
         !filters.projectName ||
-        item.projectName
-          ?.toLowerCase()
-          .includes(filters.projectName.toLowerCase());
+        (item.projectName &&
+          item.projectName
+            .toLowerCase()
+            .includes(filters.projectName.toLowerCase()));
+      const matchesGenerator =
+        !filters.generator ||
+        (item.generatorId &&
+          item.generatorId
+            .toLowerCase()
+            .includes(filters.generator.toLowerCase()));
+      const matchesContract =
+        !filters.contractNumber ||
+        (item.contractId &&
+          item.contractId
+            .toLowerCase()
+            .includes(filters.contractNumber.toLowerCase()));
+      const matchesContainerSize =
+        !filters.containerSize ||
+        (item.containerSize &&
+          item.containerSize
+            .toLowerCase()
+            .includes(filters.containerSize.toLowerCase()));
+      const matchesPricingTier =
+        !filters.pricingTier ||
+        (item.pricingType &&
+          item.pricingType
+            .toLowerCase()
+            .includes(filters.pricingTier.toLowerCase()));
+      const matchesProfileId =
+        !filters.profileId ||
+        (item.profileId &&
+          item.profileId
+            .toLowerCase()
+            .includes(filters.profileId.toLowerCase()));
+      const matchesCreatedBy =
+        !filters.createdBy ||
+        (item.createdByUser &&
+          String(item.createdByUser)
+            .toLowerCase()
+            .includes(filters.createdBy.toLowerCase()));
 
       let matchesDate = true;
       if (filters.dateFrom || filters.dateTo) {
@@ -211,6 +272,12 @@ export default function CustomerPricingPage() {
         matchesUom &&
         matchesQuote &&
         matchesProject &&
+        matchesGenerator &&
+        matchesContract &&
+        matchesContainerSize &&
+        matchesPricingTier &&
+        matchesProfileId &&
+        matchesCreatedBy &&
         matchesDate
       );
     });
@@ -752,25 +819,18 @@ export default function CustomerPricingPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Customer Pricing
+                {customer?.customerName}
               </h1>
               <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-2">
-                  <span className="text-lg font-medium text-gray-900">
-                    {customer.customerName}
-                  </span>
-                </div>
-                {customer.oracleCustomerId && (
+                {customer?.oracleCustomerId && (
                   <Badge variant="secondary">
-                    ({customer.oracleCustomerId})
+                    Oracle: {customer.oracleCustomerId}
                   </Badge>
                 )}
               </div>
             </div>
           </div>
         </div>
-
-        {/* Pricing Items Data Grid */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -833,164 +893,302 @@ export default function CustomerPricingPage() {
                 />
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            {/* Filters Section */}
-            {/* showFilters is no longer needed here as the dialog handles its own filters */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-medium text-gray-900">Filter Options</h4>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearFilters}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  Clear All
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Filters just below the heading */}
+            <Sheet>
+              <div className="flex flex-wrap gap-4 items-end mb-4 mt-4">
+                {/* Quote Number/Name Filter */}
                 <div>
-                  <Label htmlFor="product-filter">Product Name</Label>
+                  <Label>Quote Number/Name</Label>
                   <Input
-                    id="product-filter"
-                    value={filters.productName}
+                    placeholder="Quote number or name..."
+                    value={filters.quoteName}
                     onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        productName: e.target.value,
-                      }))
+                      setFilters((f) => ({ ...f, quoteName: e.target.value }))
                     }
-                    placeholder="Search product name..."
-                    className="mt-1"
+                    className="w-56"
                   />
                 </div>
+                {/* Status Filter */}
                 <div>
-                  <Label htmlFor="region-filter">Region</Label>
-                  <Select
-                    value={filters.region}
-                    onValueChange={(value) =>
-                      setFilters((prev) => ({ ...prev, region: value }))
-                    }
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="All Regions" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Regions</SelectItem>
-                      {uniqueRegions.map((region) => (
-                        <SelectItem key={region} value={region}>
-                          {region}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="status-filter">Status</Label>
+                  <Label>Status</Label>
                   <Select
                     value={filters.status}
                     onValueChange={(value) =>
-                      setFilters((prev) => ({ ...prev, status: value }))
+                      setFilters((f) => ({ ...f, status: value }))
                     }
                   >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="All Statuses" />
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="All" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Draft">Draft</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+                {/* Date Range Filter */}
                 <div>
-                  <Label htmlFor="uom-filter">UOM</Label>
-                  <Select
-                    value={filters.uom}
-                    onValueChange={(value) =>
-                      setFilters((prev) => ({ ...prev, uom: value }))
-                    }
+                  <Label>Effective Date</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="date"
+                      value={filters.dateFrom}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, dateFrom: e.target.value }))
+                      }
+                      className="w-36"
+                    />
+                    <span className="self-center">to</span>
+                    <Input
+                      type="date"
+                      value={filters.dateTo}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, dateTo: e.target.value }))
+                      }
+                      className="w-36"
+                    />
+                  </div>
+                </div>
+                {/* More Filters Button */}
+                <SheetTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700"
                   >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="All UOMs" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All UOMs</SelectItem>
-                      {uniqueUoms.map((uom) => (
-                        <SelectItem key={uom} value={uom}>
-                          {uom}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="quote-filter">Quote Name</Label>
-                  <Input
-                    id="quote-filter"
-                    value={filters.quoteName}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        quoteName: e.target.value,
-                      }))
-                    }
-                    placeholder="Search quote name..."
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="project-filter">Project Name</Label>
-                  <Input
-                    id="project-filter"
-                    value={filters.projectName}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        projectName: e.target.value,
-                      }))
-                    }
-                    placeholder="Search project name..."
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="date-from">Effective Date From</Label>
-                  <Input
-                    id="date-from"
-                    type="date"
-                    value={filters.dateFrom}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        dateFrom: e.target.value,
-                      }))
-                    }
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="date-to">Effective Date To</Label>
-                  <Input
-                    id="date-to"
-                    type="date"
-                    value={filters.dateTo}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        dateTo: e.target.value,
-                      }))
-                    }
-                    className="mt-1"
-                  />
-                </div>
+                    More Filters
+                  </Button>
+                </SheetTrigger>
               </div>
-            </div>
-
+              {/* Active Filters Chips */}
+              {Object.entries(filters).some(
+                ([key, value]) =>
+                  ["all", "", undefined, null].indexOf(value as any) === -1
+              ) && (
+                <div className="mb-4">
+                  <div className="flex flex-wrap gap-2 items-center p-3 rounded-md bg-primary-0-shaded-6 border border-primary-1/20">
+                    {Object.entries(filters)
+                      .filter(
+                        ([key, value]) =>
+                          ["all", "", undefined, null].indexOf(value as any) ===
+                          -1
+                      )
+                      .map(([key, value]) => (
+                        <span
+                          key={key}
+                          className="inline-flex items-center bg-white text-neutral-0 rounded px-2 py-1 text-xs font-medium shadow-sm"
+                        >
+                          {key
+                            .replace(/([A-Z])/g, " $1")
+                            .replace(/^./, (str) => str.toUpperCase())}
+                          : {value}
+                          <button
+                            className="ml-1 text-neutral-0 hover:text-neutral-1"
+                            onClick={() =>
+                              setFilters((f) => ({
+                                ...f,
+                                [key]:
+                                  key === "status" ||
+                                  key === "uom" ||
+                                  key === "region"
+                                    ? "all"
+                                    : "",
+                              }))
+                            }
+                            aria-label={`Remove filter ${key}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    <Button
+                      variant="ghost"
+                      className="ml-2 text-xs h-7 px-3"
+                      onClick={clearFilters}
+                    >
+                      Clear Filters
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <SheetContent
+                side="right"
+                className="max-w-md w-full flex flex-col"
+              >
+                <SheetHeader>
+                  <SheetTitle>Advanced Filters</SheetTitle>
+                </SheetHeader>
+                <div className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto">
+                  {/* Clear Filters Button - positioned at top for easy access */}
+                  <div className="flex justify-end pb-2 border-b border-gray-200">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearFilters}
+                      className="text-sm"
+                    >
+                      Clear All Filters
+                    </Button>
+                  </div>
+                  {/* Product Filter */}
+                  <div>
+                    <Label>Product</Label>
+                    <Input
+                      placeholder="Product name..."
+                      value={filters.productName}
+                      onChange={(e) =>
+                        setFilters((f) => ({
+                          ...f,
+                          productName: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  {/* Generator */}
+                  <div>
+                    <Label>Generator</Label>
+                    <Input
+                      placeholder="Generator..."
+                      value={filters.generator || ""}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, generator: e.target.value }))
+                      }
+                    />
+                  </div>
+                  {/* Facility */}
+                  <div>
+                    <Label>Facility</Label>
+                    <Input
+                      placeholder="Facility..."
+                      value={filters.facility || ""}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, facility: e.target.value }))
+                      }
+                    />
+                  </div>
+                  {/* Contract Number */}
+                  <div>
+                    <Label>Contract Number</Label>
+                    <Input
+                      placeholder="Contract number..."
+                      value={filters.contractNumber || ""}
+                      onChange={(e) =>
+                        setFilters((f) => ({
+                          ...f,
+                          contractNumber: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  {/* Container Size */}
+                  <div>
+                    <Label>Container Size</Label>
+                    <Input
+                      placeholder="Container size..."
+                      value={filters.containerSize || ""}
+                      onChange={(e) =>
+                        setFilters((f) => ({
+                          ...f,
+                          containerSize: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  {/* Unit of Measure (UOM) */}
+                  <div>
+                    <Label>Unit of Measure (UOM)</Label>
+                    <Input
+                      placeholder="UOM..."
+                      value={filters.uom}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, uom: e.target.value }))
+                      }
+                    />
+                  </div>
+                  {/* Project Name */}
+                  <div>
+                    <Label>Project Name</Label>
+                    <Input
+                      placeholder="Project name..."
+                      value={filters.projectName}
+                      onChange={(e) =>
+                        setFilters((f) => ({
+                          ...f,
+                          projectName: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  {/* Pricing Tier */}
+                  <div>
+                    <Label>Pricing Tier</Label>
+                    <Input
+                      placeholder="Pricing tier..."
+                      value={filters.pricingTier || ""}
+                      onChange={(e) =>
+                        setFilters((f) => ({
+                          ...f,
+                          pricingTier: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  {/* Profile ID */}
+                  <div>
+                    <Label>Profile ID</Label>
+                    <Input
+                      placeholder="Profile ID..."
+                      value={filters.profileId || ""}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, profileId: e.target.value }))
+                      }
+                    />
+                  </div>
+                  {/* Created By */}
+                  <div>
+                    <Label>Created By</Label>
+                    <Input
+                      placeholder="Created by..."
+                      value={filters.createdBy || ""}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, createdBy: e.target.value }))
+                      }
+                    />
+                  </div>
+                  {/* Sales Rep */}
+                  <div>
+                    <Label>Sales Rep</Label>
+                    <Input
+                      placeholder="Sales rep..."
+                      value={filters.salesRep || ""}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, salesRep: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="sticky bottom-0 left-0 w-full bg-background border-t flex gap-2 p-4 z-10">
+                  <Button
+                    className="flex-1"
+                    onClick={() => sheetCloseRef.current?.click()}
+                  >
+                    Apply Filters
+                  </Button>
+                  <SheetClose asChild>
+                    <Button
+                      ref={sheetCloseRef}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                  </SheetClose>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </CardHeader>
+          <CardContent>
             {/* View toggle */}
             {/* Remove the viewMode state and toggle buttons */}
             {/* Only render the table view for price items */}
@@ -1029,7 +1227,31 @@ export default function CustomerPricingPage() {
                       // Group header row: quote name in first cell, rest blank but styled
                       <TableRow key={quote + "-header"}>
                         <TableCell className="bg-gray-100 font-bold text-lg text-gray-900">
-                          {quote}
+                          <button
+                            onClick={() => {
+                              // Find the price header ID for this quote
+                              // First try to match by headerName, then by finding items with this quote name
+                              const priceHeader =
+                                priceHeaders.find(
+                                  (header) => header.headerName === quote
+                                ) ||
+                                priceHeaders.find((header) =>
+                                  items.some(
+                                    (item) =>
+                                      item.priceHeaderId ===
+                                      header.priceHeaderId
+                                  )
+                                );
+                              if (priceHeader) {
+                                router.push(
+                                  `/customer-pricing/${customerId}/group/${priceHeader.priceHeaderId}`
+                                );
+                              }
+                            }}
+                            className="hover:text-primary-1 hover:underline cursor-pointer transition-colors"
+                          >
+                            {quote}
+                          </button>
                         </TableCell>
                         {Array.from({ length: 9 }).map((_, i) => (
                           <TableCell key={i} className="bg-gray-100" />
@@ -1063,39 +1285,39 @@ export default function CustomerPricingPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Pricing Upload Dialog */}
-      <PricingSlideover
-        open={createPricingDialogOpen}
-        onOpenChange={setCreatePricingDialogOpen}
-        customerId={customerId}
-        priceHeaders={priceHeaders}
-        onSuccess={() => {
-          // Refresh data after import
-          customerService
-            .getCustomerPriceHeaders(customerId)
-            .then((headersResponse) => {
-              if (headersResponse.success) {
-                setPriceHeaders(headersResponse.data);
-                // Reload all price items
-                const allItems: PriceItem[] = [];
-                Promise.all(
-                  headersResponse.data.map((header) =>
-                    customerService.getPriceHeaderItems(header.priceHeaderId)
-                  )
-                ).then((results) => {
-                  results.forEach((itemsResponse) => {
-                    if (itemsResponse.success) {
-                      allItems.push(...itemsResponse.data);
-                    }
+        {/* Pricing Upload Dialog */}
+        <PricingSlideover
+          open={createPricingDialogOpen}
+          onOpenChange={setCreatePricingDialogOpen}
+          customerId={customerId}
+          priceHeaders={priceHeaders}
+          onSuccess={() => {
+            // Refresh data after import
+            customerService
+              .getCustomerPriceHeaders(customerId)
+              .then((headersResponse) => {
+                if (headersResponse.success) {
+                  setPriceHeaders(headersResponse.data);
+                  // Reload all price items
+                  const allItems: PriceItem[] = [];
+                  Promise.all(
+                    headersResponse.data.map((header) =>
+                      customerService.getPriceHeaderItems(header.priceHeaderId)
+                    )
+                  ).then((results) => {
+                    results.forEach((itemsResponse) => {
+                      if (itemsResponse.success) {
+                        allItems.push(...itemsResponse.data);
+                      }
+                    });
+                    setAllPriceItems(allItems);
                   });
-                  setAllPriceItems(allItems);
-                });
-              }
-            });
-        }}
-      />
+                }
+              });
+          }}
+        />
+      </div>
     </div>
   );
 }

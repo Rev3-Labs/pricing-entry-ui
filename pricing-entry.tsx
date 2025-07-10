@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -38,6 +39,7 @@ import {
   Filter as FilterIcon,
   FileSpreadsheet,
   Search,
+  Settings,
 } from "lucide-react";
 import { format, addYears, parseISO, isValid, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -348,14 +350,26 @@ export default function PricingEntry() {
   useEffect(() => {
     if (customerId && priceHeaderId) {
       setHeaderLoading(true);
-      fetch(`/api/customers/${customerId}/pricing/groups/${priceHeaderId}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success && data.data) {
-            setHeaderName(data.data.headerName || "");
+
+      // Load both customer info and pricing group data
+      Promise.all([
+        customerService.getCustomerInfo(customerId),
+        fetch(
+          `/api/customers/${customerId}/pricing/groups/${priceHeaderId}`
+        ).then((res) => res.json()),
+      ])
+        .then(([customerData, pricingData]) => {
+          // Set customer name
+          if (customerData) {
+            setCustomerName(customerData.customerName || "");
+          }
+
+          // Set pricing header and items
+          if (pricingData.success && pricingData.data) {
+            setHeaderName(pricingData.data.headerName || "");
             // Map items to gridData format if needed
             setGridData(
-              (data.data.items || []).map((item: any, idx: number) => ({
+              (pricingData.data.items || []).map((item: any, idx: number) => ({
                 id: item.priceItemId || String(idx + 1),
                 pricingType: item.pricingType || "",
                 pricePriority: item.pricePriority || "",
@@ -1095,332 +1109,326 @@ export default function PricingEntry() {
     );
   }
 
-  // Restore header section only
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header Section */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        {/* Top Bar */}
-        <div className="px-6 py-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          {/* Left: Customer Info */}
-          <div className="flex-1 min-w-[260px]">
-            <div className="flex items-center justify-between mb-2">
-              <h1 className="text-2xl font-bold text-gray-900">Pricing</h1>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="w-full max-w-[1800px] mx-auto px-2">
+        {/* Header */}
+        <div className="mb-8">
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/customer-search")}
+            className="mb-4 flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back to Search</span>
+          </Button>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                {headerName || "Pricing Entry"}
+              </h1>
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg font-medium text-gray-900">
+                    {customerName || "Loading customer..."}
+                  </span>
+                </div>
+                {customerId && (
+                  <Badge variant="secondary">({customerId})</Badge>
+                )}
+              </div>
+            </div>
+            <Button variant="default" className="flex items-center space-x-2">
+              <Save className="h-4 w-4" />
+              <span>Save Pricing</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Pricing Header Card */}
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center space-x-2">
+                <span>Pricing Header</span>
+              </CardTitle>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => router.push("/customer-search")}
+                onClick={() => setAncillaryChargesModalOpen(true)}
                 className="flex items-center space-x-2"
               >
-                <Search className="h-4 w-4" />
-                <span>Search Customers</span>
+                <Settings className="h-4 w-4" />
+                <span>Edit Header</span>
               </Button>
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Customer Name
-              </h2>
-              <p className="text-sm text-gray-700 mt-1">CN-10001</p>
-              <p className="text-sm text-gray-700">123 Main Street</p>
-              <p className="text-sm text-gray-700">Anytown, ST 12345</p>
-            </div>
-          </div>
-          {/* Right: Ancillary Charges */}
-          <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 min-w-[280px]">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-gray-900 tracking-wide uppercase">
-                PRICING HEADER
-              </h3>
-              <button
-                className="text-xs text-blue-700 hover:underline focus:outline-none"
-                onClick={() => setAncillaryChargesModalOpen(true)}
-              >
-                Edit
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <Label className="text-xs font-medium text-gray-700 block mb-1">
+                <Label className="text-sm font-medium text-gray-700 block mb-2">
                   Invoice Minimum
                 </Label>
-                <div className="h-8 flex items-center text-sm font-medium text-gray-900">
+                <div className="text-lg font-semibold text-gray-900">
                   $500.00
                 </div>
               </div>
               <div>
-                <Label className="text-xs font-medium text-gray-700 block mb-1">
+                <Label className="text-sm font-medium text-gray-700 block mb-2">
                   E&I %
                 </Label>
-                <div className="h-8 flex items-center text-sm font-medium text-gray-900">
-                  2.5%
-                </div>
+                <div className="text-lg font-semibold text-gray-900">2.5%</div>
               </div>
               <div>
-                <Label className="text-xs font-medium text-gray-700 block mb-1">
+                <Label className="text-sm font-medium text-gray-700 block mb-2">
                   e-Manifest Fee
                 </Label>
-                <div className="h-8 flex items-center text-sm font-medium text-gray-900">
+                <div className="text-lg font-semibold text-gray-900">
                   $15.00
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-      {/* Data Grid Section */}
-      <div className="flex-1 p-6">
-        {/* Grid Header with Actions and Stats */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-6">
-            <h2 className="text-lg font-medium text-gray-900">Line Items</h2>
-            <div className="flex items-center gap-4 text-sm text-gray-600">
-              <span>
-                Total: <strong className="text-gray-900">0</strong>
-              </span>
-              <span>
-                Invalid: <strong className="text-gray-900">0</strong>
-              </span>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Export Pricing
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setUploadModalOpen(true)}
-            >
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Upload Excel
-            </Button>
-          </div>
-        </div>
-        {priceHeaderId && (
-          <div className="mb-6">
-            {headerLoading ? (
-              <div className="text-lg font-semibold text-gray-700">
-                Loading price group...
-              </div>
-            ) : (
-              <h2 className="text-2xl font-bold text-gray-900">{headerName}</h2>
-            )}
-          </div>
-        )}
-        {/* Applied Filters Section above the grid */}
-        {Object.keys(activeFilters).length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-gray-700 mr-2">
-              Applied Filters:
-            </span>
-            {Object.entries(activeFilters).map(([colKey, value]) => {
-              if (
-                colKey === "activeDates" &&
-                value &&
-                typeof value === "object" &&
-                "from" in value &&
-                "to" in value
-              ) {
-                return (
-                  <span
-                    key={colKey}
-                    className="inline-flex items-center bg-blue-100 text-blue-800 rounded-full px-3 py-1 text-xs font-medium"
-                  >
-                    Active Dates:{" "}
-                    {value.from && value.to
-                      ? `${format(
-                          parseISO(value.from as string),
-                          "MMM dd, yyyy"
-                        )} - ${format(
-                          parseISO(value.to as string),
-                          "MMM dd, yyyy"
-                        )}`
-                      : "-"}
-                    <button
-                      className="ml-2 text-blue-500 hover:text-blue-700 focus:outline-none"
-                      onClick={() => setFilter(colKey, { from: "", to: "" })}
-                      aria-label={`Remove filter for ${colKey}`}
-                    >
-                      ×
-                    </button>
-                  </span>
-                );
-              }
-              return (
-                <span
-                  key={colKey}
-                  className="inline-flex items-center bg-blue-100 text-blue-800 rounded-full px-3 py-1 text-xs font-medium"
-                >
-                  {columns.find((c) => c.key === colKey)?.label}:{" "}
-                  {typeof value === "string" ? value : "-"}
-                  <button
-                    className="ml-2 text-blue-500 hover:text-blue-700 focus:outline-none"
-                    onClick={() => setFilter(colKey, "")}
-                    aria-label={`Remove filter for ${colKey}`}
-                  >
-                    ×
-                  </button>
-                </span>
-              );
-            })}
-            <button
-              className="ml-2 text-xs text-red-500 hover:text-red-700 underline"
-              onClick={() => setActiveFilters({})}
-            >
-              Clear All
-            </button>
-          </div>
-        )}
-        {/* Data Table */}
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-          <div
-            className="overflow-x-auto max-h-[65vh] overflow-y-auto"
-            tabIndex={0}
-            onKeyDown={filterPopoverOpen ? undefined : handleKeyDown}
-            onPaste={(e) => {
-              e.preventDefault();
-              const clipboardText = e.clipboardData.getData("text");
-              if (!clipboardText) return;
-              const rows = clipboardText.trim().split("\n");
-              const parsedData = rows.map((row) => row.split("\t"));
-              setPastedData(parsedData);
-              setPasteModalOpen(true);
-            }}
-          >
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 sticky top-0 z-10">
-                <tr>
-                  <th className="px-3 py-3 text-left font-medium text-gray-900 border-r border-gray-200 w-10 bg-gray-50">
-                    <div className="flex items-center justify-center">
-                      <span className="text-xs text-gray-500">#</span>
-                    </div>
-                  </th>
-                  {columns.map((col) => (
-                    <th
-                      key={col.key}
-                      className={`px-3 py-3 text-left font-medium text-gray-900 border-r border-gray-200 ${col.width} bg-gray-50`}
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>{col.label}</span>
-                        <Popover
-                          open={filterPopoverOpen === col.key}
-                          onOpenChange={(open) =>
-                            setFilterPopoverOpen(open ? col.key : null)
-                          }
-                        >
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              className={
-                                activeFilters[col.key]
-                                  ? "text-blue-600"
-                                  : "text-gray-400 hover:text-gray-700"
-                              }
-                              aria-label={`Filter ${col.label}`}
-                            >
-                              <Filter className="h-4 w-4" />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-64 p-3">
-                            <div className="mb-2 text-xs font-semibold text-gray-700">
-                              Filter {col.label}
-                            </div>
-                            {col.type === "dropdown" ? (
-                              <DropdownFilter
-                                colKey={col.key}
-                                values={getUniqueValues(
-                                  col.key as keyof GridRow
-                                )}
-                                active={
-                                  Array.isArray(activeFilters[col.key])
-                                    ? (activeFilters[col.key] as string[])
-                                    : []
-                                }
-                                onApply={(selected: string[]) => {
-                                  setFilter(col.key, selected);
-                                  setFilterPopoverOpen(null);
-                                }}
-                                onClear={() => {
-                                  setFilter(col.key, []);
-                                  setFilterPopoverOpen(null);
-                                }}
-                              />
-                            ) : (
-                              <TextFilter
-                                value={
-                                  typeof activeFilters[col.key] === "string"
-                                    ? (activeFilters[col.key] as string)
-                                    : ""
-                                }
-                                onApply={(val: string) => {
-                                  setFilter(col.key, val);
-                                  setFilterPopoverOpen(null);
-                                }}
-                                onClear={() => {
-                                  setFilter(col.key, "");
-                                  setFilterPopoverOpen(null);
-                                }}
-                              />
-                            )}
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredGridData.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={columns.length + 1}
-                      className="px-3 py-8 text-center text-gray-500"
-                    >
-                      No pricing rows found. Click "Add Row" to get started.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredGridData.map((row, rowIndex) => (
-                    <tr key={row.id}>
-                      <td className="px-3 py-2 border-r border-gray-200 text-sm text-gray-700 flex items-center gap-2">
-                        {rowIndex + 1}
-                        <button
-                          className="ml-2 text-red-500 hover:text-red-700 focus:outline-none"
-                          onClick={() => setRowToDelete(row.id)}
-                          aria-label="Delete row"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                      {columns.map((col) => renderCell(row, rowIndex, col))}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {/* Add Row Button */}
-        <div className="mt-4 flex justify-center">
-          <Button
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-            onClick={handleAddRow}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Row
-          </Button>
-        </div>
-      </div>
+          </CardContent>
+        </Card>
 
-      {/* Sticky Footer */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-20">
-        <div className="px-6 py-4 flex items-end justify-end">
-          <Button size="sm" className="bg-black text-white">
-            <Save className="h-4 w-4 mr-2" />
-            Save Pricing
-          </Button>
-        </div>
+        {/* Line Items Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center space-x-2">
+                <span>Line Items</span>
+                <Badge variant="outline">{filteredGridData.length} items</Badge>
+              </CardTitle>
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setUploadModalOpen(true)}
+                  className="flex items-center space-x-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span>Upload Excel</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center space-x-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Export Pricing</span>
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {/* Applied Filters Section */}
+            {Object.keys(activeFilters).length > 0 && (
+              <div className="mb-4">
+                <div className="flex flex-wrap gap-2 p-3 rounded-md bg-primary-0-shaded-6 border border-primary-1/20">
+                  {Object.entries(activeFilters).map(([colKey, value]) => {
+                    if (
+                      colKey === "activeDates" &&
+                      value &&
+                      typeof value === "object" &&
+                      "from" in value &&
+                      "to" in value
+                    ) {
+                      return (
+                        <span
+                          key={colKey}
+                          className="inline-flex items-center bg-white text-neutral-0 rounded px-2 py-1 text-xs font-medium shadow-sm"
+                        >
+                          Active Dates:{" "}
+                          {value.from && value.to
+                            ? `${format(
+                                parseISO(value.from as string),
+                                "MMM dd, yyyy"
+                              )} - ${format(
+                                parseISO(value.to as string),
+                                "MMM dd, yyyy"
+                              )}`
+                            : "-"}
+                          <button
+                            className="ml-1 text-neutral-0 hover:text-neutral-1"
+                            onClick={() =>
+                              setFilter(colKey, { from: "", to: "" })
+                            }
+                            aria-label={`Remove filter for ${colKey}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    }
+                    return (
+                      <span
+                        key={colKey}
+                        className="inline-flex items-center bg-white text-neutral-0 rounded px-2 py-1 text-xs font-medium shadow-sm"
+                      >
+                        {columns.find((c) => c.key === colKey)?.label}:{" "}
+                        {typeof value === "string" ? value : "-"}
+                        <button
+                          className="ml-1 text-neutral-0 hover:text-neutral-1"
+                          onClick={() => setFilter(colKey, "")}
+                          aria-label={`Remove filter for ${colKey}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
+                  <Button
+                    variant="ghost"
+                    className="ml-2 text-xs h-7 px-3"
+                    onClick={() => setActiveFilters({})}
+                  >
+                    Clear All Filters
+                  </Button>
+                </div>
+              </div>
+            )}
+            {/* Data Table */}
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+              <div
+                className="overflow-x-auto max-h-[65vh] overflow-y-auto"
+                tabIndex={0}
+                onKeyDown={filterPopoverOpen ? undefined : handleKeyDown}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const clipboardText = e.clipboardData.getData("text");
+                  if (!clipboardText) return;
+                  const rows = clipboardText.trim().split("\n");
+                  const parsedData = rows.map((row) => row.split("\t"));
+                  setPastedData(parsedData);
+                  setPasteModalOpen(true);
+                }}
+              >
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 sticky top-0 z-10">
+                    <tr>
+                      <th className="px-3 py-3 text-left font-medium text-gray-900 border-r border-gray-200 w-10 bg-gray-50">
+                        <div className="flex items-center justify-center">
+                          <span className="text-xs text-gray-500">#</span>
+                        </div>
+                      </th>
+                      {columns.map((col) => (
+                        <th
+                          key={col.key}
+                          className={`px-3 py-3 text-left font-medium text-gray-900 border-r border-gray-200 ${col.width} bg-gray-50`}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{col.label}</span>
+                            <Popover
+                              open={filterPopoverOpen === col.key}
+                              onOpenChange={(open) =>
+                                setFilterPopoverOpen(open ? col.key : null)
+                              }
+                            >
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className={
+                                    activeFilters[col.key]
+                                      ? "text-blue-600"
+                                      : "text-gray-400 hover:text-gray-700"
+                                  }
+                                  aria-label={`Filter ${col.label}`}
+                                >
+                                  <Filter className="h-4 w-4" />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 p-3">
+                                <div className="mb-2 text-xs font-semibold text-gray-700">
+                                  Filter {col.label}
+                                </div>
+                                {col.type === "dropdown" ? (
+                                  <DropdownFilter
+                                    colKey={col.key}
+                                    values={getUniqueValues(
+                                      col.key as keyof GridRow
+                                    )}
+                                    active={
+                                      Array.isArray(activeFilters[col.key])
+                                        ? (activeFilters[col.key] as string[])
+                                        : []
+                                    }
+                                    onApply={(selected: string[]) => {
+                                      setFilter(col.key, selected);
+                                      setFilterPopoverOpen(null);
+                                    }}
+                                    onClear={() => {
+                                      setFilter(col.key, []);
+                                      setFilterPopoverOpen(null);
+                                    }}
+                                  />
+                                ) : (
+                                  <TextFilter
+                                    value={
+                                      typeof activeFilters[col.key] === "string"
+                                        ? (activeFilters[col.key] as string)
+                                        : ""
+                                    }
+                                    onApply={(val: string) => {
+                                      setFilter(col.key, val);
+                                      setFilterPopoverOpen(null);
+                                    }}
+                                    onClear={() => {
+                                      setFilter(col.key, "");
+                                      setFilterPopoverOpen(null);
+                                    }}
+                                  />
+                                )}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredGridData.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={columns.length + 1}
+                          className="px-3 py-8 text-center text-gray-500"
+                        >
+                          No pricing rows found. Click "Add Row" to get started.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredGridData.map((row, rowIndex) => (
+                        <tr key={row.id}>
+                          <td className="px-3 py-2 border-r border-gray-200 text-sm text-gray-700 flex items-center gap-2">
+                            {rowIndex + 1}
+                            <button
+                              className="ml-2 text-red-500 hover:text-red-700 focus:outline-none"
+                              onClick={() => setRowToDelete(row.id)}
+                              aria-label="Delete row"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                          {columns.map((col) => renderCell(row, rowIndex, col))}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            {/* Add Row Button */}
+            <div className="mt-4 flex justify-center">
+              <Button
+                onClick={handleAddRow}
+                className="flex items-center space-x-2 bg-primary-0 hover:bg-primary-1 text-white border-primary-0 hover:border-primary-1"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Row</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Delete Row Confirmation Dialog */}
@@ -1541,6 +1549,112 @@ export default function PricingEntry() {
               }
             >
               Add Rows ({pastedData.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upload Excel Modal */}
+      <Dialog open={uploadModalOpen} onOpenChange={setUploadModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Excel File</DialogTitle>
+            <DialogDescription>
+              Upload an Excel file to add new pricing entries.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium">Upload Excel File</Label>
+              <div className="mt-2 border-2 border-dashed rounded-lg p-6 text-center">
+                <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600">
+                    Drag and drop an Excel file here, or{" "}
+                    <label className="text-primary-1 hover:text-primary-2 cursor-pointer">
+                      browse
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={handleFileInputChange}
+                      />
+                    </label>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Supports .xlsx, .xls, and .csv files
+                  </p>
+                </div>
+                {uploadFileName && (
+                  <div className="mt-2 text-sm text-gray-700">
+                    Selected: {uploadFileName}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadTemplate}
+                className="flex items-center space-x-2"
+              >
+                <Download className="h-4 w-4" />
+                <span>Download Template</span>
+              </Button>
+            </div>
+
+            {uploadedData.length > 0 && (
+              <div>
+                <Label className="text-sm font-medium block mb-2">
+                  Preview ({uploadedData.length} rows)
+                </Label>
+                <div className="border rounded-lg overflow-hidden max-h-32 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        {columns.slice(0, 5).map((col) => (
+                          <th
+                            key={col.key}
+                            className="px-2 py-1 text-left font-medium text-gray-700"
+                          >
+                            {col.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {uploadedData.slice(0, 3).map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {columns.slice(0, 5).map((col, colIndex) => (
+                            <td
+                              key={col.key}
+                              className="px-2 py-1 text-gray-900"
+                            >
+                              {row[colIndex] || "-"}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={applyUploadedData}
+              disabled={uploadedData.length === 0 || isUploading}
+            >
+              {isUploading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Add {uploadedData.length} Rows
             </Button>
           </DialogFooter>
         </DialogContent>

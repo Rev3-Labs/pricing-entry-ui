@@ -31,6 +31,8 @@ import {
   Check,
   Maximize2,
   X as CloseIcon,
+  Sparkles,
+  PenSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -278,15 +280,26 @@ export function PricingSlideover({
         <Card
           className={`cursor-pointer transition-all ${
             pricingType === "new"
-              ? "ring-2 ring-blue-500 bg-blue-50"
-              : "hover:bg-gray-50"
+              ? "ring-2 ring-primary-1 bg-primary-1/10"
+              : "hover:bg-primary-1/5"
           }`}
           onClick={() => setPricingType("new")}
         >
           <CardContent className="p-6">
             <div className="flex items-start space-x-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <FileSpreadsheet className="w-6 h-6 text-blue-600" />
+              <div
+                className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                  pricingType === "new" ? "bg-primary-1/20" : "bg-primary-1/5"
+                }`}
+              >
+                <FileSpreadsheet
+                  className={`w-6 h-6 ${
+                    pricingType === "new"
+                      ? "text-primary-1"
+                      : "text-primary-1/70"
+                  }`}
+                />
+                <Sparkles className="w-4 h-4 text-primary-1 ml-1 -mt-4" />
               </div>
               <div className="flex-1">
                 <h4 className="font-semibold text-gray-900 mb-1">
@@ -298,7 +311,7 @@ export function PricingSlideover({
                 </p>
               </div>
               {pricingType === "new" && (
-                <Check className="w-5 h-5 text-blue-600" />
+                <Check className="w-5 h-5 text-primary-1" />
               )}
             </div>
           </CardContent>
@@ -307,15 +320,27 @@ export function PricingSlideover({
         <Card
           className={`cursor-pointer transition-all ${
             pricingType === "addendum"
-              ? "ring-2 ring-blue-500 bg-blue-50"
-              : "hover:bg-gray-50"
+              ? "ring-2 ring-primary-1 bg-primary-1/10"
+              : "hover:bg-primary-1/5"
           }`}
           onClick={() => setPricingType("addendum")}
         >
           <CardContent className="p-6">
             <div className="flex items-start space-x-4">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Upload className="w-6 h-6 text-green-600" />
+              <div
+                className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                  pricingType === "addendum"
+                    ? "bg-primary-1/20"
+                    : "bg-primary-1/5"
+                }`}
+              >
+                <PenSquare
+                  className={`w-6 h-6 ${
+                    pricingType === "addendum"
+                      ? "text-primary-1"
+                      : "text-primary-1/70"
+                  }`}
+                />
               </div>
               <div className="flex-1">
                 <h4 className="font-semibold text-gray-900 mb-1">
@@ -326,7 +351,7 @@ export function PricingSlideover({
                 </p>
               </div>
               {pricingType === "addendum" && (
-                <Check className="w-5 h-5 text-blue-600" />
+                <Check className="w-5 h-5 text-primary-1" />
               )}
             </div>
           </CardContent>

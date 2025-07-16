@@ -8,7 +8,7 @@ interface CreatePricingItem {
   minimumPrice: number;
   effectiveDate: string;
   expirationDate: string;
-  status: "active" | "inactive" | "pending" | "draft";
+  status: "active" | "in-progress" | "new";
   quoteName?: string;
   projectName?: string;
   uom?: string;

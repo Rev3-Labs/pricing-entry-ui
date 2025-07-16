@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -38,8 +39,18 @@ import {
   Check,
   Filter as FilterIcon,
   FileSpreadsheet,
+  FileText,
   Search,
   Settings,
+  UserPlus,
+  MessageSquare,
+  User,
+  StickyNote,
+  X,
+  File,
+  FileImage,
+  FileSpreadsheet as FileExcel,
+  FileText as FileWord,
 } from "lucide-react";
 import { format, addYears, parseISO, isValid, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -92,6 +103,60 @@ interface CellPosition {
   rowIndex: number;
   colKey: keyof GridRow;
 }
+
+interface AssignmentModalState {
+  isOpen: boolean;
+  selectedTeamMember: string;
+  notes: string;
+}
+
+interface Note {
+  id: string;
+  content: string;
+  author: string;
+  timestamp: string;
+}
+
+interface NotesSidebarState {
+  isOpen: boolean;
+  newNote: string;
+}
+
+interface Document {
+  id: string;
+  name: string;
+  type:
+    | "pdf"
+    | "doc"
+    | "docx"
+    | "xls"
+    | "xlsx"
+    | "jpg"
+    | "jpeg"
+    | "png"
+    | "gif"
+    | "bmp"
+    | "webp";
+  size: number;
+  uploadedBy: string;
+  timestamp: string;
+  url?: string;
+}
+
+interface DocumentsSidebarState {
+  isOpen: boolean;
+  isUploading: boolean;
+  isDragOver: boolean;
+}
+
+// Available team members
+const TEAM_MEMBERS = [
+  "Sarah Johnson",
+  "David Brown",
+  "Michael Chen",
+  "Emily Rodriguez",
+  "Alex Thompson",
+];
 
 const initialRow: Omit<GridRow, "id"> = {
   pricingType: "",
@@ -346,6 +411,10 @@ export default function PricingEntry() {
   const priceHeaderId = params.priceHeaderId as string | undefined;
   const [headerName, setHeaderName] = useState<string>("");
   const [headerLoading, setHeaderLoading] = useState(false);
+  const [currentAssignment, setCurrentAssignment] = useState<{
+    assignedTeamMember: string;
+    assignmentNotes?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (customerId && priceHeaderId) {
@@ -367,6 +436,16 @@ export default function PricingEntry() {
           // Set pricing header and items
           if (pricingData.success && pricingData.data) {
             setHeaderName(pricingData.data.headerName || "");
+
+            // Set assignment data if available
+            if (pricingData.data.assignment) {
+              setCurrentAssignment({
+                assignedTeamMember:
+                  pricingData.data.assignment.assignedTeamMember || "",
+                assignmentNotes: pricingData.data.assignment.assignmentNotes,
+              });
+            }
+
             // Map items to gridData format if needed
             setGridData(
               (pricingData.data.items || []).map((item: any, idx: number) => ({
@@ -470,6 +549,110 @@ export default function PricingEntry() {
   const nextRowId = useRef(1); // Start at 1 since we no longer have an initial row
 
   const [rowToDelete, setRowToDelete] = useState<string | null>(null);
+
+  // Assignment modal state
+  const [assignmentModal, setAssignmentModal] = useState<AssignmentModalState>({
+    isOpen: false,
+    selectedTeamMember: "",
+    notes: "",
+  });
+
+  // Notes sidebar state
+  const [notesSidebar, setNotesSidebar] = useState<NotesSidebarState>({
+    isOpen: false,
+    newNote: "",
+  });
+
+  // Mock notes data
+  const [notes, setNotes] = useState<Note[]>([
+    {
+      id: "1",
+      content:
+        "Customer requested expedited processing for this quote. High priority.",
+      author: "Sarah Johnson",
+      timestamp: "2024-02-15T10:30:00Z",
+    },
+    {
+      id: "2",
+      content:
+        "Pricing structure updated to include new regional rates for Q2 2024.",
+      author: "David Brown",
+      timestamp: "2024-02-14T14:20:00Z",
+    },
+    {
+      id: "3",
+      content: "Quote assigned to Sarah for review and final approval.",
+      author: "Mike Wilson",
+      timestamp: "2024-02-13T09:15:00Z",
+    },
+    {
+      id: "4",
+      content:
+        "Customer mentioned potential volume increase in Q3. Consider bulk pricing options.",
+      author: "Sarah Johnson",
+      timestamp: "2024-02-12T16:45:00Z",
+    },
+  ]);
+
+  // Documents sidebar state
+  const [documentsSidebar, setDocumentsSidebar] =
+    useState<DocumentsSidebarState>({
+      isOpen: false,
+      isUploading: false,
+      isDragOver: false,
+    });
+
+  // Mock documents data
+  const [documents, setDocuments] = useState<Document[]>([
+    {
+      id: "1",
+      name: "Customer_Requirements.pdf",
+      type: "pdf",
+      size: 2457600, // 2.4MB
+      uploadedBy: "Sarah Johnson",
+      timestamp: "2024-02-15T10:30:00Z",
+    },
+    {
+      id: "2",
+      name: "Pricing_Proposal.docx",
+      type: "docx",
+      size: 512000, // 512KB
+      uploadedBy: "David Brown",
+      timestamp: "2024-02-14T14:20:00Z",
+    },
+    {
+      id: "3",
+      name: "Volume_Analysis.xlsx",
+      type: "xlsx",
+      size: 1024000, // 1MB
+      uploadedBy: "Mike Wilson",
+      timestamp: "2024-02-13T09:15:00Z",
+    },
+    {
+      id: "4",
+      name: "Contract_Template.doc",
+      type: "doc",
+      size: 768000, // 768KB
+      uploadedBy: "Sarah Johnson",
+      timestamp: "2024-02-12T16:45:00Z",
+    },
+    {
+      id: "5",
+      name: "Site_Photo.jpg",
+      type: "jpg",
+      size: 1536000, // 1.5MB
+      uploadedBy: "Sarah Johnson",
+      timestamp: "2024-02-11T11:20:00Z",
+    },
+    {
+      id: "6",
+      name: "Equipment_Diagram.png",
+      type: "png",
+      size: 896000, // 896KB
+      uploadedBy: "David Brown",
+      timestamp: "2024-02-10T15:45:00Z",
+    },
+  ]);
 
   // Add these inside the component, above the return:
   const cancelDeleteRow = () => setRowToDelete(null);
@@ -1086,6 +1269,183 @@ export default function PricingEntry() {
     XLSX.writeFile(workbook, "pricing-template.xlsx");
   };
 
+  // Assignment handlers
+  const handleAssignClick = () => {
+    setAssignmentModal({
+      isOpen: true,
+      selectedTeamMember: currentAssignment?.assignedTeamMember || "",
+      notes: currentAssignment?.assignmentNotes || "",
+    });
+  };
+
+  const handleAssignmentSubmit = async () => {
+    if (!assignmentModal.selectedTeamMember) return;
+
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      console.log(
+        `Assigning quote ${priceHeaderId} to ${assignmentModal.selectedTeamMember} with notes: ${assignmentModal.notes}`
+      );
+
+      // Update local state
+      setCurrentAssignment({
+        assignedTeamMember: assignmentModal.selectedTeamMember,
+        assignmentNotes: assignmentModal.notes || undefined,
+      });
+
+      // Close modal
+      setAssignmentModal({
+        isOpen: false,
+        selectedTeamMember: "",
+        notes: "",
+      });
+
+      const action = currentAssignment?.assignedTeamMember
+        ? "reassigned"
+        : "assigned";
+      toast.success(`Quote ${action} to ${assignmentModal.selectedTeamMember}`);
+    } catch (error) {
+      console.error("Failed to assign quote:", error);
+      toast.error("Failed to assign quote. Please try again.");
+    }
+  };
+
+  const handleAssignmentCancel = () => {
+    setAssignmentModal({
+      isOpen: false,
+      selectedTeamMember: "",
+      notes: "",
+    });
+  };
+
+  // Notes handlers
+  const handleNotesToggle = () => {
+    setNotesSidebar((prev) => ({ ...prev, isOpen: !prev.isOpen }));
+  };
+
+  const handleAddNote = () => {
+    if (!notesSidebar.newNote.trim()) return;
+
+    const newNote: Note = {
+      id: Date.now().toString(),
+      content: notesSidebar.newNote.trim(),
+      author: "Sarah Johnson", // Current user
+      timestamp: new Date().toISOString(),
+    };
+
+    setNotes((prev) => [newNote, ...prev]);
+    setNotesSidebar((prev) => ({ ...prev, newNote: "" }));
+    toast.success("Note added successfully");
+  };
+
+  const handleDeleteNote = (noteId: string) => {
+    setNotes((prev) => prev.filter((note) => note.id !== noteId));
+    toast.success("Note deleted");
+  };
+
+  // Documents handlers
+  const handleDocumentsToggle = () => {
+    setDocumentsSidebar((prev) => ({ ...prev, isOpen: !prev.isOpen }));
+  };
+
+  const handleDocumentUpload = async (file: File) => {
+    if (!file) return;
+
+    // Check file type
+    const validTypes = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/bmp",
+      "image/webp",
+    ];
+
+    if (!validTypes.includes(file.type)) {
+      toast.error(
+        "Please upload a valid document (PDF, Word, Excel) or image (JPG, PNG, GIF, BMP, WebP)"
+      );
+      return;
+    }
+
+    // Check file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File size must be less than 10MB");
+      return;
+    }
+
+    setDocumentsSidebar((prev) => ({ ...prev, isUploading: true }));
+
+    try {
+      // Simulate upload
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const newDocument: Document = {
+        id: Date.now().toString(),
+        name: file.name,
+        type: file.name.split(".").pop()?.toLowerCase() as Document["type"],
+        size: file.size,
+        uploadedBy: "Sarah Johnson",
+        timestamp: new Date().toISOString(),
+      };
+
+      setDocuments((prev) => [newDocument, ...prev]);
+      toast.success(`Document "${file.name}" uploaded successfully`);
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      toast.error("Failed to upload document. Please try again.");
+    } finally {
+      setDocumentsSidebar((prev) => ({ ...prev, isUploading: false }));
+    }
+  };
+
+  const handleDocumentDelete = (documentId: string) => {
+    setDocuments((prev) => prev.filter((doc) => doc.id !== documentId));
+    toast.success("Document deleted");
+  };
+
+  const handleDocumentDownload = (document: Document) => {
+    // Simulate download
+    console.log(`Downloading document: ${document.name}`);
+    toast.success(`Downloading "${document.name}"`);
+  };
+
+  const getDocumentIcon = (type: Document["type"]) => {
+    switch (type) {
+      case "pdf":
+        return <FileText className="h-5 w-5 text-red-500" />;
+      case "doc":
+      case "docx":
+        return <FileWord className="h-5 w-5 text-blue-500" />;
+      case "xls":
+      case "xlsx":
+        return <FileExcel className="h-5 w-5 text-green-500" />;
+      case "jpg":
+      case "jpeg":
+      case "png":
+      case "gif":
+      case "bmp":
+      case "webp":
+        return <FileImage className="h-5 w-5 text-purple-500" />;
+      default:
+        return <File className="h-5 w-5 text-gray-500" />;
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
   // All hooks above! Now safe to return early:
   if (loading && !customers.length) {
     return (
@@ -1116,33 +1476,87 @@ export default function PricingEntry() {
         <div className="mb-8">
           <Button
             variant="ghost"
-            onClick={() => router.push("/customer-search")}
+            onClick={() => router.push("/customer-pricing/1")}
             className="mb-4 flex items-center space-x-2 text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>Back to Search</span>
+            <span>Back</span>
           </Button>
 
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                {headerName || "Pricing Entry"}
+                {headerName || "Pricing Entry"}{" "}
+                {priceHeaderId && (
+                  <Badge variant="secondary">({priceHeaderId})</Badge>
+                )}
               </h1>
               <div className="flex items-center space-x-2">
                 <div className="flex items-center space-x-2">
                   <span className="text-lg font-medium text-gray-900">
                     {customerName || "Loading customer..."}
                   </span>
+                  {customerId && (
+                    <Badge variant="outline">({customerId})</Badge>
+                  )}
                 </div>
-                {customerId && (
-                  <Badge variant="secondary">({customerId})</Badge>
-                )}
               </div>
             </div>
-            <Button variant="default" className="flex items-center space-x-2">
-              <Save className="h-4 w-4" />
-              <span>Save Pricing</span>
-            </Button>
+            <div className="flex space-x-2 items-center">
+              {/* Assignment Button */}
+              <Button
+                variant="outline"
+                onClick={handleAssignClick}
+                className="flex items-center space-x-2"
+              >
+                {currentAssignment ? (
+                  <>
+                    <User className="h-4 w-4" />
+                    <span>
+                      Assigned: {currentAssignment.assignedTeamMember}
+                    </span>
+                    {currentAssignment.assignedTeamMember ===
+                      "Sarah Johnson" && (
+                      <Badge
+                        variant="secondary"
+                        className="text-xs bg-green-600 text-white"
+                      >
+                        Me
+                      </Badge>
+                    )}
+                    {currentAssignment.assignmentNotes && (
+                      <MessageSquare className="h-4 w-4 text-blue-500" />
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="h-4 w-4" />
+                    <span>Assign Quote</span>
+                  </>
+                )}
+              </Button>
+              {/* Notes, Documents, Save Buttons */}
+              <Button
+                variant="outline"
+                onClick={handleNotesToggle}
+                className="flex items-center space-x-2"
+              >
+                <StickyNote className="h-4 w-4" />
+                <span>Notes ({notes.length})</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDocumentsToggle}
+                className="flex items-center space-x-2"
+              >
+                <File className="h-4 w-4" />
+                <span>Documents ({documents.length})</span>
+              </Button>
+              <Button variant="default" className="flex items-center space-x-2">
+                <Save className="h-4 w-4" />
+                <span>Save Pricing</span>
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -1714,6 +2128,369 @@ export default function PricingEntry() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Assignment Modal */}
+      <Dialog
+        open={assignmentModal.isOpen}
+        onOpenChange={handleAssignmentCancel}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Quote</DialogTitle>
+            <DialogDescription>
+              Assign this quote to a team member and optionally add notes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Quote Info */}
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm font-medium text-gray-900">
+                {headerName || "Pricing Entry"}
+              </div>
+              <div className="text-sm text-gray-600">
+                {customerName || "Loading customer..."}
+              </div>
+              {currentAssignment?.assignedTeamMember && (
+                <div className="text-sm text-blue-600 mt-1">
+                  Currently assigned to: {currentAssignment.assignedTeamMember}
+                </div>
+              )}
+            </div>
+
+            {/* Team Member Selection */}
+            <div>
+              <Label htmlFor="team-member">Assign to</Label>
+              <Select
+                value={assignmentModal.selectedTeamMember}
+                onValueChange={(value) =>
+                  setAssignmentModal((prev) => ({
+                    ...prev,
+                    selectedTeamMember: value,
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select team member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TEAM_MEMBERS.map((member) => (
+                    <SelectItem key={member} value={member}>
+                      {member}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Notes */}
+            <div>
+              <Label htmlFor="notes">Notes (optional)</Label>
+              <Textarea
+                id="notes"
+                placeholder="Add any notes about this assignment..."
+                value={assignmentModal.notes}
+                onChange={(e) =>
+                  setAssignmentModal((prev) => ({
+                    ...prev,
+                    notes: e.target.value,
+                  }))
+                }
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleAssignmentCancel}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAssignmentSubmit}
+              disabled={!assignmentModal.selectedTeamMember}
+            >
+              Assign Quote
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Documents Sidebar */}
+      {documentsSidebar.isOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black bg-opacity-25 transition-opacity"
+            onClick={handleDocumentsToggle}
+          />
+
+          {/* Sidebar */}
+          <div className="absolute right-0 top-0 h-full w-96 bg-white shadow-xl transform transition-transform">
+            <div className="flex flex-col h-full">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b">
+                <div className="flex items-center space-x-2">
+                  <File className="h-5 w-5 text-blue-600" />
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Documents
+                  </h2>
+                  <Badge variant="secondary" className="text-xs">
+                    {documents.length}
+                  </Badge>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDocumentsToggle}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Upload Section */}
+              <div className="p-4 border-b bg-gray-50">
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">
+                    Upload Document
+                  </Label>
+                  <div
+                    className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+                      documentsSidebar.isDragOver
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-300 hover:border-gray-400"
+                    }`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDocumentsSidebar((prev) => ({
+                        ...prev,
+                        isDragOver: true,
+                      }));
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      setDocumentsSidebar((prev) => ({
+                        ...prev,
+                        isDragOver: false,
+                      }));
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDocumentsSidebar((prev) => ({
+                        ...prev,
+                        isDragOver: false,
+                      }));
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) handleDocumentUpload(file);
+                    }}
+                  >
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.bmp,.webp"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleDocumentUpload(file);
+                      }}
+                      className="hidden"
+                      id="document-upload"
+                      disabled={documentsSidebar.isUploading}
+                    />
+                    <label
+                      htmlFor="document-upload"
+                      className="cursor-pointer block"
+                    >
+                      <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">
+                        {documentsSidebar.isUploading ? (
+                          <span className="flex items-center justify-center">
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Uploading...
+                          </span>
+                        ) : documentsSidebar.isDragOver ? (
+                          <span>Drop file to upload</span>
+                        ) : (
+                          <span>Click to upload or drag and drop</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        PDF, Word, Excel, Images (max 10MB)
+                      </p>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Documents List */}
+              <div className="flex-1 overflow-y-auto p-4">
+                {documents.length === 0 ? (
+                  <div className="text-center py-8">
+                    <File className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 text-sm">No documents yet</p>
+                    <p className="text-gray-400 text-xs">
+                      Upload your first document above
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {documents.map((document) => (
+                      <div
+                        key={document.id}
+                        className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            {getDocumentIcon(document.type)}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {document.name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {formatFileSize(document.size)} •{" "}
+                                {format(
+                                  parseISO(document.timestamp),
+                                  "MMM dd, yyyy"
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDocumentDownload(document)}
+                              className="h-6 w-6 p-0 text-gray-400 hover:text-blue-500"
+                            >
+                              <Download className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDocumentDelete(document.id)}
+                              className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex items-center text-xs text-gray-500">
+                          <User className="h-3 w-3 mr-1" />
+                          {document.uploadedBy}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notes Sidebar */}
+      {notesSidebar.isOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black bg-opacity-25 transition-opacity"
+            onClick={handleNotesToggle}
+          />
+
+          {/* Sidebar */}
+          <div className="absolute right-0 top-0 h-full w-96 bg-white shadow-xl transform transition-transform">
+            <div className="flex flex-col h-full">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b">
+                <div className="flex items-center space-x-2">
+                  <StickyNote className="h-5 w-5 text-blue-600" />
+                  <h2 className="text-lg font-semibold text-gray-900">Notes</h2>
+                  <Badge variant="secondary" className="text-xs">
+                    {notes.length}
+                  </Badge>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleNotesToggle}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Add Note Section */}
+              <div className="p-4 border-b bg-gray-50">
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">
+                    Add New Note
+                  </Label>
+                  <Textarea
+                    placeholder="Type your note here..."
+                    value={notesSidebar.newNote}
+                    onChange={(e) =>
+                      setNotesSidebar((prev) => ({
+                        ...prev,
+                        newNote: e.target.value,
+                      }))
+                    }
+                    rows={3}
+                    className="resize-none"
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      onClick={handleAddNote}
+                      disabled={!notesSidebar.newNote.trim()}
+                    >
+                      Add Note
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes List */}
+              <div className="flex-1 overflow-y-auto p-4">
+                {notes.length === 0 ? (
+                  <div className="text-center py-8">
+                    <StickyNote className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 text-sm">No notes yet</p>
+                    <p className="text-gray-400 text-xs">
+                      Add your first note above
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {notes.map((note) => (
+                      <div
+                        key={note.id}
+                        className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-gray-500">
+                              {format(
+                                parseISO(note.timestamp),
+                                "MMM dd, yyyy 'at' h:mm a"
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-700 mb-2">
+                          {note.content}
+                        </p>
+                        <div className="flex items-center text-xs text-gray-500">
+                          <User className="h-3 w-3 mr-1" />
+                          {note.author}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {contextMenu && (
         <div
           style={{

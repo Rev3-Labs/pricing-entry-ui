@@ -39,7 +39,7 @@ export interface PriceHeader {
   description?: string;
   effectiveDate: string;
   expirationDate: string;
-  status: "active" | "inactive" | "pending" | "draft";
+  status: "active" | "in-progress" | "new";
   termsAndConditionsId?: string;
   invoiceMinimum?: number;
   container55gMinimum?: number;
@@ -66,7 +66,7 @@ export interface PriceItem {
   minimumPrice: number;
   effectiveDate: string;
   expirationDate: string;
-  status: "active" | "inactive" | "pending";
+  status: "active" | "in-progress" | "new";
   quoteName?: string;
   projectName?: string;
   uom?: string;
@@ -172,7 +172,7 @@ export class CustomerService {
           description: "Draft pricing for Q2 2024",
           effectiveDate: "2024-04-01",
           expirationDate: "2024-06-30",
-          status: "draft",
+          status: "in-progress",
           invoiceMinimum: 600.0,
           container55gMinimum: 250.0,
           absoluteContainerMinimum: 120.0,
@@ -277,7 +277,7 @@ export class CustomerService {
           minimumPrice: 550.0,
           effectiveDate: "2024-01-01",
           expirationDate: "2024-12-31",
-          status: "pending",
+          status: "in-progress",
           quoteName: "Q-2024-004",
           projectName: "Clean Earth Southeast",
           uom: "Per Ton",
@@ -343,7 +343,7 @@ export class CustomerService {
         description: "Standard pricing for Acme Corporation",
         effectiveDate: "2024-01-01",
         expirationDate: "2024-12-31",
-        status: "active",
+        status: "new",
         invoiceMinimum: 500.0,
         container55gMinimum: 200.0,
         absoluteContainerMinimum: 100.0,

@@ -6,7 +6,7 @@ interface ImportPriceHeader {
   description?: string;
   effectiveDate: string;
   expirationDate: string;
-  status: "active" | "inactive" | "pending" | "draft";
+  status: "active" | "in-progress" | "new";
   invoiceMinimum?: number;
   container55gMinimum?: number;
   absoluteContainerMinimum?: number;

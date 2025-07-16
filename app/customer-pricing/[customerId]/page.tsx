@@ -315,7 +315,8 @@ export default function CustomerPricingPage() {
   }, [filteredPriceItems]);
 
   const handleBack = () => {
-    router.back();
+    //router.back();
+    router.push(`/`);
   };
 
   const handleTypeSelection = (type: "new" | "addendum") => {
@@ -707,12 +708,12 @@ export default function CustomerPricingPage() {
     switch (status) {
       case "active":
         return <Badge className="bg-green-100 text-green-800">Active</Badge>;
-      case "inactive":
-        return <Badge variant="secondary">Inactive</Badge>;
-      case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
-      case "draft":
-        return <Badge className="bg-gray-100 text-gray-800">Draft</Badge>;
+      case "in-progress":
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800">In-Progress</Badge>
+        );
+      case "new":
+        return <Badge className="bg-gray-100 text-gray-800">New</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -813,7 +814,7 @@ export default function CustomerPricingPage() {
             className="mb-4 flex items-center space-x-2 text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>Back to Search</span>
+            <span>Back</span>
           </Button>
 
           <div className="flex items-center justify-between">
@@ -923,8 +924,8 @@ export default function CustomerPricingPage() {
                     <SelectContent>
                       <SelectItem value="all">All</SelectItem>
                       <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="Pending">Pending</SelectItem>
-                      <SelectItem value="Draft">Draft</SelectItem>
+                      <SelectItem value="In-Progress">In-Progress</SelectItem>
+                      <SelectItem value="New">New</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

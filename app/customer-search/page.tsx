@@ -6,7 +6,7 @@ import { CustomerSearch, Customer } from "@/components/customer-search";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Building2, User, Hash } from "lucide-react";
+import { ArrowLeft, Building2, User, Hash, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 export default function CustomerSearchPage() {
@@ -53,6 +53,16 @@ export default function CustomerSearchPage() {
               Search for customers by name or Oracle Customer ID to access their
               pricing information and manage their account settings.
             </p>
+            <div className="mt-4 flex justify-center space-x-4">
+              <Button
+                variant="outline"
+                onClick={() => router.push("/quote-queue")}
+                className="flex items-center space-x-2"
+              >
+                <FileText className="h-4 w-4" />
+                <span>View Quote Queue</span>
+              </Button>
+            </div>
           </div>
         </div>
 

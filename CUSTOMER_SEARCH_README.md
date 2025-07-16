@@ -109,7 +109,7 @@ interface CustomerPricing {
   minimumPrice: number;
   effectiveDate: string;
   expirationDate: string;
-  status: "active" | "inactive" | "pending";
+  status: "active" | "in-progress" | "new";
 }
 ```
 

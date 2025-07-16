@@ -117,7 +117,7 @@ export default function CustomerPricingPage() {
   >("upload");
   const [pricingType, setPricingType] = useState<"new" | "addendum">("new");
   const [selectedPriceHeader, setSelectedPriceHeader] = useState<string>("");
-  const [pricingGroupName, setPricingGroupName] = useState("");
+  const [pricingQuoteName, setPricingQuoteName] = useState("");
   const [headerTemplate, setHeaderTemplate] = useState("custom");
   const [customHeaderFields, setCustomHeaderFields] = useState({
     description: "",
@@ -305,13 +305,13 @@ export default function CustomerPricingPage() {
 
   // Group filteredPriceItems by quote name
   const groupedByQuote = useMemo(() => {
-    const groups: { [quote: string]: PriceItem[] } = {};
+    const quotes: { [quote: string]: PriceItem[] } = {};
     filteredPriceItems.forEach((item) => {
       const quote = item.quoteName || "Q-2024-001";
-      if (!groups[quote]) groups[quote] = [];
-      groups[quote].push(item);
+      if (!quotes[quote]) quotes[quote] = [];
+      quotes[quote].push(item);
     });
-    return groups;
+    return quotes;
   }, [filteredPriceItems]);
 
   const handleBack = () => {
@@ -326,7 +326,7 @@ export default function CustomerPricingPage() {
     if (type === "addendum") {
       setSelectedPriceHeader(""); // Clear selected price header for addendum
     } else {
-      setPricingGroupName(""); // Clear pricing group name for new pricing
+      setPricingQuoteName(""); // Clear pricing quote name for new pricing
       setHeaderTemplate(""); // Clear header template for new pricing
       setCustomHeaderFields({
         description: "",
@@ -359,12 +359,12 @@ export default function CustomerPricingPage() {
         }
         formData.append("priceHeaderId", selectedPriceHeader);
       } else {
-        if (!pricingGroupName.trim()) {
-          toast.error("Please enter a pricing group name for new pricing");
+        if (!pricingQuoteName.trim()) {
+          toast.error("Please enter a pricing quote name for new pricing");
           setIsImporting(false);
           return;
         }
-        formData.append("pricingGroupName", pricingGroupName);
+        formData.append("pricingQuoteName", pricingQuoteName);
         formData.append("headerTemplate", headerTemplate);
         formData.append(
           "customHeaderFields",
@@ -387,7 +387,7 @@ export default function CustomerPricingPage() {
         setCreatePricingDialogOpen(false);
         setSelectedFile(null);
         setUploadedData([]);
-        setPricingGroupName("");
+        setPricingQuoteName("");
         setHeaderTemplate("");
         setCustomHeaderFields({
           description: "",
@@ -474,8 +474,8 @@ export default function CustomerPricingPage() {
   };
 
   const handleNewPricingSubmit = async () => {
-    if (!pricingGroupName.trim()) {
-      toast.error("Please enter a pricing group name");
+    if (!pricingQuoteName.trim()) {
+      toast.error("Please enter a pricing quote name");
       return;
     }
 
@@ -484,7 +484,7 @@ export default function CustomerPricingPage() {
       const formData = new FormData();
       formData.append("file", selectedFile!);
       formData.append("type", "new");
-      formData.append("pricingGroupName", pricingGroupName);
+      formData.append("pricingQuoteName", pricingQuoteName);
       formData.append("headerTemplate", headerTemplate);
       formData.append("customHeaderFields", JSON.stringify(customHeaderFields));
 
@@ -503,7 +503,7 @@ export default function CustomerPricingPage() {
         setCreatePricingDialogOpen(false);
         setSelectedFile(null);
         setUploadedData([]);
-        setPricingGroupName("");
+        setPricingQuoteName("");
         setHeaderTemplate("");
         setCustomHeaderFields({
           description: "",
@@ -766,7 +766,7 @@ export default function CustomerPricingPage() {
     setUploadedData([]);
     setPricingType("new");
     setSelectedPriceHeader("");
-    setPricingGroupName("");
+    setPricingQuoteName("");
     setHeaderTemplate("custom");
     setCustomHeaderFields({
       description: "",
@@ -1225,7 +1225,7 @@ export default function CustomerPricingPage() {
                     </TableRow>
                   ) : (
                     Object.entries(groupedByQuote).map(([quote, items]) => [
-                      // Group header row: quote name in first cell, rest blank but styled
+                      // Quote header row: quote name in first cell, rest blank but styled
                       <TableRow key={quote + "-header"}>
                         <TableCell className="bg-gray-100 font-bold text-lg text-gray-900">
                           <button
@@ -1245,7 +1245,7 @@ export default function CustomerPricingPage() {
                                 );
                               if (priceHeader) {
                                 router.push(
-                                  `/customer-pricing/${customerId}/group/${priceHeader.priceHeaderId}`
+                                  `/customer-pricing/${customerId}/quote/${priceHeader.priceHeaderId}`
                                 );
                               }
                             }}
@@ -1258,7 +1258,7 @@ export default function CustomerPricingPage() {
                           <TableCell key={i} className="bg-gray-100" />
                         ))}
                       </TableRow>,
-                      // Group line items
+                      // Quote line items
                       ...items.map((item) => (
                         <TableRow key={item.priceItemId}>
                           <TableCell />

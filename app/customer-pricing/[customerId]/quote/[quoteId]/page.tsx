@@ -54,7 +54,7 @@ import {
 } from "lucide-react";
 import { format, addYears, parseISO, isValid, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
-import { usePricingService } from "./hooks/usePricingService";
+import { usePricingService } from "@/hooks/usePricingService";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -408,7 +408,7 @@ export default function PricingEntry() {
   const router = useRouter();
   const params = useParams();
   const customerId = params.customerId as string | undefined;
-  const priceHeaderId = params.priceHeaderId as string | undefined;
+  const quoteId = params.quoteId as string | undefined;
   const [headerName, setHeaderName] = useState<string>("");
   const [headerLoading, setHeaderLoading] = useState(false);
   const [currentAssignment, setCurrentAssignment] = useState<{
@@ -417,15 +417,15 @@ export default function PricingEntry() {
   } | null>(null);
 
   useEffect(() => {
-    if (customerId && priceHeaderId) {
+    if (customerId && quoteId) {
       setHeaderLoading(true);
 
-      // Load both customer info and pricing group data
+      // Load both customer info and pricing quote data
       Promise.all([
         customerService.getCustomerInfo(customerId),
-        fetch(
-          `/api/customers/${customerId}/pricing/groups/${priceHeaderId}`
-        ).then((res) => res.json()),
+        fetch(`/api/customers/${customerId}/pricing/quotes/${quoteId}`).then(
+          (res) => res.json()
+        ),
       ])
         .then(([customerData, pricingData]) => {
           // Set customer name
@@ -477,7 +477,7 @@ export default function PricingEntry() {
         })
         .catch(() => setHeaderLoading(false));
     }
-  }, [customerId, priceHeaderId]);
+  }, [customerId, quoteId]);
 
   // All hooks must be declared before any return!
   const {
@@ -1285,7 +1285,7 @@ export default function PricingEntry() {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 500));
       console.log(
-        `Assigning quote ${priceHeaderId} to ${assignmentModal.selectedTeamMember} with notes: ${assignmentModal.notes}`
+        `Assigning quote ${quoteId} to ${assignmentModal.selectedTeamMember} with notes: ${assignmentModal.notes}`
       );
 
       // Update local state
@@ -1476,7 +1476,7 @@ export default function PricingEntry() {
         <div className="mb-8">
           <Button
             variant="ghost"
-            onClick={() => router.push("/customer-pricing/1")}
+            onClick={() => router.push(`/customer-pricing/${customerId}`)}
             className="mb-4 flex items-center space-x-2 text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -1487,9 +1487,7 @@ export default function PricingEntry() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {headerName || "Pricing Entry"}{" "}
-                {priceHeaderId && (
-                  <Badge variant="secondary">({priceHeaderId})</Badge>
-                )}
+                {quoteId && <Badge variant="secondary">({quoteId})</Badge>}
               </h1>
               <div className="flex items-center space-x-2">
                 <div className="flex items-center space-x-2">

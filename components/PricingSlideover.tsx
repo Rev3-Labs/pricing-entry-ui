@@ -211,7 +211,7 @@ export function PricingSlideover({
       if (result.success && result.priceHeaderId) {
         handleClose();
         router.push(
-          `/customer-pricing/${customerId}/group/${result.priceHeaderId}`
+          `/customer-pricing/${customerId}/quote/${result.priceHeaderId}`
         );
       } else {
         toast.error(result.message || "Failed to create pricing group");

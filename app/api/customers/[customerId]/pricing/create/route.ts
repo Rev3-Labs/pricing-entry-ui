@@ -30,7 +30,7 @@ export async function POST(
     const file = formData.get("file") as File;
     const type = formData.get("type") as string;
     const priceHeaderId = formData.get("priceHeaderId") as string;
-    const pricingGroupName = formData.get("pricingGroupName") as string;
+    const pricingQuoteName = formData.get("pricingQuoteName") as string;
     const headerTemplate = formData.get("headerTemplate") as string;
     const customHeaderFields = formData.get("customHeaderFields") as string;
 
@@ -69,12 +69,12 @@ export async function POST(
     }
 
     // Validate new pricing-specific requirements
-    if (type === "new" && !pricingGroupName) {
+    if (type === "new" && !pricingQuoteName) {
       return NextResponse.json(
         {
           success: false,
-          message: "Pricing group name is required for new pricing",
-          errors: ["Pricing group name is required"],
+          message: "Pricing quote name is required for new pricing",
+          errors: ["Pricing quote name is required"],
         },
         { status: 400 }
       );
@@ -296,7 +296,7 @@ export async function POST(
       type,
       customerId: params.customerId,
       priceHeaderId: type === "addendum" ? priceHeaderId : undefined,
-      pricingGroupName: type === "new" ? pricingGroupName : undefined,
+      pricingQuoteName: type === "new" ? pricingQuoteName : undefined,
       headerTemplate: type === "new" ? headerTemplate : undefined,
       customHeaderFields: type === "new" ? customHeaderFields : undefined,
       itemCount: processedData.length,
@@ -317,7 +317,7 @@ export async function POST(
     if (type === "addendum") {
       responseData.priceHeaderId = priceHeaderId;
     } else {
-      responseData.pricingGroupName = pricingGroupName;
+      responseData.pricingQuoteName = pricingQuoteName;
       responseData.headerTemplate = headerTemplate;
       if (customHeaderFields) {
         try {

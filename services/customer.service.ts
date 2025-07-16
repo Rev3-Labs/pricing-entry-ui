@@ -365,7 +365,7 @@ export class CustomerService {
     }
   }
 
-  // Create a new price header (group) with line items
+  // Create a new price header (quote) with line items
   async createPriceHeaderWithItems(
     customerId: string,
     headerName: string,

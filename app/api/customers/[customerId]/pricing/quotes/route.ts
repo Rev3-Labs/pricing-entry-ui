@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGroups, addGroup } from "./data";
+import { getQuotes, addQuote } from "./data";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { customerId: string } }
 ) {
   const { customerId } = params;
-  const customerGroups = getGroups().filter((g) => g.customerId === customerId);
-  return NextResponse.json({ success: true, data: customerGroups });
+  const customerQuotes = getQuotes().filter((q) => q.customerId === customerId);
+  return NextResponse.json({ success: true, data: customerQuotes });
 }
 
 export async function POST(
@@ -18,7 +18,7 @@ export async function POST(
   const body = await req.json();
   const { headerName, headerTemplate, items } = body;
   const newId = `PH-${Math.floor(Math.random() * 10000)}`;
-  const newGroup = {
+  const newQuote = {
     priceHeaderId: newId,
     customerId,
     headerName,
@@ -60,6 +60,6 @@ export async function POST(
       };
     }),
   };
-  addGroup(newGroup);
+  addQuote(newQuote);
   return NextResponse.json({ success: true, priceHeaderId: newId });
 }

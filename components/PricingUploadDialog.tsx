@@ -42,7 +42,7 @@ export const PricingUploadDialog: React.FC<PricingUploadDialogProps> = ({
     mode || "new"
   );
   const [selectedPriceHeader, setSelectedPriceHeader] = useState<string>("");
-  const [pricingGroupName, setPricingGroupName] = useState("");
+  const [pricingQuoteName, setPricingQuoteName] = useState("");
   const [headerTemplate, setHeaderTemplate] = useState("custom");
   const [customHeaderFields, setCustomHeaderFields] = useState({
     description: "",
@@ -83,7 +83,7 @@ export const PricingUploadDialog: React.FC<PricingUploadDialogProps> = ({
       if (pricingType === "addendum") {
         formData.append("priceHeaderId", selectedPriceHeader);
       } else {
-        formData.append("pricingGroupName", pricingGroupName);
+        formData.append("pricingQuoteName", pricingQuoteName);
         formData.append("headerTemplate", headerTemplate);
         formData.append(
           "customHeaderFields",
@@ -102,7 +102,7 @@ export const PricingUploadDialog: React.FC<PricingUploadDialogProps> = ({
         onOpenChange(false);
         setSelectedFile(null);
         setUploadedData([]);
-        setPricingGroupName("");
+        setPricingQuoteName("");
         setHeaderTemplate("custom");
         setCustomHeaderFields({
           description: "",
@@ -133,7 +133,7 @@ export const PricingUploadDialog: React.FC<PricingUploadDialogProps> = ({
     setUploadedData([]);
     setPricingType(mode || "new");
     setSelectedPriceHeader("");
-    setPricingGroupName("");
+    setPricingQuoteName("");
     setHeaderTemplate("custom");
     setCustomHeaderFields({
       description: "",

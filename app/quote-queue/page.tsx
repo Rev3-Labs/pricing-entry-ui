@@ -325,8 +325,8 @@ export default function QuoteQueuePage() {
   };
 
   const handleQuoteClick = (quote: QuoteQueueItem) => {
-    // Navigate to the pricing group page
-    router.push(`/customer-pricing/${quote.customerId}/group/${quote.quoteId}`);
+    // Navigate to the pricing quote page
+    router.push(`/customer-pricing/${quote.customerId}/quote/${quote.quoteId}`);
   };
 
   const handleAssignClick = (e: React.MouseEvent, quote: QuoteQueueItem) => {

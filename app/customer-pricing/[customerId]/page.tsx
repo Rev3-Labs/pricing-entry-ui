@@ -58,7 +58,7 @@ import {
   PriceItem,
   customerService,
 } from "@/services/customer.service";
-import { PricingSlideover } from "@/components/PricingSlideover";
+import { PricingFullScreenModal } from "@/components/PricingFullScreenModal";
 import {
   Sheet,
   SheetTrigger,
@@ -842,15 +842,17 @@ export default function CustomerPricingPage() {
                 </Badge>
               </CardTitle>
               <div className="flex space-x-2">
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => setCreatePricingDialogOpen(true)}
-                  className="flex items-center space-x-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Create New Pricing</span>
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setCreatePricingDialogOpen(true)}
+                    className="flex items-center space-x-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Create New Pricing</span>
+                  </Button>
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
@@ -860,7 +862,7 @@ export default function CustomerPricingPage() {
                   <Download className="h-4 w-4" />
                   <span>Export Excel</span>
                 </Button>
-                <PricingSlideover
+                <PricingFullScreenModal
                   open={createPricingDialogOpen}
                   onOpenChange={setCreatePricingDialogOpen}
                   customerId={customerId}
@@ -1288,7 +1290,7 @@ export default function CustomerPricingPage() {
         </Card>
 
         {/* Pricing Upload Dialog */}
-        <PricingSlideover
+        <PricingFullScreenModal
           open={createPricingDialogOpen}
           onOpenChange={setCreatePricingDialogOpen}
           customerId={customerId}

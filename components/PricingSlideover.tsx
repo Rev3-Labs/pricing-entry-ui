@@ -14,6 +14,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Sheet,
   SheetContent,
@@ -21,6 +28,14 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Upload,
   FileSpreadsheet,
@@ -33,11 +48,16 @@ import {
   X as CloseIcon,
   Sparkles,
   PenSquare,
+  CalendarIcon,
+  Settings,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { useRouter } from "next/navigation";
 import { customerService } from "@/services/customer.service";
+import { format, addYears } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface PriceHeader {
   priceHeaderId: string;
@@ -46,6 +66,21 @@ interface PriceHeader {
   effectiveDate: string;
   expirationDate: string;
   status: string;
+}
+
+interface HeaderTemplate {
+  eei: string;
+  fuelSurcharge: string;
+  invoiceMinimum: number;
+  containerConversion: string;
+  itemMinimums: string;
+  economicAdjustmentFee: number;
+  eManifestFee: number;
+  hubFee: boolean;
+  regionalPricing: boolean;
+  zoneTransportation: boolean;
+  effectiveDate: Date | undefined;
+  expirationDate: Date | undefined;
 }
 
 interface PricingSlideoverProps {
@@ -58,6 +93,22 @@ interface PricingSlideoverProps {
 
 type Step = "type" | "addendum" | "setup" | "excel-input" | "preview";
 
+// Standard template defaults
+const STANDARD_TEMPLATE: HeaderTemplate = {
+  eei: "Regular",
+  fuelSurcharge: "Standard Monthly",
+  invoiceMinimum: 350,
+  containerConversion: "Standard Conversion 2",
+  itemMinimums: "Standard Tables",
+  economicAdjustmentFee: 3,
+  eManifestFee: 25,
+  hubFee: true,
+  regionalPricing: true,
+  zoneTransportation: true,
+  effectiveDate: new Date(),
+  expirationDate: undefined,
+};
+
 export function PricingSlideover({
   open,
   onOpenChange,
@@ -69,7 +120,14 @@ export function PricingSlideover({
   const [pricingType, setPricingType] = useState<"new" | "addendum">("new");
   const [selectedPriceHeader, setSelectedPriceHeader] = useState<string>("");
   const [priceGroupName, setPriceGroupName] = useState("");
-  const [headerTemplate, setHeaderTemplate] = useState("custom");
+  const [headerTemplateType, setHeaderTemplateType] = useState<
+    "standard" | "custom"
+  >("standard");
+  const [headerFields, setHeaderFields] = useState<HeaderTemplate>({
+    ...STANDARD_TEMPLATE,
+  });
+  const [isHeaderCustomized, setIsHeaderCustomized] = useState(false);
+  const [showHeaderEditor, setShowHeaderEditor] = useState(false);
   const [excelInputMethod, setExcelInputMethod] = useState<"upload" | "paste">(
     "upload"
   );
@@ -187,7 +245,10 @@ export function PricingSlideover({
     setPricingType("new");
     setSelectedPriceHeader("");
     setPriceGroupName("");
-    setHeaderTemplate("custom");
+    setHeaderTemplateType("standard");
+    setHeaderFields({ ...STANDARD_TEMPLATE });
+    setIsHeaderCustomized(false);
+    setShowHeaderEditor(false);
     setExcelInputMethod("upload");
     setPastedData("");
     setUploadedFile(null);
@@ -205,7 +266,7 @@ export function PricingSlideover({
       const result = await customerService.createPriceHeaderWithItems(
         customerId,
         priceGroupName,
-        headerTemplate,
+        JSON.stringify(headerFields),
         parsedData
       );
       if (result.success && result.priceHeaderId) {
@@ -465,40 +526,418 @@ export function PricingSlideover({
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          {pricingType === "new" ? "New Price Group Setup" : "Addendum Setup"}
+          {pricingType === "new" ? "New Price Quote" : "Quote Addendum"}
         </h3>
         <p className="text-gray-600">
           {pricingType === "new"
-            ? "Configure your new price group settings."
-            : "Configure the addendum settings."}
+            ? "Configure your new price quote settings."
+            : "Configure the quote addendum settings."}
         </p>
       </div>
 
       <div className="space-y-4">
         <div>
-          <Label htmlFor="group-name">Price Group Name</Label>
+          <Label htmlFor="group-name">Price Quote Name</Label>
           <Input
             id="group-name"
             value={priceGroupName}
             onChange={(e) => setPriceGroupName(e.target.value)}
-            placeholder="Enter price group name..."
+            placeholder="Enter price quote name..."
             className="mt-1"
           />
         </div>
 
         <div>
-          <Label htmlFor="header-template">Header Template</Label>
-          <Select value={headerTemplate} onValueChange={setHeaderTemplate}>
-            <SelectTrigger className="mt-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="custom">Custom Template</SelectItem>
-              <SelectItem value="standard">Standard Template</SelectItem>
-              <SelectItem value="premium">Premium Template</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label>Header Template</Label>
+          <div className="mt-2 space-y-3">
+            <div className="flex items-center space-x-2">
+              <input
+                type="radio"
+                id="standard-template"
+                name="header-template"
+                value="standard"
+                checked={headerTemplateType === "standard"}
+                onChange={(e) => {
+                  setHeaderTemplateType("standard");
+                  setHeaderFields({ ...STANDARD_TEMPLATE });
+                  setIsHeaderCustomized(false);
+                }}
+                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+              />
+              <Label
+                htmlFor="standard-template"
+                className="text-sm font-medium"
+              >
+                Standard
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="radio"
+                id="custom-template"
+                name="header-template"
+                value="custom"
+                checked={headerTemplateType === "custom"}
+                onChange={(e) => {
+                  setHeaderTemplateType("custom");
+                  setIsHeaderCustomized(true);
+                }}
+                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+              />
+              <Label htmlFor="custom-template" className="text-sm font-medium">
+                Custom
+              </Label>
+            </div>
+          </div>
         </div>
+
+        {/* Standard Template Summary */}
+        {headerTemplateType === "standard" && !isHeaderCustomized && (
+          <Card className="mt-4">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium text-gray-900">
+                  Standard Template Settings
+                </h4>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowHeaderEditor(true)}
+                  className="flex items-center space-x-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Edit Header</span>
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">EEI:</span>
+                  <span className="ml-2 font-medium">{headerFields.eei}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Fuel Surcharge:</span>
+                  <span className="ml-2 font-medium">
+                    {headerFields.fuelSurcharge}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Invoice Minimum:</span>
+                  <span className="ml-2 font-medium">
+                    ${headerFields.invoiceMinimum}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">E-Manifest Fee:</span>
+                  <span className="ml-2 font-medium">
+                    ${headerFields.eManifestFee}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Economic Adjustment:</span>
+                  <span className="ml-2 font-medium">
+                    {headerFields.economicAdjustmentFee}%
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Effective Date:</span>
+                  <span className="ml-2 font-medium">
+                    {headerFields.effectiveDate
+                      ? format(
+                          headerFields.effectiveDate as Date,
+                          "MMM dd, yyyy"
+                        )
+                      : "Not set"}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Custom Template Fields */}
+        {headerTemplateType === "custom" && (
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium text-gray-900">
+                Custom Header Settings
+              </h4>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setHeaderFields({ ...STANDARD_TEMPLATE });
+                  setIsHeaderCustomized(false);
+                }}
+                className="flex items-center space-x-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Reset to Standard</span>
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>EEI</Label>
+                <Select
+                  value={headerFields.eei}
+                  onValueChange={(value) => {
+                    setHeaderFields((prev) => ({ ...prev, eei: value }));
+                    setIsHeaderCustomized(true);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Regular">Regular</SelectItem>
+                    <SelectItem value="Custom">Custom</SelectItem>
+                    <SelectItem value="Floating">Floating</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Fuel Surcharge (FSC)</Label>
+                <Select
+                  value={headerFields.fuelSurcharge}
+                  onValueChange={(value) => {
+                    setHeaderFields((prev) => ({
+                      ...prev,
+                      fuelSurcharge: value,
+                    }));
+                    setIsHeaderCustomized(true);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Standard Monthly">
+                      Standard Monthly
+                    </SelectItem>
+                    <SelectItem value="Standard Weekly">
+                      Standard Weekly
+                    </SelectItem>
+                    <SelectItem value="Custom">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Invoice Minimum</Label>
+                <Input
+                  type="number"
+                  value={headerFields.invoiceMinimum}
+                  onChange={(e) => {
+                    setHeaderFields((prev) => ({
+                      ...prev,
+                      invoiceMinimum: Number(e.target.value),
+                    }));
+                    setIsHeaderCustomized(true);
+                  }}
+                  placeholder="350"
+                />
+              </div>
+              <div>
+                <Label>Container Conversion</Label>
+                <Select
+                  value={headerFields.containerConversion}
+                  onValueChange={(value) => {
+                    setHeaderFields((prev) => ({
+                      ...prev,
+                      containerConversion: value,
+                    }));
+                    setIsHeaderCustomized(true);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Standard Conversion 1">
+                      Standard Conversion 1
+                    </SelectItem>
+                    <SelectItem value="Standard Conversion 2">
+                      Standard Conversion 2
+                    </SelectItem>
+                    <SelectItem value="Custom Conversion">
+                      Custom Conversion
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Item Minimums</Label>
+                <Select
+                  value={headerFields.itemMinimums}
+                  onValueChange={(value) => {
+                    setHeaderFields((prev) => ({
+                      ...prev,
+                      itemMinimums: value,
+                    }));
+                    setIsHeaderCustomized(true);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Standard Tables">
+                      Standard Tables
+                    </SelectItem>
+                    <SelectItem value="Custom Tables">Custom Tables</SelectItem>
+                    <SelectItem value="No Minimums">No Minimums</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Economic Adjustment Fee (EAF) %</Label>
+                <Input
+                  type="number"
+                  value={headerFields.economicAdjustmentFee}
+                  onChange={(e) => {
+                    setHeaderFields((prev) => ({
+                      ...prev,
+                      economicAdjustmentFee: Number(e.target.value),
+                    }));
+                    setIsHeaderCustomized(true);
+                  }}
+                  placeholder="3"
+                />
+              </div>
+              <div>
+                <Label>E-Manifest Fee</Label>
+                <Input
+                  type="number"
+                  value={headerFields.eManifestFee}
+                  onChange={(e) => {
+                    setHeaderFields((prev) => ({
+                      ...prev,
+                      eManifestFee: Number(e.target.value),
+                    }));
+                    setIsHeaderCustomized(true);
+                  }}
+                  placeholder="25"
+                />
+              </div>
+              <div className="col-span-2">
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="hub-fee"
+                      checked={headerFields.hubFee}
+                      onCheckedChange={(checked) => {
+                        setHeaderFields((prev) => ({
+                          ...prev,
+                          hubFee: checked as boolean,
+                        }));
+                        setIsHeaderCustomized(true);
+                      }}
+                    />
+                    <Label htmlFor="hub-fee">Hub Fee</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="regional-pricing"
+                      checked={headerFields.regionalPricing}
+                      onCheckedChange={(checked) => {
+                        setHeaderFields((prev) => ({
+                          ...prev,
+                          regionalPricing: checked as boolean,
+                        }));
+                        setIsHeaderCustomized(true);
+                      }}
+                    />
+                    <Label htmlFor="regional-pricing">Regional Pricing</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="zone-transportation"
+                      checked={headerFields.zoneTransportation}
+                      onCheckedChange={(checked) => {
+                        setHeaderFields((prev) => ({
+                          ...prev,
+                          zoneTransportation: checked as boolean,
+                        }));
+                        setIsHeaderCustomized(true);
+                      }}
+                    />
+                    <Label htmlFor="zone-transportation">
+                      Zone Transportation
+                    </Label>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <Label>Effective Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !headerFields.effectiveDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {headerFields.effectiveDate ? (
+                        format(headerFields.effectiveDate as Date, "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={headerFields.effectiveDate}
+                      onSelect={(date) => {
+                        setHeaderFields((prev) => ({
+                          ...prev,
+                          effectiveDate: date,
+                        }));
+                        setIsHeaderCustomized(true);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <Label>Expiration Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !headerFields.expirationDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {headerFields.expirationDate ? (
+                        format(headerFields.expirationDate as Date, "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={headerFields.expirationDate}
+                      onSelect={(date) => {
+                        setHeaderFields((prev) => ({
+                          ...prev,
+                          expirationDate: date,
+                        }));
+                        setIsHeaderCustomized(true);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-between">
@@ -776,39 +1215,350 @@ export function PricingSlideover({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="w-[800px] xl:w-[900px] max-w-full overflow-y-auto"
-      >
-        <SheetHeader className="mb-6">
-          <SheetTitle>Create New Pricing</SheetTitle>
-          <SheetDescription>
-            Set up pricing for customer {customerId}
-          </SheetDescription>
-        </SheetHeader>
-        {/* Simple step label */}
-        {(() => {
-          const steps = [
-            { key: "type", label: "Type" },
-            // Only include 'addendum' step if pricingType is 'addendum'
-            ...(pricingType === "addendum"
-              ? [{ key: "addendum", label: "Group" }]
-              : []),
-            { key: "setup", label: "Setup" },
-            { key: "excel-input", label: "Data" },
-            { key: "preview", label: "Preview" },
-          ];
-          const currentIndex = steps.findIndex((s) => s.key === currentStep);
-          return (
-            <div className="mb-6 text-lg font-medium text-gray-700">
-              Step {currentIndex + 1} of {steps.length} –{" "}
-              {steps[currentIndex]?.label}
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent
+          side="right"
+          className="w-[800px] xl:w-[900px] max-w-full overflow-y-auto"
+        >
+          <SheetHeader className="mb-6">
+            <SheetTitle>Create New Pricing</SheetTitle>
+            <SheetDescription>
+              Set up pricing for customer {customerId}
+            </SheetDescription>
+          </SheetHeader>
+          {/* Simple step label */}
+          {(() => {
+            const steps = [
+              { key: "type", label: "Type" },
+              // Only include 'addendum' step if pricingType is 'addendum'
+              ...(pricingType === "addendum"
+                ? [{ key: "addendum", label: "Group" }]
+                : []),
+              { key: "setup", label: "Setup" },
+              { key: "excel-input", label: "Data" },
+              { key: "preview", label: "Preview" },
+            ];
+            const currentIndex = steps.findIndex((s) => s.key === currentStep);
+            return (
+              <div className="mb-6 text-lg font-medium text-gray-700">
+                Step {currentIndex + 1} of {steps.length} –{" "}
+                {steps[currentIndex]?.label}
+              </div>
+            );
+          })()}
+          {renderCurrentStep()}
+        </SheetContent>
+      </Sheet>
+
+      {/* Header Editor Modal */}
+      <Dialog open={showHeaderEditor} onOpenChange={setShowHeaderEditor}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Header Settings</DialogTitle>
+            <DialogDescription>
+              Customize the header settings for this pricing quote.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium text-gray-900">
+                Header Configuration
+              </h4>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setHeaderFields({ ...STANDARD_TEMPLATE });
+                  setIsHeaderCustomized(false);
+                }}
+                className="flex items-center space-x-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Reset to Standard</span>
+              </Button>
             </div>
-          );
-        })()}
-        {renderCurrentStep()}
-      </SheetContent>
-    </Sheet>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>EEI</Label>
+                <Select
+                  value={headerFields.eei}
+                  onValueChange={(value) => {
+                    setHeaderFields((prev) => ({ ...prev, eei: value }));
+                    setIsHeaderCustomized(true);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Regular">Regular</SelectItem>
+                    <SelectItem value="Custom">Custom</SelectItem>
+                    <SelectItem value="Floating">Floating</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Fuel Surcharge (FSC)</Label>
+                <Select
+                  value={headerFields.fuelSurcharge}
+                  onValueChange={(value) => {
+                    setHeaderFields((prev) => ({
+                      ...prev,
+                      fuelSurcharge: value,
+                    }));
+                    setIsHeaderCustomized(true);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Standard Monthly">
+                      Standard Monthly
+                    </SelectItem>
+                    <SelectItem value="Standard Weekly">
+                      Standard Weekly
+                    </SelectItem>
+                    <SelectItem value="Custom">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Invoice Minimum</Label>
+                <Input
+                  type="number"
+                  value={headerFields.invoiceMinimum}
+                  onChange={(e) => {
+                    setHeaderFields((prev) => ({
+                      ...prev,
+                      invoiceMinimum: Number(e.target.value),
+                    }));
+                    setIsHeaderCustomized(true);
+                  }}
+                  placeholder="350"
+                />
+              </div>
+              <div>
+                <Label>Container Conversion</Label>
+                <Select
+                  value={headerFields.containerConversion}
+                  onValueChange={(value) => {
+                    setHeaderFields((prev) => ({
+                      ...prev,
+                      containerConversion: value,
+                    }));
+                    setIsHeaderCustomized(true);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Standard Conversion 1">
+                      Standard Conversion 1
+                    </SelectItem>
+                    <SelectItem value="Standard Conversion 2">
+                      Standard Conversion 2
+                    </SelectItem>
+                    <SelectItem value="Custom Conversion">
+                      Custom Conversion
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Item Minimums</Label>
+                <Select
+                  value={headerFields.itemMinimums}
+                  onValueChange={(value) => {
+                    setHeaderFields((prev) => ({
+                      ...prev,
+                      itemMinimums: value,
+                    }));
+                    setIsHeaderCustomized(true);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Standard Tables">
+                      Standard Tables
+                    </SelectItem>
+                    <SelectItem value="Custom Tables">Custom Tables</SelectItem>
+                    <SelectItem value="No Minimums">No Minimums</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Economic Adjustment Fee (EAF) %</Label>
+                <Input
+                  type="number"
+                  value={headerFields.economicAdjustmentFee}
+                  onChange={(e) => {
+                    setHeaderFields((prev) => ({
+                      ...prev,
+                      economicAdjustmentFee: Number(e.target.value),
+                    }));
+                    setIsHeaderCustomized(true);
+                  }}
+                  placeholder="3"
+                />
+              </div>
+              <div>
+                <Label>E-Manifest Fee</Label>
+                <Input
+                  type="number"
+                  value={headerFields.eManifestFee}
+                  onChange={(e) => {
+                    setHeaderFields((prev) => ({
+                      ...prev,
+                      eManifestFee: Number(e.target.value),
+                    }));
+                    setIsHeaderCustomized(true);
+                  }}
+                  placeholder="25"
+                />
+              </div>
+              <div className="col-span-2">
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="modal-hub-fee"
+                      checked={headerFields.hubFee}
+                      onCheckedChange={(checked) => {
+                        setHeaderFields((prev) => ({
+                          ...prev,
+                          hubFee: checked as boolean,
+                        }));
+                        setIsHeaderCustomized(true);
+                      }}
+                    />
+                    <Label htmlFor="modal-hub-fee">Hub Fee</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="modal-regional-pricing"
+                      checked={headerFields.regionalPricing}
+                      onCheckedChange={(checked) => {
+                        setHeaderFields((prev) => ({
+                          ...prev,
+                          regionalPricing: checked as boolean,
+                        }));
+                        setIsHeaderCustomized(true);
+                      }}
+                    />
+                    <Label htmlFor="modal-regional-pricing">
+                      Regional Pricing
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="modal-zone-transportation"
+                      checked={headerFields.zoneTransportation}
+                      onCheckedChange={(checked) => {
+                        setHeaderFields((prev) => ({
+                          ...prev,
+                          zoneTransportation: checked as boolean,
+                        }));
+                        setIsHeaderCustomized(true);
+                      }}
+                    />
+                    <Label htmlFor="modal-zone-transportation">
+                      Zone Transportation
+                    </Label>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <Label>Effective Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !headerFields.effectiveDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {headerFields.effectiveDate ? (
+                        format(headerFields.effectiveDate as Date, "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={headerFields.effectiveDate}
+                      onSelect={(date) => {
+                        setHeaderFields((prev) => ({
+                          ...prev,
+                          effectiveDate: date,
+                        }));
+                        setIsHeaderCustomized(true);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <Label>Expiration Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !headerFields.expirationDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {headerFields.expirationDate ? (
+                        format(headerFields.expirationDate as Date, "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={headerFields.expirationDate}
+                      onSelect={(date) => {
+                        setHeaderFields((prev) => ({
+                          ...prev,
+                          expirationDate: date,
+                        }));
+                        setIsHeaderCustomized(true);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowHeaderEditor(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => setShowHeaderEditor(false)}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

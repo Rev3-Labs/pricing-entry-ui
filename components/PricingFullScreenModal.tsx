@@ -107,7 +107,7 @@ const STANDARD_CONTAINER_CONVERSIONS: ContainerConversionItem[] = [
 ];
 
 const STANDARD_TEMPLATE: HeaderFields = {
-  eei: "5",
+  eei: "15",
   fuelSurcharge: "Standard Monthly",
   invoiceMinimum: 350,
   containerConversion: "Standard",
@@ -157,6 +157,12 @@ export function PricingFullScreenModal({
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
+
+  // Track raw input values for better UX
+  const [rawInputValues, setRawInputValues] = useState<{
+    [key: string]: string;
+  }>({});
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const handleTypeSelection = (type: "new" | "addendum") => {
     setPricingType(type);
@@ -272,6 +278,8 @@ export function PricingFullScreenModal({
     setIsProcessing(false);
     setIsPreviewExpanded(false);
     setIsSaving(false);
+    setRawInputValues({});
+    setFocusedField(null);
   };
 
   const handleClose = () => {
@@ -924,16 +932,54 @@ export function PricingFullScreenModal({
                     <div className="flex items-center space-x-3">
                       <div className="flex items-center border rounded-md bg-white">
                         <Input
-                          type="number"
-                          value={headerFields.eeiValue?.toFixed(2) || "5.00"}
+                          type="text"
+                          value={
+                            focusedField === "eeiValue"
+                              ? rawInputValues["eeiValue"] || ""
+                              : headerFields.eeiValue
+                              ? headerFields.eeiValue.toFixed(2)
+                              : "15.00"
+                          }
                           onChange={(e) => {
+                            const value = e.target.value.replace(
+                              /[^0-9.]/g,
+                              ""
+                            );
+                            setRawInputValues((prev) => ({
+                              ...prev,
+                              eeiValue: value,
+                            }));
+
+                            if (value === "" || value === ".") {
+                              updateHeaderField("eeiValue", 15);
+                            } else {
+                              const numValue = Number(value);
+                              if (!isNaN(numValue)) {
+                                updateHeaderField("eeiValue", numValue);
+                              }
+                            }
+                          }}
+                          onFocus={() => {
+                            setFocusedField("eeiValue");
+                            setRawInputValues((prev) => ({
+                              ...prev,
+                              eeiValue: headerFields.eeiValue
+                                ? headerFields.eeiValue.toString()
+                                : "15",
+                            }));
+                          }}
+                          onBlur={(e) => {
+                            setFocusedField(null);
+                            const value =
+                              e.target.value === ""
+                                ? 15
+                                : Number(e.target.value);
                             updateHeaderField(
                               "eeiValue",
-                              Number(parseFloat(e.target.value).toFixed(2))
+                              Number(value.toFixed(2))
                             );
                           }}
-                          step="0.01"
-                          placeholder="5.00"
+                          placeholder="15.00"
                           className="w-24 border-0 focus:ring-0 focus:border-0 shadow-none rounded-none h-8"
                         />
                         <span className="px-2 py-1 text-sm text-gray-500 bg-gray-50 border-l rounded-r-md">
@@ -960,15 +1006,50 @@ export function PricingFullScreenModal({
                           $
                         </span>
                         <Input
-                          type="number"
-                          value={headerFields.invoiceMinimum.toFixed(2)}
-                          onChange={(e) =>
+                          type="text"
+                          value={
+                            focusedField === "invoiceMinimum"
+                              ? rawInputValues["invoiceMinimum"] || ""
+                              : headerFields.invoiceMinimum.toFixed(2)
+                          }
+                          onChange={(e) => {
+                            const value = e.target.value.replace(
+                              /[^0-9.]/g,
+                              ""
+                            );
+                            setRawInputValues((prev) => ({
+                              ...prev,
+                              invoiceMinimum: value,
+                            }));
+
+                            if (value === "" || value === ".") {
+                              updateHeaderField("invoiceMinimum", 0);
+                            } else {
+                              const numValue = Number(value);
+                              if (!isNaN(numValue)) {
+                                updateHeaderField("invoiceMinimum", numValue);
+                              }
+                            }
+                          }}
+                          onFocus={() => {
+                            setFocusedField("invoiceMinimum");
+                            setRawInputValues((prev) => ({
+                              ...prev,
+                              invoiceMinimum:
+                                headerFields.invoiceMinimum.toString(),
+                            }));
+                          }}
+                          onBlur={(e) => {
+                            setFocusedField(null);
+                            const value =
+                              e.target.value === ""
+                                ? 0
+                                : Number(e.target.value);
                             updateHeaderField(
                               "invoiceMinimum",
-                              Number(parseFloat(e.target.value).toFixed(2))
-                            )
-                          }
-                          step="0.01"
+                              Number(value.toFixed(2))
+                            );
+                          }}
                           placeholder="350.00"
                           className="w-24 border-0 focus:ring-0 focus:border-0 shadow-none h-8"
                         />
@@ -990,15 +1071,53 @@ export function PricingFullScreenModal({
                     <div className="flex items-center space-x-3">
                       <div className="flex items-center border rounded-md bg-white">
                         <Input
-                          type="number"
-                          value={headerFields.economicAdjustmentFee.toFixed(2)}
-                          onChange={(e) =>
+                          type="text"
+                          value={
+                            focusedField === "economicAdjustmentFee"
+                              ? rawInputValues["economicAdjustmentFee"] || ""
+                              : headerFields.economicAdjustmentFee.toFixed(2)
+                          }
+                          onChange={(e) => {
+                            const value = e.target.value.replace(
+                              /[^0-9.]/g,
+                              ""
+                            );
+                            setRawInputValues((prev) => ({
+                              ...prev,
+                              economicAdjustmentFee: value,
+                            }));
+
+                            if (value === "" || value === ".") {
+                              updateHeaderField("economicAdjustmentFee", 0);
+                            } else {
+                              const numValue = Number(value);
+                              if (!isNaN(numValue)) {
+                                updateHeaderField(
+                                  "economicAdjustmentFee",
+                                  numValue
+                                );
+                              }
+                            }
+                          }}
+                          onFocus={() => {
+                            setFocusedField("economicAdjustmentFee");
+                            setRawInputValues((prev) => ({
+                              ...prev,
+                              economicAdjustmentFee:
+                                headerFields.economicAdjustmentFee.toString(),
+                            }));
+                          }}
+                          onBlur={(e) => {
+                            setFocusedField(null);
+                            const value =
+                              e.target.value === ""
+                                ? 0
+                                : Number(e.target.value);
                             updateHeaderField(
                               "economicAdjustmentFee",
-                              Number(parseFloat(e.target.value).toFixed(2))
-                            )
-                          }
-                          step="0.01"
+                              Number(value.toFixed(2))
+                            );
+                          }}
                           placeholder="3.00"
                           className="w-24 border-0 focus:ring-0 focus:border-0 shadow-none rounded-none h-8"
                         />
@@ -1028,15 +1147,50 @@ export function PricingFullScreenModal({
                           $
                         </span>
                         <Input
-                          type="number"
-                          value={headerFields.eManifestFee.toFixed(2)}
-                          onChange={(e) =>
+                          type="text"
+                          value={
+                            focusedField === "eManifestFee"
+                              ? rawInputValues["eManifestFee"] || ""
+                              : headerFields.eManifestFee.toFixed(2)
+                          }
+                          onChange={(e) => {
+                            const value = e.target.value.replace(
+                              /[^0-9.]/g,
+                              ""
+                            );
+                            setRawInputValues((prev) => ({
+                              ...prev,
+                              eManifestFee: value,
+                            }));
+
+                            if (value === "" || value === ".") {
+                              updateHeaderField("eManifestFee", 0);
+                            } else {
+                              const numValue = Number(value);
+                              if (!isNaN(numValue)) {
+                                updateHeaderField("eManifestFee", numValue);
+                              }
+                            }
+                          }}
+                          onFocus={() => {
+                            setFocusedField("eManifestFee");
+                            setRawInputValues((prev) => ({
+                              ...prev,
+                              eManifestFee:
+                                headerFields.eManifestFee.toString(),
+                            }));
+                          }}
+                          onBlur={(e) => {
+                            setFocusedField(null);
+                            const value =
+                              e.target.value === ""
+                                ? 0
+                                : Number(e.target.value);
                             updateHeaderField(
                               "eManifestFee",
-                              Number(parseFloat(e.target.value).toFixed(2))
-                            )
-                          }
-                          step="0.01"
+                              Number(value.toFixed(2))
+                            );
+                          }}
                           placeholder="25.00"
                           className="w-24 border-0 focus:ring-0 focus:border-0 shadow-none h-8"
                         />
@@ -1167,18 +1321,112 @@ export function PricingFullScreenModal({
                                 <td className="px-4 py-2">
                                   <div className="flex items-center space-x-2">
                                     <Input
-                                      type="number"
-                                      value={item.customValue.toFixed(2)}
+                                      type="text"
+                                      value={
+                                        focusedField ===
+                                        `containerConversion_${index}`
+                                          ? rawInputValues[
+                                              `containerConversion_${index}`
+                                            ] || ""
+                                          : item.customValue.toFixed(2)
+                                      }
                                       onChange={(e) => {
-                                        const value = Number(
-                                          parseFloat(e.target.value).toFixed(2)
+                                        const value = e.target.value.replace(
+                                          /[^0-9.]/g,
+                                          ""
+                                        );
+                                        setRawInputValues((prev) => ({
+                                          ...prev,
+                                          [`containerConversion_${index}`]:
+                                            value,
+                                        }));
+
+                                        if (value === "" || value === ".") {
+                                          const updatedConversions = [
+                                            ...headerFields.containerConversions,
+                                          ];
+                                          updatedConversions[index] = {
+                                            ...item,
+                                            customValue: item.standardValue,
+                                          };
+                                          setHeaderFields((prev) => ({
+                                            ...prev,
+                                            containerConversions:
+                                              updatedConversions,
+                                          }));
+                                        } else {
+                                          const numValue = Number(value);
+                                          if (!isNaN(numValue)) {
+                                            const updatedConversions = [
+                                              ...headerFields.containerConversions,
+                                            ];
+                                            updatedConversions[index] = {
+                                              ...item,
+                                              customValue: numValue,
+                                            };
+                                            setHeaderFields((prev) => ({
+                                              ...prev,
+                                              containerConversions:
+                                                updatedConversions,
+                                            }));
+
+                                            const hasCustomValues =
+                                              updatedConversions.some(
+                                                (conv) =>
+                                                  conv.customValue !==
+                                                  conv.standardValue
+                                              );
+
+                                            if (hasCustomValues) {
+                                              setCustomizedFields((prev) =>
+                                                new Set(prev).add(
+                                                  "containerConversions"
+                                                )
+                                              );
+                                              setIsHeaderCustomized(true);
+                                              if (
+                                                (headerTemplateType as string) ===
+                                                "standard"
+                                              ) {
+                                                setHeaderTemplateType("custom");
+                                              }
+                                            } else {
+                                              setCustomizedFields((prev) => {
+                                                const newSet = new Set(prev);
+                                                newSet.delete(
+                                                  "containerConversions"
+                                                );
+                                                return newSet;
+                                              });
+                                            }
+                                          }
+                                        }
+                                      }}
+                                      onFocus={() => {
+                                        setFocusedField(
+                                          `containerConversion_${index}`
+                                        );
+                                        setRawInputValues((prev) => ({
+                                          ...prev,
+                                          [`containerConversion_${index}`]:
+                                            item.customValue.toString(),
+                                        }));
+                                      }}
+                                      onBlur={(e) => {
+                                        setFocusedField(null);
+                                        const value =
+                                          e.target.value === ""
+                                            ? item.standardValue
+                                            : Number(e.target.value);
+                                        const formattedValue = Number(
+                                          value.toFixed(2)
                                         );
                                         const updatedConversions = [
                                           ...headerFields.containerConversions,
                                         ];
                                         updatedConversions[index] = {
                                           ...item,
-                                          customValue: value,
+                                          customValue: formattedValue,
                                         };
                                         setHeaderFields((prev) => ({
                                           ...prev,
@@ -1267,17 +1515,75 @@ export function PricingFullScreenModal({
                           $
                         </span>
                         <Input
-                          type="number"
-                          value={headerFields.containerMinimum.toFixed(2)}
+                          type="text"
+                          value={
+                            focusedField === "containerMinimum"
+                              ? rawInputValues["containerMinimum"] || ""
+                              : headerFields.containerMinimum.toFixed(2)
+                          }
                           onChange={(e) => {
-                            const value = Number(
-                              parseFloat(e.target.value).toFixed(2)
+                            const value = e.target.value.replace(
+                              /[^0-9.]/g,
+                              ""
                             );
-                            setHeaderFields((prev) => ({
+                            setRawInputValues((prev) => ({
                               ...prev,
                               containerMinimum: value,
                             }));
-                            if (value !== STANDARD_TEMPLATE.containerMinimum) {
+
+                            if (value === "" || value === ".") {
+                              setHeaderFields((prev) => ({
+                                ...prev,
+                                containerMinimum: 0,
+                              }));
+                            } else {
+                              const numValue = Number(value);
+                              if (!isNaN(numValue)) {
+                                setHeaderFields((prev) => ({
+                                  ...prev,
+                                  containerMinimum: numValue,
+                                }));
+                                if (
+                                  numValue !==
+                                  STANDARD_TEMPLATE.containerMinimum
+                                ) {
+                                  setCustomizedFields((prev) =>
+                                    new Set(prev).add("containerMinimum")
+                                  );
+                                  setIsHeaderCustomized(true);
+                                  if (
+                                    (headerTemplateType as string) ===
+                                    "standard"
+                                  ) {
+                                    setHeaderTemplateType("custom");
+                                  }
+                                }
+                              }
+                            }
+                          }}
+                          onFocus={() => {
+                            setFocusedField("containerMinimum");
+                            setRawInputValues((prev) => ({
+                              ...prev,
+                              containerMinimum:
+                                headerFields.containerMinimum.toString(),
+                            }));
+                          }}
+                          onBlur={(e) => {
+                            setFocusedField(null);
+                            const value =
+                              e.target.value === ""
+                                ? 0
+                                : Number(e.target.value);
+                            const formattedValue = Number(value.toFixed(2));
+                            setHeaderFields((prev) => ({
+                              ...prev,
+                              containerMinimum: formattedValue,
+                            }));
+                            if (
+                              formattedValue !==
+                              STANDARD_TEMPLATE.containerMinimum
+                            ) {
                               setCustomizedFields((prev) =>
                                 new Set(prev).add("containerMinimum")
                               );
@@ -1289,7 +1595,6 @@ export function PricingFullScreenModal({
                               }
                             }
                           }}
-                          step="0.01"
                           placeholder="30.00"
                           className="w-24 border-0 focus:ring-0 focus:border-0 shadow-none h-8"
                         />
@@ -1763,54 +2068,105 @@ export function PricingFullScreenModal({
               <div>
                 <Label>Invoice Minimum</Label>
                 <Input
-                  type="number"
+                  type="text"
                   value={headerFields.invoiceMinimum.toFixed(2)}
                   onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9.]/g, "");
+                    if (value === "" || value === ".") {
+                      setHeaderFields((prev) => ({
+                        ...prev,
+                        invoiceMinimum: 0,
+                      }));
+                    } else {
+                      const numValue = Number(value);
+                      if (!isNaN(numValue)) {
+                        setHeaderFields((prev) => ({
+                          ...prev,
+                          invoiceMinimum: numValue,
+                        }));
+                        setIsHeaderCustomized(true);
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value =
+                      e.target.value === "" ? 0 : Number(e.target.value);
                     setHeaderFields((prev) => ({
                       ...prev,
-                      invoiceMinimum: Number(
-                        parseFloat(e.target.value).toFixed(2)
-                      ),
+                      invoiceMinimum: Number(value.toFixed(2)),
                     }));
                     setIsHeaderCustomized(true);
                   }}
-                  step="0.01"
                   placeholder="350.00"
                 />
               </div>
               <div>
                 <Label>E-Manifest Fee</Label>
                 <Input
-                  type="number"
+                  type="text"
                   value={headerFields.eManifestFee.toFixed(2)}
                   onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9.]/g, "");
+                    if (value === "" || value === ".") {
+                      setHeaderFields((prev) => ({
+                        ...prev,
+                        eManifestFee: 0,
+                      }));
+                    } else {
+                      const numValue = Number(value);
+                      if (!isNaN(numValue)) {
+                        setHeaderFields((prev) => ({
+                          ...prev,
+                          eManifestFee: numValue,
+                        }));
+                        setIsHeaderCustomized(true);
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value =
+                      e.target.value === "" ? 0 : Number(e.target.value);
                     setHeaderFields((prev) => ({
                       ...prev,
-                      eManifestFee: Number(
-                        parseFloat(e.target.value).toFixed(2)
-                      ),
+                      eManifestFee: Number(value.toFixed(2)),
                     }));
                     setIsHeaderCustomized(true);
                   }}
-                  step="0.01"
                   placeholder="25.00"
                 />
               </div>
               <div>
                 <Label>Economic Adjustment Fee (EAF) %</Label>
                 <Input
-                  type="number"
+                  type="text"
                   value={headerFields.economicAdjustmentFee.toFixed(2)}
                   onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9.]/g, "");
+                    if (value === "" || value === ".") {
+                      setHeaderFields((prev) => ({
+                        ...prev,
+                        economicAdjustmentFee: 0,
+                      }));
+                    } else {
+                      const numValue = Number(value);
+                      if (!isNaN(numValue)) {
+                        setHeaderFields((prev) => ({
+                          ...prev,
+                          economicAdjustmentFee: numValue,
+                        }));
+                        setIsHeaderCustomized(true);
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value =
+                      e.target.value === "" ? 0 : Number(e.target.value);
                     setHeaderFields((prev) => ({
                       ...prev,
-                      economicAdjustmentFee: Number(
-                        parseFloat(e.target.value).toFixed(2)
-                      ),
+                      economicAdjustmentFee: Number(value.toFixed(2)),
                     }));
                     setIsHeaderCustomized(true);
                   }}
-                  step="0.01"
                   placeholder="3.00"
                 />
               </div>
@@ -1916,17 +2272,47 @@ export function PricingFullScreenModal({
                   <div className="flex items-center space-x-2 mt-1">
                     <Input
                       id="container-minimum"
-                      type="number"
+                      type="text"
                       value={headerFields.containerMinimum.toFixed(2)}
                       onChange={(e) => {
-                        const value = Number(
-                          parseFloat(e.target.value).toFixed(2)
-                        );
+                        const value = e.target.value.replace(/[^0-9.]/g, "");
+                        if (value === "" || value === ".") {
+                          setHeaderFields((prev) => ({
+                            ...prev,
+                            containerMinimum: 0,
+                          }));
+                        } else {
+                          const numValue = Number(value);
+                          if (!isNaN(numValue)) {
+                            setHeaderFields((prev) => ({
+                              ...prev,
+                              containerMinimum: numValue,
+                            }));
+                            if (
+                              numValue !== STANDARD_TEMPLATE.containerMinimum
+                            ) {
+                              setCustomizedFields((prev) =>
+                                new Set(prev).add("containerMinimum")
+                              );
+                              setIsHeaderCustomized(true);
+                              if (headerTemplateType === "standard") {
+                                setHeaderTemplateType("custom");
+                              }
+                            }
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const value =
+                          e.target.value === "" ? 0 : Number(e.target.value);
+                        const formattedValue = Number(value.toFixed(2));
                         setHeaderFields((prev) => ({
                           ...prev,
-                          containerMinimum: value,
+                          containerMinimum: formattedValue,
                         }));
-                        if (value !== STANDARD_TEMPLATE.containerMinimum) {
+                        if (
+                          formattedValue !== STANDARD_TEMPLATE.containerMinimum
+                        ) {
                           setCustomizedFields((prev) =>
                             new Set(prev).add("containerMinimum")
                           );
@@ -1936,7 +2322,6 @@ export function PricingFullScreenModal({
                           }
                         }
                       }}
-                      step="0.01"
                       placeholder="30.00"
                       className="flex-1"
                     />
@@ -2033,18 +2418,93 @@ export function PricingFullScreenModal({
                               <td className="px-4 py-3">
                                 <div className="flex items-center space-x-2">
                                   <Input
-                                    type="number"
+                                    type="text"
                                     value={item.customValue.toFixed(2)}
                                     onChange={(e) => {
-                                      const value = Number(
-                                        parseFloat(e.target.value).toFixed(2)
+                                      const value = e.target.value.replace(
+                                        /[^0-9.]/g,
+                                        ""
+                                      );
+                                      if (value === "" || value === ".") {
+                                        const updatedConversions = [
+                                          ...headerFields.containerConversions,
+                                        ];
+                                        updatedConversions[index] = {
+                                          ...item,
+                                          customValue: item.standardValue,
+                                        };
+                                        setHeaderFields((prev) => ({
+                                          ...prev,
+                                          containerConversions:
+                                            updatedConversions,
+                                        }));
+                                      } else {
+                                        const numValue = Number(value);
+                                        if (!isNaN(numValue)) {
+                                          const updatedConversions = [
+                                            ...headerFields.containerConversions,
+                                          ];
+                                          updatedConversions[index] = {
+                                            ...item,
+                                            customValue: numValue,
+                                          };
+                                          setHeaderFields((prev) => ({
+                                            ...prev,
+                                            containerConversions:
+                                              updatedConversions,
+                                          }));
+
+                                          // Check if any values are customized
+                                          const hasCustomValues =
+                                            updatedConversions.some(
+                                              (conv) =>
+                                                conv.customValue !==
+                                                conv.standardValue
+                                            );
+
+                                          if (hasCustomValues) {
+                                            setCustomizedFields((prev) =>
+                                              new Set(prev).add(
+                                                "containerConversions"
+                                              )
+                                            );
+                                            setIsHeaderCustomized(true);
+                                            if (
+                                              headerTemplateType === "standard"
+                                            ) {
+                                              setHeaderTemplateType("custom");
+                                            }
+                                            // Update container conversion selection to "Custom Conversion"
+                                            updateHeaderField(
+                                              "containerConversion",
+                                              "Custom Conversion"
+                                            );
+                                          } else {
+                                            setCustomizedFields((prev) => {
+                                              const newSet = new Set(prev);
+                                              newSet.delete(
+                                                "containerConversions"
+                                              );
+                                              return newSet;
+                                            });
+                                          }
+                                        }
+                                      }
+                                    }}
+                                    onBlur={(e) => {
+                                      const value =
+                                        e.target.value === ""
+                                          ? item.standardValue
+                                          : Number(e.target.value);
+                                      const formattedValue = Number(
+                                        value.toFixed(2)
                                       );
                                       const updatedConversions = [
                                         ...headerFields.containerConversions,
                                       ];
                                       updatedConversions[index] = {
                                         ...item,
-                                        customValue: value,
+                                        customValue: formattedValue,
                                       };
                                       setHeaderFields((prev) => ({
                                         ...prev,

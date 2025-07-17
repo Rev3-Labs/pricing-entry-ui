@@ -90,7 +90,7 @@ interface PricingFullScreenModalProps {
   onSuccess?: (headerFields: HeaderFields) => void;
 }
 
-type Step = "type" | "quote-name" | "header" | "excel-input" | "preview";
+type Step = "effective-dates" | "header" | "excel-input" | "preview";
 
 const STANDARD_CONTAINER_CONVERSIONS: ContainerConversionItem[] = [
   { containerSize: "<=5 Gallon", standardValue: 0.35, customValue: 0.35 },
@@ -130,7 +130,7 @@ export function PricingFullScreenModal({
   priceHeaders,
   onSuccess,
 }: PricingFullScreenModalProps) {
-  const [currentStep, setCurrentStep] = useState<Step>("type");
+  const [currentStep, setCurrentStep] = useState<Step>("effective-dates");
   const [pricingType, setPricingType] = useState<"new" | "addendum">("new");
   const [selectedPriceHeader, setSelectedPriceHeader] = useState<string>("");
   const [priceGroupName, setPriceGroupName] = useState("");
@@ -164,18 +164,9 @@ export function PricingFullScreenModal({
   }>({});
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const handleTypeSelection = (type: "new" | "addendum") => {
-    setPricingType(type);
-    setCurrentStep("quote-name");
-  };
-
-  const handleQuoteNameContinue = () => {
-    if (!priceGroupName.trim()) {
-      toast.error("Please enter a quote name");
-      return;
-    }
-    if (pricingType === "addendum" && !selectedPriceHeader) {
-      toast.error("Please select an existing quote");
+  const handleEffectiveDatesContinue = () => {
+    if (!headerFields.effectiveDate) {
+      toast.error("Please select an effective date");
       return;
     }
     setCurrentStep("header");
@@ -246,11 +237,8 @@ export function PricingFullScreenModal({
 
   const handleBack = () => {
     switch (currentStep) {
-      case "quote-name":
-        setCurrentStep("type");
-        break;
       case "header":
-        setCurrentStep("quote-name");
+        setCurrentStep("effective-dates");
         break;
       case "excel-input":
         setCurrentStep("header");
@@ -262,7 +250,7 @@ export function PricingFullScreenModal({
   };
 
   const resetModal = () => {
-    setCurrentStep("type");
+    setCurrentStep("effective-dates");
     setPricingType("new");
     setSelectedPriceHeader("");
     setPriceGroupName("");
@@ -359,8 +347,7 @@ export function PricingFullScreenModal({
 
   const renderStepIndicator = () => {
     const steps = [
-      { key: "type", label: "Type" },
-      { key: "quote-name", label: "Quote Name" },
+      { key: "effective-dates", label: "Effective Dates" },
       { key: "header", label: "Header" },
       { key: "excel-input", label: "Data" },
       { key: "preview", label: "Preview" },
@@ -399,224 +386,18 @@ export function PricingFullScreenModal({
     );
   };
 
-  const renderTypeStep = () => (
+  const renderEffectiveDatesStep = () => (
     <div className="space-y-6" onClick={(e) => e.stopPropagation()}>
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Create New Pricing
+          Effective Dates
         </h3>
         <p className="text-gray-600">
-          Choose how you want to create pricing for this customer.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Card
-          className={`cursor-pointer transition-all ${
-            pricingType === "new"
-              ? "ring-2 ring-primary-1 bg-primary-1/10"
-              : "hover:bg-primary-1/5"
-          }`}
-          onClick={(e) => {
-            e.stopPropagation();
-            setPricingType("new");
-          }}
-        >
-          <CardContent className="p-6">
-            <div className="flex items-start space-x-4">
-              <div
-                className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                  pricingType === "new" ? "bg-primary-1/20" : "bg-primary-1/5"
-                }`}
-              >
-                <FileSpreadsheet
-                  className={`w-6 h-6 ${
-                    pricingType === "new"
-                      ? "text-primary-1"
-                      : "text-primary-1/70"
-                  }`}
-                />
-                <Sparkles className="w-4 h-4 text-primary-1 ml-1 -mt-4" />
-              </div>
-              <div className="flex-1">
-                <h4 className="font-semibold text-gray-900 mb-1">
-                  New Price Quote
-                </h4>
-                <p className="text-sm text-gray-600">
-                  Create a completely new pricing group with its own name and
-                  settings.
-                </p>
-              </div>
-              {pricingType === "new" && (
-                <Check className="w-5 h-5 text-primary-1" />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          className={`cursor-pointer transition-all ${
-            pricingType === "addendum"
-              ? "ring-2 ring-primary-1 bg-primary-1/10"
-              : "hover:bg-primary-1/5"
-          }`}
-          onClick={(e) => {
-            e.stopPropagation();
-            setPricingType("addendum");
-          }}
-        >
-          <CardContent className="p-6">
-            <div className="flex items-start space-x-4">
-              <div
-                className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                  pricingType === "addendum"
-                    ? "bg-primary-1/20"
-                    : "bg-primary-1/5"
-                }`}
-              >
-                <PenSquare
-                  className={`w-6 h-6 ${
-                    pricingType === "addendum"
-                      ? "text-primary-1"
-                      : "text-primary-1/70"
-                  }`}
-                />
-              </div>
-              <div className="flex-1">
-                <h4 className="font-semibold text-gray-900 mb-1">
-                  Addendum to Existing Quote
-                </h4>
-                <p className="text-sm text-gray-600">
-                  Add new pricing items to an existing price quote.
-                </p>
-              </div>
-              {pricingType === "addendum" && (
-                <Check className="w-5 h-5 text-primary-1" />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex justify-end">
-        <Button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleTypeSelection(pricingType);
-          }}
-        >
-          Continue
-          <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
-      </div>
-    </div>
-  );
-
-  const renderQuoteNameStep = () => (
-    <div className="space-y-6" onClick={(e) => e.stopPropagation()}>
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          {pricingType === "new" ? "New Quote Name" : "Addendum Quote Name"}
-        </h3>
-        <p className="text-gray-600">
-          {pricingType === "new"
-            ? "Enter a name for your new pricing quote."
-            : "Select an existing quote and enter a name for the addendum."}
+          Set the effective and expiration dates for your pricing quote.
         </p>
       </div>
 
       <div className="space-y-4">
-        {pricingType === "addendum" && (
-          <div>
-            <Label htmlFor="existing-quote-select">Existing Quote</Label>
-            <Select
-              value={selectedPriceHeader}
-              onValueChange={setSelectedPriceHeader}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select an existing quote..." />
-              </SelectTrigger>
-              <SelectContent
-                position="popper"
-                side="bottom"
-                align="start"
-                className="z-[10000]"
-              >
-                {priceHeaders.map((header) => (
-                  <SelectItem
-                    key={header.priceHeaderId}
-                    value={header.priceHeaderId}
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-medium">{header.headerName}</span>
-                      <span className="text-sm text-gray-500">
-                        {header.effectiveDate} - {header.expirationDate}
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {selectedPriceHeader && (
-              <div className="p-4 bg-gray-50 rounded-lg mt-2">
-                <h4 className="font-medium text-gray-900 mb-2">
-                  Selected Quote Details
-                </h4>
-                {(() => {
-                  const header = priceHeaders.find(
-                    (h) => h.priceHeaderId === selectedPriceHeader
-                  );
-                  return header ? (
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <span className="font-medium">Name:</span>{" "}
-                        {header.headerName}
-                      </div>
-                      <div>
-                        <span className="font-medium">Status:</span>
-                        <Badge
-                          variant={
-                            header.status === "Active" ? "default" : "secondary"
-                          }
-                          className="ml-2"
-                        >
-                          {header.status}
-                        </Badge>
-                      </div>
-                      <div>
-                        <span className="font-medium">Effective Date:</span>{" "}
-                        {header.effectiveDate}
-                      </div>
-                      <div>
-                        <span className="font-medium">Expiration Date:</span>{" "}
-                        {header.expirationDate}
-                      </div>
-                    </div>
-                  ) : null;
-                })()}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div>
-          <Label htmlFor="quote-name">
-            {pricingType === "new" ? "Quote Name" : "Addendum Name"}
-          </Label>
-          <Input
-            id="quote-name"
-            value={priceGroupName}
-            onChange={(e) => setPriceGroupName(e.target.value)}
-            placeholder={
-              pricingType === "new"
-                ? "Enter quote name..."
-                : "Enter addendum name..."
-            }
-            className="mt-1"
-          />
-        </div>
-
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="effective-date">Effective Date</Label>
@@ -690,26 +471,13 @@ export function PricingFullScreenModal({
         </div>
       </div>
 
-      <div className="flex justify-between">
-        <Button
-          variant="outline"
-          onClick={(e) => {
-            e.stopPropagation();
-            setCurrentStep("type");
-          }}
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
+      <div className="flex justify-end">
         <Button
           onClick={(e) => {
             e.stopPropagation();
-            handleQuoteNameContinue();
+            handleEffectiveDatesContinue();
           }}
-          disabled={
-            !priceGroupName.trim() ||
-            (pricingType === "addendum" && !selectedPriceHeader)
-          }
+          disabled={!headerFields.effectiveDate}
         >
           Continue
           <ArrowRight className="w-4 h-4 ml-2" />
@@ -1725,44 +1493,94 @@ export function PricingFullScreenModal({
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div>
-          <Label>Input Method</Label>
-          <div className="mt-2 space-y-3">
-            <div className="flex items-center space-x-2">
-              <input
-                type="radio"
-                id="upload-method"
-                name="input-method"
-                value="upload"
-                checked={excelInputMethod === "upload"}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  setExcelInputMethod("upload");
-                }}
-                className="w-4 h-4 text-primary-1 border-gray-300 focus:ring-primary-1/50"
-              />
-              <Label htmlFor="upload-method" className="text-sm font-medium">
-                Upload Excel File
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="radio"
-                id="paste-method"
-                name="input-method"
-                value="paste"
-                checked={excelInputMethod === "paste"}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  setExcelInputMethod("paste");
-                }}
-                className="w-4 h-4 text-primary-1 border-gray-300 focus:ring-primary-1/50"
-              />
-              <Label htmlFor="paste-method" className="text-sm font-medium">
-                Paste from Clipboard
-              </Label>
-            </div>
+          <div className="mt-4 flex gap-4">
+            <Card
+              className={`cursor-pointer transition-all flex-1 ${
+                excelInputMethod === "upload"
+                  ? "ring-2 ring-primary-1 bg-primary-1/10"
+                  : "hover:bg-primary-1/5"
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setExcelInputMethod("upload");
+              }}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      excelInputMethod === "upload"
+                        ? "bg-primary-1/20"
+                        : "bg-primary-1/5"
+                    }`}
+                  >
+                    <Upload
+                      className={`w-5 h-5 ${
+                        excelInputMethod === "upload"
+                          ? "text-primary-1"
+                          : "text-primary-1/70"
+                      }`}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-gray-900 text-sm">
+                      Upload Excel File
+                    </h4>
+                    <p className="text-xs text-gray-600">
+                      Upload an Excel file (.xlsx, .xls) from your computer.
+                    </p>
+                  </div>
+                  {excelInputMethod === "upload" && (
+                    <Check className="w-4 h-4 text-primary-1" />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card
+              className={`cursor-pointer transition-all flex-1 ${
+                excelInputMethod === "paste"
+                  ? "ring-2 ring-primary-1 bg-primary-1/10"
+                  : "hover:bg-primary-1/5"
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setExcelInputMethod("paste");
+              }}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      excelInputMethod === "paste"
+                        ? "bg-primary-1/20"
+                        : "bg-primary-1/5"
+                    }`}
+                  >
+                    <Clipboard
+                      className={`w-5 h-5 ${
+                        excelInputMethod === "paste"
+                          ? "text-primary-1"
+                          : "text-primary-1/70"
+                      }`}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-gray-900 text-sm">
+                      Paste from Clipboard
+                    </h4>
+                    <p className="text-xs text-gray-600">
+                      Paste Excel data directly from your clipboard.
+                    </p>
+                  </div>
+                  {excelInputMethod === "paste" && (
+                    <Check className="w-4 h-4 text-primary-1" />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
@@ -1956,10 +1774,8 @@ export function PricingFullScreenModal({
 
   const renderCurrentStep = () => {
     switch (currentStep) {
-      case "type":
-        return renderTypeStep();
-      case "quote-name":
-        return renderQuoteNameStep();
+      case "effective-dates":
+        return renderEffectiveDatesStep();
       case "header":
         return renderHeaderStep();
       case "excel-input":
@@ -1967,7 +1783,7 @@ export function PricingFullScreenModal({
       case "preview":
         return renderPreviewStep();
       default:
-        return renderTypeStep();
+        return renderEffectiveDatesStep();
     }
   };
 

@@ -273,7 +273,7 @@ const columns: {
     width: "min-w-[120px]",
     type: "text",
   },
-  { key: "quoteId", label: "Quote", width: "min-w-[100px]", type: "text" },
+
   { key: "jobId", label: "Job", width: "min-w-[100px]", type: "text" },
 
   { key: "vendorId", label: "Vendor", width: "min-w-[100px]", type: "text" },
@@ -2134,9 +2134,9 @@ export default function PricingEntry() {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Assign Quote</DialogTitle>
+            <DialogTitle>Assign</DialogTitle>
             <DialogDescription>
-              Assign this quote to a team member and optionally add notes.
+              Assign this to a team member and optionally add notes.
             </DialogDescription>
           </DialogHeader>
 
@@ -2207,7 +2207,7 @@ export default function PricingEntry() {
               onClick={handleAssignmentSubmit}
               disabled={!assignmentModal.selectedTeamMember}
             >
-              Assign Quote
+              Assign
             </Button>
           </DialogFooter>
         </DialogContent>

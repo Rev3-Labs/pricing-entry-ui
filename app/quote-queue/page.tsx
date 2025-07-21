@@ -67,7 +67,7 @@ interface QuoteQueueItem {
 
 interface FilterState {
   customer: string;
-  quote: string;
+  changeRequest: string;
   status: string;
   submittedDateFrom: string;
   submittedDateTo: string;
@@ -90,8 +90,8 @@ class QuoteQueueService {
 
     return [
       {
-        quoteId: "Q-2024-001",
-        quoteName: "Q-2024-001",
+        quoteId: "CR-2024-001",
+        quoteName: "CR-2024-001",
         customerId: "CUST-001",
         customerName: "Acme Corporation",
         salesRep: "John Smith",
@@ -105,8 +105,8 @@ class QuoteQueueService {
         itemCount: 5,
       },
       {
-        quoteId: "Q-2024-002",
-        quoteName: "Q-2024-002",
+        quoteId: "CR-2024-002",
+        quoteName: "CR-2024-002",
         customerId: "CUST-002",
         customerName: "Tech Solutions Inc",
         salesRep: "Mike Wilson",
@@ -120,8 +120,8 @@ class QuoteQueueService {
         itemCount: 3,
       },
       {
-        quoteId: "Q-2024-003",
-        quoteName: "Q-2024-003",
+        quoteId: "CR-2024-003",
+        quoteName: "CR-2024-003",
         customerId: "CUST-003",
         customerName: "Green Energy Co",
         salesRep: "Lisa Davis",
@@ -134,8 +134,8 @@ class QuoteQueueService {
         itemCount: 8,
       },
       {
-        quoteId: "Q-2024-004",
-        quoteName: "Q-2024-004",
+        quoteId: "CR-2024-004",
+        quoteName: "CR-2024-004",
         customerId: "CUST-001",
         customerName: "Acme Corporation",
         salesRep: "John Smith",
@@ -148,8 +148,8 @@ class QuoteQueueService {
         itemCount: 2,
       },
       {
-        quoteId: "Q-2024-005",
-        quoteName: "Q-2024-005",
+        quoteId: "CR-2024-005",
+        quoteName: "CR-2024-005",
         customerId: "CUST-004",
         customerName: "Industrial Cleanup Ltd",
         salesRep: "Robert Taylor",
@@ -162,8 +162,8 @@ class QuoteQueueService {
         itemCount: 6,
       },
       {
-        quoteId: "Q-2024-006",
-        quoteName: "Q-2024-006",
+        quoteId: "CR-2024-006",
+        quoteName: "CR-2024-006",
         customerId: "CUST-005",
         customerName: "Environmental Services LLC",
         salesRep: "Jennifer Adams",
@@ -176,8 +176,8 @@ class QuoteQueueService {
         itemCount: 10,
       },
       {
-        quoteId: "Q-2024-007",
-        quoteName: "Q-2024-007",
+        quoteId: "CR-2024-007",
+        quoteName: "CR-2024-007",
         customerId: "CUST-006",
         customerName: "Waste Management Corp",
         salesRep: "Tom Wilson",
@@ -190,8 +190,8 @@ class QuoteQueueService {
         itemCount: 4,
       },
       {
-        quoteId: "Q-2024-008",
-        quoteName: "Q-2024-008",
+        quoteId: "CR-2024-008",
+        quoteName: "CR-2024-008",
         customerId: "CUST-007",
         customerName: "Clean Energy Solutions",
         salesRep: "Maria Garcia",
@@ -236,7 +236,7 @@ export default function QuoteQueuePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState<FilterState>({
     customer: "",
-    quote: "",
+    changeRequest: "",
     status: "all",
     submittedDateFrom: "",
     submittedDateTo: "",
@@ -276,9 +276,11 @@ export default function QuoteQueuePage() {
         quote.customerName
           .toLowerCase()
           .includes(filters.customer.toLowerCase());
-      const matchesQuote =
-        !filters.quote ||
-        quote.quoteName.toLowerCase().includes(filters.quote.toLowerCase());
+      const matchesChangeRequest =
+        !filters.changeRequest ||
+        quote.quoteName
+          .toLowerCase()
+          .includes(filters.changeRequest.toLowerCase());
       const matchesStatus =
         filters.status === "all" || quote.status === filters.status;
       const matchesSalesRep =
@@ -311,7 +313,7 @@ export default function QuoteQueuePage() {
 
       return (
         matchesCustomer &&
-        matchesQuote &&
+        matchesChangeRequest &&
         matchesStatus &&
         matchesSalesRep &&
         matchesAssignedTeamMember &&
@@ -393,7 +395,7 @@ export default function QuoteQueuePage() {
   const clearFilters = () => {
     setFilters({
       customer: "",
-      quote: "",
+      changeRequest: "",
       status: "all",
       submittedDateFrom: "",
       submittedDateTo: "",
@@ -481,7 +483,7 @@ export default function QuoteQueuePage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Quote Queue
+                Price Queue
               </h1>
               <div className="flex items-center space-x-4 my-2">
                 <Badge
@@ -503,8 +505,8 @@ export default function QuoteQueuePage() {
                 </Badge>
               </div>
               <p className="text-gray-600">
-                Review and manage quotes with "New" or "In-Progress" status
-                across all customers
+                Review and manage price changes with "New" or "In-Progress"
+                status across all customers
               </p>
             </div>
           </div>
@@ -534,14 +536,14 @@ export default function QuoteQueuePage() {
                 />
               </div>
 
-              {/* Quote Filter */}
+              {/* Change Request Filter */}
               <div>
-                <Label>Quote</Label>
+                <Label>Change Request</Label>
                 <Input
-                  placeholder="Search quotes..."
-                  value={filters.quote}
+                  placeholder="Search change requests..."
+                  value={filters.changeRequest}
                   onChange={(e) =>
-                    setFilters((f) => ({ ...f, quote: e.target.value }))
+                    setFilters((f) => ({ ...f, changeRequest: e.target.value }))
                   }
                   className="w-48"
                 />
@@ -587,19 +589,6 @@ export default function QuoteQueuePage() {
                     <SelectItem value="Michael Chen">Michael Chen</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              {/* Sales Rep Filter */}
-              <div>
-                <Label>Sales Rep</Label>
-                <Input
-                  placeholder="Search sales rep..."
-                  value={filters.salesRep}
-                  onChange={(e) =>
-                    setFilters((f) => ({ ...f, salesRep: e.target.value }))
-                  }
-                  className="w-48"
-                />
               </div>
 
               {/* Submitted Date Range Filter */}
@@ -706,9 +695,8 @@ export default function QuoteQueuePage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Quote</TableHead>
                       <TableHead>Customer</TableHead>
-                      <TableHead>Sales Rep</TableHead>
+                      <TableHead>Change Request</TableHead>
                       <TableHead>Assigned Team Member</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Submitted Date</TableHead>
@@ -716,43 +704,44 @@ export default function QuoteQueuePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredQuotes.map((quote) => (
+                    {filteredQuotes.map((changeRequest) => (
                       <TableRow
-                        key={quote.quoteId}
+                        key={changeRequest.quoteId}
                         className={`cursor-pointer transition-colors ${
-                          quote.status === "New"
+                          changeRequest.status === "New"
                             ? "hover:bg-blue-50"
-                            : quote.status === "In-Progress"
+                            : changeRequest.status === "In-Progress"
                             ? "hover:bg-yellow-50 "
-                            : quote.status === "Active"
+                            : changeRequest.status === "Active"
                             ? "hover:bg-green-50 "
                             : "hover:bg-gray-50"
                         }`}
-                        onClick={() => handleQuoteClick(quote)}
+                        onClick={() => handleQuoteClick(changeRequest)}
                       >
                         <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <span>{changeRequest.customerName}</span>
+                            <Badge
+                              variant="secondary"
+                              className="uppercase text-xs px-2 py-0.5 bg-gray-100 text-gray-700 border-gray-300"
+                            >
+                              {changeRequest.customerId}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
                           <div className="font-medium text-blue-600 hover:text-blue-800">
-                            {quote.quoteName}
+                            {changeRequest.quoteName}
                           </div>
                         </TableCell>
+
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            <span>{quote.customerName}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <User className="h-4 w-4 text-gray-500" />
-                            <span>{quote.salesRep}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            {quote.assignedTeamMember ? (
+                            {changeRequest.assignedTeamMember ? (
                               <>
                                 <User className="h-4 w-4 text-gray-500" />
-                                <span>{quote.assignedTeamMember}</span>
-                                {quote.assignedTeamMember ===
+                                <span>{changeRequest.assignedTeamMember}</span>
+                                {changeRequest.assignedTeamMember ===
                                   "Sarah Johnson" && (
                                   <Badge
                                     variant="secondary"
@@ -761,11 +750,11 @@ export default function QuoteQueuePage() {
                                     Me
                                   </Badge>
                                 )}
-                                {quote.assignmentNotes && (
+                                {changeRequest.assignmentNotes && (
                                   <div className="relative group">
                                     <MessageSquare className="h-4 w-4 text-blue-500 cursor-help" />
                                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                                      {quote.assignmentNotes}
+                                      {changeRequest.assignmentNotes}
                                     </div>
                                   </div>
                                 )}
@@ -777,9 +766,15 @@ export default function QuoteQueuePage() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>{getStatusBadge(quote.status)}</TableCell>
-                        <TableCell>{formatDate(quote.submittedDate)}</TableCell>
-                        <TableCell>{formatDate(quote.effectiveDate)}</TableCell>
+                        <TableCell>
+                          {getStatusBadge(changeRequest.status)}
+                        </TableCell>
+                        <TableCell>
+                          {formatDate(changeRequest.submittedDate)}
+                        </TableCell>
+                        <TableCell>
+                          {formatDate(changeRequest.effectiveDate)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

@@ -56,7 +56,7 @@ export default function CustomerSearchPage() {
             <div className="mt-4 flex justify-center space-x-4">
               <Button
                 variant="outline"
-                onClick={() => router.push("/quote-queue")}
+                onClick={() => router.push("/change-requests")}
                 className="flex items-center space-x-2"
               >
                 <FileText className="h-4 w-4" />

@@ -18,7 +18,7 @@ export default function LandingPage() {
   const router = useRouter();
 
   const handleViewPriceQueue = () => {
-    router.push("/quote-queue");
+    router.push("/change-requests");
   };
 
   const handleViewCustomerPricing = () => {

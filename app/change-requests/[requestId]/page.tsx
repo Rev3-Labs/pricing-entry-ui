@@ -2,25 +2,18 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import {
+  TextField,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
+  MenuItem,
+  FormControl,
+  InputLabel,
   Dialog,
-  DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  DialogContent,
+  DialogActions,
+  Button as MuiButton,
+} from "@mui/material";
 
 import {
   ArrowLeft,
@@ -82,6 +75,14 @@ interface EditModeState {
   customerId: string;
   customerName: string;
   assignedTo: string;
+  status:
+    | "Draft"
+    | "Submitted"
+    | "In Review"
+    | "Approved"
+    | "In Progress"
+    | "Completed"
+    | "Rejected";
 }
 
 interface Note {
@@ -405,11 +406,13 @@ export default function PriceChangeRequestDetailsPage() {
     customerId: "",
     customerName: "",
     assignedTo: "",
+    status: "Draft",
   });
   const [newNote, setNewNote] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [isUpdatingRequest, setIsUpdatingRequest] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   useEffect(() => {
     const loadRequest = async () => {
@@ -420,7 +423,6 @@ export default function PriceChangeRequestDetailsPage() {
         );
         setRequest(data);
         if (data) {
-          setStatusUpdateModal((prev) => ({ ...prev, newStatus: data.status }));
           // Initialize edit mode with current request data
           setEditMode({
             isEditing: false,
@@ -430,6 +432,7 @@ export default function PriceChangeRequestDetailsPage() {
             customerId: data.customerId || "",
             customerName: data.customerName || "",
             assignedTo: data.assignedTo,
+            status: data.status,
           });
         }
       } catch (error) {
@@ -453,9 +456,20 @@ export default function PriceChangeRequestDetailsPage() {
     return true; // Allow editing for all users regardless of status or ownership
   };
 
+  const handleStatusClick = () => {
+    if (request) {
+      setStatusUpdateModal({
+        isOpen: true,
+        newStatus: request.status,
+        notes: "",
+      });
+    }
+  };
+
   const handleStatusUpdate = async () => {
     if (!request || !statusUpdateModal.newStatus) return;
 
+    setIsUpdatingStatus(true);
     try {
       await priceChangeRequestService.updateRequestStatus(
         request.requestId,
@@ -469,7 +483,6 @@ export default function PriceChangeRequestDetailsPage() {
           ? {
               ...prev,
               status: statusUpdateModal.newStatus as any,
-              notes: statusUpdateModal.notes || prev.notes,
             }
           : null
       );
@@ -479,6 +492,8 @@ export default function PriceChangeRequestDetailsPage() {
     } catch (error) {
       console.error("Failed to update status:", error);
       toast.error("Failed to update status");
+    } finally {
+      setIsUpdatingStatus(false);
     }
   };
 
@@ -588,98 +603,103 @@ export default function PriceChangeRequestDetailsPage() {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       Draft: {
-        variant: "outline" as const,
         label: "Draft",
-        className: "bg-gray-100 text-gray-800 border-gray-200",
+        className: "text-[#63666a]",
+        bgColor: "bg-[rgba(99,102,106,0.1)]",
         icon: Clock,
       },
       Submitted: {
-        variant: "secondary" as const,
         label: "Submitted",
-        className: "bg-blue-100 text-blue-800 border-blue-200",
+        className: "text-[#1976d2]",
+        bgColor: "bg-[rgba(25,118,210,0.1)]",
         icon: Send,
       },
       "In Review": {
-        variant: "outline" as const,
         label: "In Review",
-        className: "bg-yellow-100 text-yellow-800 border-yellow-200",
+        className: "text-[#ed6c02]",
+        bgColor: "bg-[rgba(237,108,2,0.1)]",
         icon: AlertCircle,
       },
       Approved: {
-        variant: "default" as const,
         label: "Approved",
-        className: "bg-green-100 text-green-800 border-green-200",
+        className: "text-[#2e7d32]",
+        bgColor: "bg-[rgba(46,125,50,0.1)]",
         icon: CheckCircle,
       },
       "In Progress": {
-        variant: "outline" as const,
         label: "In Progress",
-        className: "bg-orange-100 text-orange-800 border-orange-200",
+        className: "text-[#ed6c02]",
+        bgColor: "bg-[rgba(237,108,2,0.1)]",
         icon: Clock,
       },
       Completed: {
-        variant: "default" as const,
         label: "Completed",
-        className: "bg-green-600 text-white border-green-600",
+        className: "text-[#2e7d32]",
+        bgColor: "bg-[rgba(46,125,50,0.1)]",
         icon: CheckCircle,
       },
       Rejected: {
-        variant: "destructive" as const,
         label: "Rejected",
-        className: "bg-red-100 text-red-800 border-red-200",
+        className: "text-[#d32f2f]",
+        bgColor: "bg-[rgba(211,47,47,0.1)]",
         icon: XCircle,
       },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || {
-      variant: "outline" as const,
       label: status,
-      className: "",
+      className: "text-[#63666a]",
+      bgColor: "bg-[rgba(99,102,106,0.1)]",
       icon: AlertCircle,
     };
 
     const IconComponent = config.icon;
 
     return (
-      <Badge
-        variant={config.variant}
-        className={`${config.className} flex items-center gap-1`}
+      <div
+        className={`flex items-center gap-2 px-3 py-1 rounded-[50px] ${config.bgColor} ${config.className}`}
       >
-        <IconComponent className="h-3 w-3" />
-        {config.label}
-      </Badge>
+        <IconComponent className="h-4 w-4" />
+        <span className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px]">
+          {config.label}
+        </span>
+      </div>
     );
   };
 
   const getRequestTypeBadge = (type: string) => {
     const typeConfig = {
       Customer: {
-        variant: "secondary" as const,
         label: "Customer",
-        className: "bg-blue-100 text-blue-800 border-blue-200",
+        className: "text-[#1976d2]",
+        bgColor: "bg-[rgba(25,118,210,0.1)]",
       },
       "Multiple Customers": {
-        variant: "outline" as const,
         label: "Multiple",
-        className: "bg-purple-100 text-purple-800 border-purple-200",
+        className: "text-[#7b1fa2]",
+        bgColor: "bg-[rgba(123,31,162,0.1)]",
       },
       "General/Global": {
-        variant: "outline" as const,
         label: "Global",
-        className: "bg-orange-100 text-orange-800 border-orange-200",
+        className: "text-[#ed6c02]",
+        bgColor: "bg-[rgba(237,108,2,0.1)]",
       },
     };
 
     const config = typeConfig[type as keyof typeof typeConfig] || {
-      variant: "outline" as const,
       label: type,
-      className: "",
+      className: "text-[#63666a]",
+      bgColor: "bg-[rgba(99,102,106,0.1)]",
     };
 
     return (
-      <Badge variant={config.variant} className={config.className}>
-        {config.label}
-      </Badge>
+      <div
+        className={`flex items-center px-3 py-1 rounded-[50px] ${config.bgColor} ${config.className}`}
+      >
+        <span className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px]">
+          {config.label}
+        </span>
+      </div>
     );
   };
 
@@ -701,12 +721,16 @@ export default function PriceChangeRequestDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="w-full max-w-6xl mx-auto px-4">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading request details...</p>
+      <div className="bg-[#fffbfe] min-h-screen">
+        <div className="bg-[#eaeaea] min-h-screen">
+          <div className="flex flex-col gap-6 px-6 py-6 max-w-7xl mx-auto">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#65b230] mx-auto mb-4"></div>
+                <p className="font-['Roboto:Regular',_sans-serif] text-[#63666a]">
+                  Loading request details...
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -716,20 +740,39 @@ export default function PriceChangeRequestDetailsPage() {
 
   if (!request) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="w-full max-w-6xl mx-auto px-4">
-          <div className="text-center py-12">
-            <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Request not found
-            </h3>
-            <p className="text-gray-600 mb-4">
-              The price change request you're looking for doesn't exist.
-            </p>
-            <Button onClick={handleBack}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Requests
-            </Button>
+      <div className="bg-[#fffbfe] min-h-screen">
+        <div className="bg-[#eaeaea] min-h-screen">
+          <div className="flex flex-col gap-6 px-6 py-6 max-w-7xl mx-auto">
+            <div className="bg-[#ffffff] rounded shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)] p-8">
+              <div className="text-center py-12">
+                <AlertCircle className="h-12 w-12 text-[#63666a] mx-auto mb-4" />
+                <h3 className="font-['Roboto:Medium',_sans-serif] font-medium text-[18px] leading-[27px] text-[#1c1b1f] mb-2">
+                  Request not found
+                </h3>
+                <p className="font-['Roboto:Regular',_sans-serif] text-[#63666a] mb-4">
+                  The price change request you're looking for doesn't exist.
+                </p>
+                <MuiButton
+                  onClick={handleBack}
+                  variant="contained"
+                  className="flex items-center gap-2 mx-auto"
+                  style={{
+                    backgroundColor: "#65b230",
+                    color: "white",
+                    fontFamily: "Roboto, sans-serif",
+                    fontWeight: 500,
+                    fontSize: "14px",
+                    lineHeight: "21px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1px",
+                    borderRadius: "100px",
+                  }}
+                >
+                  <ArrowLeft className="h-4 w-4 text-white" />
+                  <span>Back to Requests</span>
+                </MuiButton>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -737,616 +780,775 @@ export default function PriceChangeRequestDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="w-full max-w-6xl mx-auto px-4">
-        {/* Header */}
-        <div className="mb-8">
-          <Button
-            variant="ghost"
-            onClick={handleBack}
-            className="mb-4 flex items-center space-x-2 text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Requests</span>
-          </Button>
-
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center space-x-3 mb-2">
-                <h1 className="text-3xl font-bold text-gray-900">
-                  {request.requestId}
-                </h1>
-                {getStatusBadge(request.status)}
-                {getRequestTypeBadge(request.requestType)}
-              </div>
-              <h2 className="text-xl font-semibold text-gray-800 mb-2">
-                {request.subject}
-              </h2>
-              <div className="flex items-center space-x-6 text-sm text-gray-600">
-                <div className="flex items-center space-x-1">
-                  <User className="h-4 w-4" />
-                  <span>Submitted by {request.submittedBy}</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Calendar className="h-4 w-4" />
-                  <span>{formatDateShort(request.submittedDate)}</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                onClick={() =>
-                  setStatusUpdateModal({
-                    isOpen: true,
-                    newStatus: request.status,
-                    notes: "",
-                  })
-                }
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Update Status
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Request Details - Editable Section */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Request Details</CardTitle>
-                  {!editMode.isEditing && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setEditMode((prev) => ({ ...prev, isEditing: true }))
-                      }
+    <div className="bg-[#fffbfe] min-h-screen">
+      <div className="bg-[#eaeaea] min-h-screen">
+        <div className="flex flex-col gap-6 px-6 py-6 max-w-7xl mx-auto">
+          {/* Main Card */}
+          <div className="bg-[#ffffff] rounded shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)]">
+            {/* Header Section */}
+            <div className="border-b border-[#eaeaea] pb-6 pt-6 px-8">
+              <div className="flex justify-between items-start">
+                <div className="flex flex-col gap-4 min-w-[1098.75px]">
+                  {/* Back Button */}
+                  <div className="mb-4">
+                    <MuiButton
+                      onClick={handleBack}
+                      variant="text"
+                      className="flex items-center gap-2"
+                      style={{
+                        color: "#63666a",
+                        fontFamily: "Roboto, sans-serif",
+                        fontWeight: 400,
+                        fontSize: "16px",
+                        lineHeight: "24px",
+                        textTransform: "none",
+                        padding: "0",
+                        minWidth: "auto",
+                      }}
                     >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {editMode.isEditing ? (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">
-                          Subject *
-                        </label>
-                        <input
-                          type="text"
-                          value={editMode.subject}
-                          onChange={(e) =>
-                            setEditMode((prev) => ({
-                              ...prev,
-                              subject: e.target.value,
-                            }))
-                          }
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                          placeholder="Brief summary of the change"
-                        />
+                      <ArrowLeft className="h-4 w-4" />
+                      <span>Back to Requests</span>
+                    </MuiButton>
+                  </div>
+
+                  {/* Title */}
+                  <div>
+                    <h1 className="font-['Roboto:Medium',_sans-serif] font-medium text-[24px] leading-[36px] text-[#1c1b1f] tracking-[0.25px]">
+                      {request.requestId}
+                    </h1>
+                    <h2 className="font-['Roboto:Regular',_sans-serif] font-normal text-[18px] leading-[27px] text-[#1c1b1f] mt-2">
+                      {request.subject}
+                    </h2>
+                  </div>
+
+                  {/* Metadata Rows */}
+                  <div className="flex gap-12">
+                    <div className="flex grow">
+                      <div className="w-32">
+                        <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#63666a]">
+                          Submitted By:
+                        </span>
                       </div>
-
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">
-                          Request Type *
-                        </label>
-                        <Select
-                          value={editMode.requestType}
-                          onValueChange={(
-                            value:
-                              | "Customer"
-                              | "Multiple Customers"
-                              | "General/Global"
-                          ) =>
-                            setEditMode((prev) => ({
-                              ...prev,
-                              requestType: value,
-                            }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select request type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Customer">Customer</SelectItem>
-                            <SelectItem value="Multiple Customers">
-                              Multiple Customers
-                            </SelectItem>
-                            <SelectItem value="General/Global">
-                              General/Global
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {editMode.requestType === "Customer" && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">
-                            Customer *
-                          </label>
-                          <Select
-                            value={editMode.customerId}
-                            onValueChange={(value) =>
-                              setEditMode((prev) => ({
-                                ...prev,
-                                customerId: value,
-                                customerName:
-                                  value === "CUST-001"
-                                    ? "Acme Corporation"
-                                    : value === "CUST-002"
-                                    ? "Tech Solutions Inc"
-                                    : value === "CUST-003"
-                                    ? "Utah State Agencies"
-                                    : "",
-                              }))
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select customer" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="CUST-001">
-                                Acme Corporation
-                              </SelectItem>
-                              <SelectItem value="CUST-002">
-                                Tech Solutions Inc
-                              </SelectItem>
-                              <SelectItem value="CUST-003">
-                                Utah State Agencies
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">
-                          Assigned To *
-                        </label>
-                        <Select
-                          value={editMode.assignedTo}
-                          onValueChange={(value) =>
-                            setEditMode((prev) => ({
-                              ...prev,
-                              assignedTo: value,
-                            }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select team member" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Sarah Johnson">
-                              Sarah Johnson
-                            </SelectItem>
-                            <SelectItem value="John Smith">
-                              John Smith
-                            </SelectItem>
-                            <SelectItem value="David Brown">
-                              David Brown
-                            </SelectItem>
-                            <SelectItem value="Mike Wilson">
-                              Mike Wilson
-                            </SelectItem>
-                            <SelectItem value="Michael Chen">
-                              Michael Chen
-                            </SelectItem>
-                            <SelectItem value="Lisa Davis">
-                              Lisa Davis
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-[#63666a]" />
+                        <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
+                          {request.submittedBy}
+                        </span>
                       </div>
                     </div>
-
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">
-                        Description *
-                      </label>
-                      <textarea
-                        value={editMode.description}
-                        onChange={(e) =>
-                          setEditMode((prev) => ({
-                            ...prev,
-                            description: e.target.value,
-                          }))
-                        }
-                        rows={4}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                        placeholder="Detailed explanation of the request and reasoning"
-                      />
-                    </div>
-
-                    <div className="flex space-x-2 pt-4 border-t">
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          setEditMode((prev) => ({ ...prev, isEditing: false }))
-                        }
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleUpdateRequest}
-                        disabled={
-                          isUpdatingRequest ||
-                          !editMode.subject.trim() ||
-                          !editMode.description.trim() ||
-                          !editMode.assignedTo.trim() ||
-                          (editMode.requestType === "Customer" &&
-                            !editMode.customerId.trim())
-                        }
-                      >
-                        {isUpdatingRequest ? "Updating..." : "Save Changes"}
-                      </Button>
+                    <div className="flex grow">
+                      <div className="w-[143.99px]">
+                        <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#63666a]">
+                          Submitted Date:
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-[#63666a]" />
+                        <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
+                          {formatDateShort(request.submittedDate)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">
-                          Subject
-                        </label>
-                        <p className="mt-1 text-gray-900">{request.subject}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">
-                          Request Type
-                        </label>
-                        <div className="mt-1">
-                          {getRequestTypeBadge(request.requestType)}
+
+                  {request.customerName && (
+                    <div className="flex gap-12">
+                      <div className="flex grow">
+                        <div className="w-32">
+                          <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#63666a]">
+                            Customer:
+                          </span>
                         </div>
-                      </div>
-                      {request.customerName && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">
-                            Customer
-                          </label>
-                          <div className="mt-1">
-                            <div className="flex items-center space-x-2">
-                              <span className="font-medium">
-                                {request.customerName}
-                              </span>
-                              <Badge variant="secondary" className="text-xs">
-                                {request.customerId}
-                              </Badge>
-                            </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
+                            {request.customerName}
+                          </span>
+                          <div className="bg-[rgba(101,178,48,0.1)] px-2 py-1 rounded-[50px]">
+                            <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[12px] leading-[20px] text-[#1c1b1f]">
+                              {request.customerId}
+                            </span>
                           </div>
                         </div>
-                      )}
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">
-                          Assigned To
-                        </label>
-                        <div className="mt-1 flex items-center space-x-2">
-                          <User className="h-4 w-4 text-gray-500" />
-                          <span>{request.assignedTo}</span>
+                      </div>
+                      <div className="flex grow">
+                        <div className="w-[143.99px]">
+                          <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#63666a]">
+                            Assigned To:
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-[#63666a]" />
+                          <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
+                            {request.assignedTo}
+                          </span>
                           {request.assignedTo === "Sarah Johnson" && (
-                            <Badge
-                              variant="secondary"
-                              className="text-xs bg-green-600 text-white"
-                            >
-                              Me
-                            </Badge>
+                            <div className="bg-[#65b230] px-2 py-1 rounded-[50px]">
+                              <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[12px] leading-[20px] text-[#ffffff]">
+                                Me
+                              </span>
+                            </div>
                           )}
                         </div>
                       </div>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">
-                        Description
-                      </label>
-                      <p className="mt-1 text-gray-700 whitespace-pre-wrap">
-                        {request.description}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Notes */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <MessageSquare className="h-5 w-5" />
-                  <span>Notes</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {/* Add Note Section */}
-                <div className="mb-6 pb-4 border-b">
-                  <Textarea
-                    placeholder="Add a note..."
-                    value={newNote}
-                    onChange={(e) => setNewNote(e.target.value)}
-                    rows={3}
-                    className="mb-3"
-                  />
-                  <Button
-                    onClick={handleAddNote}
-                    disabled={!newNote.trim() || isAddingNote}
-                    className="flex items-center space-x-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>{isAddingNote ? "Adding..." : "Add Note"}</span>
-                  </Button>
-                </div>
-
-                {/* Notes List */}
-                <div className="space-y-6">
-                  {request.notesList && request.notesList.length > 0 ? (
-                    [...request.notesList]
-                      .sort(
-                        (a, b) =>
-                          new Date(b.timestamp).getTime() -
-                          new Date(a.timestamp).getTime()
-                      )
-                      .map((note) => (
-                        <div key={note.id} className="flex space-x-3">
-                          {/* Avatar */}
-                          <div className="flex-shrink-0">
-                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-medium text-blue-600">
-                                {note.author
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")
-                                  .toUpperCase()}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Note Content */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <span className="font-medium text-gray-900 text-sm">
-                                {note.author}
-                              </span>
-                              <span className="text-gray-400">•</span>
-                              <span className="text-xs text-gray-500">
-                                {formatDate(note.timestamp)}
-                              </span>
-                            </div>
-                            <div className="bg-gray-50 rounded-lg p-3">
-                              <p className="text-gray-700 text-sm leading-relaxed">
-                                {note.content}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500 text-sm">No notes yet</p>
-                      <p className="text-gray-400 text-xs mt-1">
-                        Be the first to add a note
-                      </p>
-                    </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Documents */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <FileText className="h-5 w-5" />
-                  <span>Documents ({request.documents?.length || 0})</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Upload Section */}
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 mb-2">
-                      Upload additional documents to this request
-                    </p>
-                    <input
-                      type="file"
-                      onChange={handleFileUpload}
-                      disabled={isUploadingDocument}
-                      className="hidden"
-                      id="document-upload"
-                    />
-                    <label
-                      htmlFor="document-upload"
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isUploadingDocument ? "Uploading..." : "Choose File"}
-                    </label>
-                  </div>
-
-                  {/* Documents List */}
-                  {request.documents && request.documents.length > 0 ? (
-                    <div className="space-y-2">
-                      {request.documents.map((document) => (
-                        <div
-                          key={document.id}
-                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <FileText className="h-5 w-5 text-gray-500" />
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2">
-                                <span className="font-medium text-gray-900">
-                                  {document.name}
-                                </span>
-                                {document.type === "attachment" && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    Original
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {document.size} • {document.uploadedBy} •{" "}
-                                {formatDateShort(document.uploadedAt)}
-                              </div>
-                            </div>
-                          </div>
-                          <Button variant="ghost" size="sm">
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 italic text-center py-4">
-                      No documents available
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Request Status & Timeline */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Status & Timeline</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    Current Status
-                  </label>
-                  <div className="mt-1">{getStatusBadge(request.status)}</div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    Submitted By
-                  </label>
-                  <div className="mt-1 flex items-center space-x-2">
-                    <User className="h-4 w-4 text-gray-500" />
-                    <span>{request.submittedBy}</span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    Submitted Date
-                  </label>
-                  <div className="mt-1 flex items-center space-x-2">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    <span>{formatDateShort(request.submittedDate)}</span>
-                  </div>
-                </div>
-
-                {request.notes && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">
-                      Status Notes
-                    </label>
-                    <div className="mt-1 p-3 bg-gray-50 rounded-md">
-                      <p className="text-sm text-gray-700">{request.notes}</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Status Update Modal */}
-        <Dialog
-          open={statusUpdateModal.isOpen}
-          onOpenChange={(open) =>
-            setStatusUpdateModal((prev) => ({ ...prev, isOpen: open }))
-          }
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Update Request Status</DialogTitle>
-              <DialogDescription>
-                Update the status of this price change request and add any
-                relevant notes.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">
-                  New Status
-                </label>
-                <Select
-                  value={statusUpdateModal.newStatus}
-                  onValueChange={(value) =>
-                    setStatusUpdateModal((prev) => ({
-                      ...prev,
-                      newStatus: value,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Draft">Draft</SelectItem>
-                    <SelectItem value="Submitted">Submitted</SelectItem>
-                    <SelectItem value="In Review">In Review</SelectItem>
-                    <SelectItem value="Approved">Approved</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Completed">Completed</SelectItem>
-                    <SelectItem value="Rejected">Rejected</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">
-                  Notes (Optional)
-                </label>
-                <Textarea
-                  placeholder="Add notes about this status change..."
-                  value={statusUpdateModal.notes}
-                  onChange={(e) =>
-                    setStatusUpdateModal((prev) => ({
-                      ...prev,
-                      notes: e.target.value,
-                    }))
-                  }
-                  rows={3}
-                />
               </div>
             </div>
 
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  setStatusUpdateModal({
-                    isOpen: false,
-                    newStatus: "",
-                    notes: "",
-                  })
-                }
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleStatusUpdate}>Update Status</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            {/* Content Section */}
+            <div className="pb-8 pt-8 px-8">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Main Content */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Request Details - Editable Section */}
+                  <div className="bg-[#ffffff] rounded border border-[#b9b9b9]">
+                    <div className="border-b border-[#b9b9b9] px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-['Roboto:Medium',_sans-serif] font-medium text-[18px] leading-[27px] text-[#1c1b1f]">
+                          Request Details
+                        </h3>
+                        {!editMode.isEditing ? (
+                          <MuiButton
+                            onClick={() =>
+                              setEditMode((prev) => ({
+                                ...prev,
+                                isEditing: true,
+                              }))
+                            }
+                            variant="contained"
+                            className="flex items-center gap-2"
+                            style={{
+                              backgroundColor: "#65b230",
+                              color: "white",
+                              fontFamily: "Roboto, sans-serif",
+                              fontWeight: 500,
+                              fontSize: "14px",
+                              lineHeight: "21px",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.1px",
+                              borderRadius: "100px",
+                              height: "36px",
+                              padding: "8px 12px",
+                            }}
+                          >
+                            <Edit className="w-4 h-4 text-white" />
+                            <span>Edit</span>
+                          </MuiButton>
+                        ) : (
+                          <div className="flex space-x-2">
+                            <MuiButton
+                              onClick={() =>
+                                setEditMode((prev) => ({
+                                  ...prev,
+                                  isEditing: false,
+                                }))
+                              }
+                              variant="outlined"
+                              style={{
+                                borderColor: "#b9b9b9",
+                                color: "#1c1b1f",
+                                fontFamily: "Roboto, sans-serif",
+                                fontWeight: 500,
+                                fontSize: "14px",
+                                lineHeight: "21px",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.1px",
+                                borderRadius: "100px",
+                                height: "36px",
+                                padding: "8px 12px",
+                              }}
+                            >
+                              Cancel
+                            </MuiButton>
+                            <MuiButton
+                              onClick={handleUpdateRequest}
+                              disabled={
+                                isUpdatingRequest ||
+                                !editMode.subject.trim() ||
+                                !editMode.description.trim() ||
+                                !editMode.assignedTo.trim() ||
+                                (editMode.requestType === "Customer" &&
+                                  !editMode.customerId.trim())
+                              }
+                              variant="contained"
+                              style={{
+                                backgroundColor: "#65b230",
+                                color: "white",
+                                fontFamily: "Roboto, sans-serif",
+                                fontWeight: 500,
+                                fontSize: "14px",
+                                lineHeight: "21px",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.1px",
+                                borderRadius: "100px",
+                                height: "36px",
+                                padding: "8px 12px",
+                              }}
+                            >
+                              {isUpdatingRequest
+                                ? "Updating..."
+                                : "Save Changes"}
+                            </MuiButton>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      {editMode.isEditing ? (
+                        <div className="space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <TextField
+                                label="Subject *"
+                                variant="outlined"
+                                fullWidth
+                                value={editMode.subject}
+                                onChange={(e) =>
+                                  setEditMode((prev) => ({
+                                    ...prev,
+                                    subject: e.target.value,
+                                  }))
+                                }
+                                placeholder="Brief summary of the change"
+                                InputProps={{
+                                  style: {
+                                    fontVariationSettings: "'wdth' 100",
+                                  },
+                                }}
+                              />
+                            </div>
+
+                            <div>
+                              <FormControl variant="outlined" fullWidth>
+                                <InputLabel id="edit-request-type-label">
+                                  Request Type *
+                                </InputLabel>
+                                <Select
+                                  labelId="edit-request-type-label"
+                                  value={editMode.requestType}
+                                  onChange={(e) =>
+                                    setEditMode((prev) => ({
+                                      ...prev,
+                                      requestType: e.target.value as
+                                        | "Customer"
+                                        | "Multiple Customers"
+                                        | "General/Global",
+                                    }))
+                                  }
+                                  label="Request Type *"
+                                  style={{
+                                    fontVariationSettings: "'wdth' 100",
+                                  }}
+                                >
+                                  <MenuItem value="Customer">Customer</MenuItem>
+                                  <MenuItem value="Multiple Customers">
+                                    Multiple Customers
+                                  </MenuItem>
+                                  <MenuItem value="General/Global">
+                                    General/Global
+                                  </MenuItem>
+                                </Select>
+                              </FormControl>
+                            </div>
+
+                            {editMode.requestType === "Customer" && (
+                              <div>
+                                <FormControl variant="outlined" fullWidth>
+                                  <InputLabel id="edit-customer-label">
+                                    Customer *
+                                  </InputLabel>
+                                  <Select
+                                    labelId="edit-customer-label"
+                                    value={editMode.customerId}
+                                    onChange={(e) => {
+                                      const value = e.target.value as string;
+                                      setEditMode((prev) => ({
+                                        ...prev,
+                                        customerId: value,
+                                        customerName:
+                                          value === "CUST-001"
+                                            ? "Acme Corporation"
+                                            : value === "CUST-002"
+                                            ? "Tech Solutions Inc"
+                                            : value === "CUST-003"
+                                            ? "Utah State Agencies"
+                                            : "",
+                                      }));
+                                    }}
+                                    label="Customer *"
+                                    style={{
+                                      fontVariationSettings: "'wdth' 100",
+                                    }}
+                                  >
+                                    <MenuItem value="CUST-001">
+                                      Acme Corporation
+                                    </MenuItem>
+                                    <MenuItem value="CUST-002">
+                                      Tech Solutions Inc
+                                    </MenuItem>
+                                    <MenuItem value="CUST-003">
+                                      Utah State Agencies
+                                    </MenuItem>
+                                  </Select>
+                                </FormControl>
+                              </div>
+                            )}
+
+                            <div>
+                              <FormControl variant="outlined" fullWidth>
+                                <InputLabel id="edit-assigned-to-label">
+                                  Assigned To *
+                                </InputLabel>
+                                <Select
+                                  labelId="edit-assigned-to-label"
+                                  value={editMode.assignedTo}
+                                  onChange={(e) =>
+                                    setEditMode((prev) => ({
+                                      ...prev,
+                                      assignedTo: e.target.value as string,
+                                    }))
+                                  }
+                                  label="Assigned To *"
+                                  style={{
+                                    fontVariationSettings: "'wdth' 100",
+                                  }}
+                                >
+                                  <MenuItem value="Sarah Johnson">
+                                    Sarah Johnson
+                                  </MenuItem>
+                                  <MenuItem value="John Smith">
+                                    John Smith
+                                  </MenuItem>
+                                  <MenuItem value="David Brown">
+                                    David Brown
+                                  </MenuItem>
+                                  <MenuItem value="Mike Wilson">
+                                    Mike Wilson
+                                  </MenuItem>
+                                  <MenuItem value="Michael Chen">
+                                    Michael Chen
+                                  </MenuItem>
+                                  <MenuItem value="Lisa Davis">
+                                    Lisa Davis
+                                  </MenuItem>
+                                </Select>
+                              </FormControl>
+                            </div>
+                          </div>
+
+                          <div>
+                            <TextField
+                              label="Description *"
+                              variant="outlined"
+                              fullWidth
+                              multiline
+                              rows={4}
+                              value={editMode.description}
+                              onChange={(e) =>
+                                setEditMode((prev) => ({
+                                  ...prev,
+                                  description: e.target.value,
+                                }))
+                              }
+                              placeholder="Detailed explanation of the request and reasoning"
+                              InputProps={{
+                                style: {
+                                  fontVariationSettings: "'wdth' 100",
+                                },
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
+                                Subject
+                              </label>
+                              <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
+                                {request.subject}
+                              </p>
+                            </div>
+                            <div>
+                              <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
+                                Request Type
+                              </label>
+                              <div className="mt-1">
+                                {getRequestTypeBadge(request.requestType)}
+                              </div>
+                            </div>
+                            {request.customerName && (
+                              <div>
+                                <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
+                                  Customer
+                                </label>
+                                <div className="mt-1">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
+                                      {request.customerName}
+                                    </span>
+                                    <div className="bg-[rgba(101,178,48,0.1)] px-2 py-1 rounded-[50px]">
+                                      <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[12px] leading-[20px] text-[#1c1b1f]">
+                                        {request.customerId}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            <div>
+                              <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
+                                Assigned To
+                              </label>
+                              <div className="mt-1 flex items-center space-x-2">
+                                <User className="h-4 w-4 text-[#63666a]" />
+                                <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
+                                  {request.assignedTo}
+                                </span>
+                                {request.assignedTo === "Sarah Johnson" && (
+                                  <div className="bg-[#65b230] px-2 py-1 rounded-[50px]">
+                                    <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[12px] leading-[20px] text-[#ffffff]">
+                                      Me
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
+                              Description
+                            </label>
+                            <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#63666a] whitespace-pre-wrap">
+                              {request.description}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Documents */}
+                  <div className="bg-[#ffffff] rounded border border-[#b9b9b9]">
+                    <div className="border-b border-[#b9b9b9] px-6 py-4">
+                      <h3 className="font-['Roboto:Medium',_sans-serif] font-medium text-[18px] leading-[27px] text-[#1c1b1f] flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        <span>
+                          Documents ({request.documents?.length || 0})
+                        </span>
+                      </h3>
+                    </div>
+                    <div className="p-6">
+                      {/* Upload Section */}
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                        <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600 mb-2">
+                          Upload additional documents to this request
+                        </p>
+                        <input
+                          type="file"
+                          onChange={handleFileUpload}
+                          disabled={isUploadingDocument}
+                          className="hidden"
+                          id="document-upload"
+                        />
+                        <MuiButton
+                          component="label"
+                          htmlFor="document-upload"
+                          variant="contained"
+                          disabled={isUploadingDocument}
+                          style={{
+                            backgroundColor: "#1976d2",
+                            color: "white",
+                            fontFamily: "Roboto, sans-serif",
+                            fontWeight: 500,
+                            fontSize: "14px",
+                            lineHeight: "21px",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.1px",
+                            borderRadius: "100px",
+                          }}
+                        >
+                          {isUploadingDocument ? "Uploading..." : "Choose File"}
+                        </MuiButton>
+                      </div>
+
+                      {/* Documents List */}
+                      {request.documents && request.documents.length > 0 ? (
+                        <div className="space-y-2">
+                          {request.documents.map((document) => (
+                            <div
+                              key={document.id}
+                              className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <FileText className="h-5 w-5 text-gray-500" />
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="font-medium text-gray-900">
+                                      {document.name}
+                                    </span>
+                                    {document.type === "attachment" && (
+                                      <span className="inline-flex items-center bg-[rgba(158,158,158,0.1)] text-[#616161] rounded-full px-2 py-1 text-xs font-['Roboto:Medium',_sans-serif] font-medium">
+                                        Original
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {document.size} • {document.uploadedBy} •{" "}
+                                    {formatDateShort(document.uploadedAt)}
+                                  </div>
+                                </div>
+                              </div>
+                              <MuiButton
+                                variant="outlined"
+                                size="small"
+                                style={{
+                                  borderColor: "#b9b9b9",
+                                  color: "#1c1b1f",
+                                  fontFamily: "Roboto, sans-serif",
+                                  fontWeight: 500,
+                                  fontSize: "14px",
+                                  lineHeight: "21px",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.1px",
+                                }}
+                              >
+                                <Download className="h-4 w-4" />
+                              </MuiButton>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 italic text-center py-4">
+                          No documents available
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes Section */}
+                <div className="lg:col-span-1">
+                  <div className="bg-[#ffffff] rounded border border-[#b9b9b9]">
+                    <div className="border-b border-[#b9b9b9] px-6 py-4">
+                      <h3 className="font-['Roboto:Medium',_sans-serif] font-medium text-[18px] leading-[27px] text-[#1c1b1f] flex items-center gap-2">
+                        <MessageSquare className="h-5 w-5" />
+                        <span>Notes</span>
+                      </h3>
+                    </div>
+                    <div className="p-6">
+                      {/* Add Note Section */}
+                      <div className="mb-6 pb-4 border-b">
+                        <TextField
+                          placeholder="Add a note..."
+                          value={newNote}
+                          onChange={(e) => setNewNote(e.target.value)}
+                          multiline
+                          rows={3}
+                          variant="outlined"
+                          fullWidth
+                          className="mb-3"
+                          InputProps={{
+                            style: {
+                              fontVariationSettings: "'wdth' 100",
+                            },
+                          }}
+                        />
+                        <MuiButton
+                          onClick={handleAddNote}
+                          disabled={!newNote.trim() || isAddingNote}
+                          variant="contained"
+                          fullWidth
+                          className="flex items-center space-x-2"
+                          style={{
+                            backgroundColor: "#65b230",
+                            color: "white",
+                            fontFamily: "Roboto, sans-serif",
+                            fontWeight: 500,
+                            fontSize: "14px",
+                            lineHeight: "21px",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.1px",
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                          <span>{isAddingNote ? "Adding..." : "Add Note"}</span>
+                        </MuiButton>
+                      </div>
+
+                      {/* Notes List */}
+                      <div className="space-y-4">
+                        {request.notesList && request.notesList.length > 0 ? (
+                          [...request.notesList]
+                            .sort(
+                              (a, b) =>
+                                new Date(b.timestamp).getTime() -
+                                new Date(a.timestamp).getTime()
+                            )
+                            .map((note) => (
+                              <div key={note.id} className="flex space-x-3">
+                                {/* Avatar */}
+                                <div className="flex-shrink-0">
+                                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <span className="text-sm font-medium text-blue-600">
+                                      {note.author
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .join("")
+                                        .toUpperCase()}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Note Content */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center space-x-2 mb-1">
+                                    <span className="font-medium text-gray-900 text-sm">
+                                      {note.author}
+                                    </span>
+                                    <span className="text-gray-400">•</span>
+                                    <span className="text-xs text-gray-500">
+                                      {formatDate(note.timestamp)}
+                                    </span>
+                                  </div>
+                                  <div className="bg-gray-50 rounded-lg p-3">
+                                    <p className="text-gray-700 text-sm leading-relaxed">
+                                      {note.content}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                        ) : (
+                          <div className="text-center py-8">
+                            <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                            <p className="text-gray-500 text-sm">
+                              No notes yet
+                            </p>
+                            <p className="text-gray-400 text-xs mt-1">
+                              Be the first to add a note
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Status Update Modal */}
+      <Dialog
+        open={statusUpdateModal.isOpen}
+        onClose={() =>
+          setStatusUpdateModal((prev) => ({ ...prev, isOpen: false }))
+        }
+      >
+        <DialogTitle>Update Request Status</DialogTitle>
+        <DialogContent>
+          <p className="text-sm text-gray-600 mb-4">
+            Update the status of this price change request and add any relevant
+            notes.
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <FormControl variant="outlined" fullWidth>
+                <InputLabel id="status-update-label">New Status</InputLabel>
+                <Select
+                  labelId="status-update-label"
+                  value={statusUpdateModal.newStatus}
+                  onChange={(e) =>
+                    setStatusUpdateModal((prev) => ({
+                      ...prev,
+                      newStatus: e.target.value as string,
+                    }))
+                  }
+                  label="New Status"
+                  style={{ fontVariationSettings: "'wdth' 100" }}
+                >
+                  <MenuItem value="Draft">Draft</MenuItem>
+                  <MenuItem value="Submitted">Submitted</MenuItem>
+                  <MenuItem value="In Review">In Review</MenuItem>
+                  <MenuItem value="Approved">Approved</MenuItem>
+                  <MenuItem value="In Progress">In Progress</MenuItem>
+                  <MenuItem value="Completed">Completed</MenuItem>
+                  <MenuItem value="Rejected">Rejected</MenuItem>
+                </Select>
+              </FormControl>
+            </div>
+
+            <div>
+              <TextField
+                label="Notes (Optional)"
+                variant="outlined"
+                fullWidth
+                multiline
+                rows={3}
+                placeholder="Add notes about this status change..."
+                value={statusUpdateModal.notes}
+                onChange={(e) =>
+                  setStatusUpdateModal((prev) => ({
+                    ...prev,
+                    notes: e.target.value,
+                  }))
+                }
+                InputProps={{
+                  style: {
+                    fontVariationSettings: "'wdth' 100",
+                  },
+                }}
+              />
+            </div>
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <MuiButton
+            onClick={() =>
+              setStatusUpdateModal({
+                isOpen: false,
+                newStatus: "",
+                notes: "",
+              })
+            }
+            style={{
+              borderColor: "#b9b9b9",
+              color: "#1c1b1f",
+              fontFamily: "Roboto, sans-serif",
+              fontWeight: 500,
+              fontSize: "14px",
+              lineHeight: "21px",
+              textTransform: "uppercase",
+              letterSpacing: "0.1px",
+            }}
+          >
+            Cancel
+          </MuiButton>
+          <MuiButton
+            onClick={handleStatusUpdate}
+            disabled={isUpdatingStatus}
+            variant="contained"
+            style={{
+              backgroundColor: "#65b230",
+              color: "white",
+              fontFamily: "Roboto, sans-serif",
+              fontWeight: 500,
+              fontSize: "14px",
+              lineHeight: "21px",
+              textTransform: "uppercase",
+              letterSpacing: "0.1px",
+            }}
+          >
+            {isUpdatingStatus ? "Updating..." : "Update Status"}
+          </MuiButton>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }

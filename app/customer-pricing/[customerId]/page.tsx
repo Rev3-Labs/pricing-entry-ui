@@ -2,35 +2,18 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
+  TextField,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Button as MuiButton,
   Dialog,
-  DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogFooter,
-  DialogClose,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  DialogContent,
+  DialogActions,
+} from "@mui/material";
 import {
   ArrowLeft,
   Building2,
@@ -59,15 +42,6 @@ import {
   customerService,
 } from "@/services/customer.service";
 import { PricingFullScreenModal } from "@/components/PricingFullScreenModal";
-import {
-  Sheet,
-  SheetTrigger,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-  SheetClose,
-} from "@/components/ui/sheet";
 
 interface FilterState {
   productName: string;
@@ -89,7 +63,6 @@ interface FilterState {
 }
 
 export default function CustomerPricingPage() {
-  const sheetCloseRef = React.useRef<HTMLButtonElement>(null);
   const params = useParams();
   const router = useRouter();
   const customerId = params.customerId as string;
@@ -128,6 +101,7 @@ export default function CustomerPricingPage() {
     absoluteContainerMinimum: "",
   });
   const [searchTerm, setSearchTerm] = useState("");
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   // Add state for view toggle
   // Remove the viewMode state and toggle buttons
   // Only render the table view for price items
@@ -705,17 +679,31 @@ export default function CustomerPricingPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case "active":
-        return <Badge className="bg-green-100 text-green-800">Active</Badge>;
+        return (
+          <span className="inline-flex items-center bg-[rgba(46,125,50,0.1)] text-[#2e7d32] rounded-full px-3 py-1 text-xs font-medium">
+            Active
+          </span>
+        );
       case "in-progress":
         return (
-          <Badge className="bg-yellow-100 text-yellow-800">In-Progress</Badge>
+          <span className="inline-flex items-center bg-[rgba(237,108,2,0.1)] text-[#ed6c02] rounded-full px-3 py-1 text-xs font-medium">
+            In-Progress
+          </span>
         );
       case "new":
-        return <Badge className="bg-gray-100 text-gray-800">New</Badge>;
+        return (
+          <span className="inline-flex items-center bg-[rgba(25,118,210,0.1)] text-[#1976d2] rounded-full px-3 py-1 text-xs font-medium">
+            New
+          </span>
+        );
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return (
+          <span className="inline-flex items-center bg-[rgba(158,158,158,0.1)] text-[#49454f] rounded-full px-3 py-1 text-xs font-medium">
+            {status}
+          </span>
+        );
     }
   };
 
@@ -781,10 +769,10 @@ export default function CustomerPricingPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#fffbfe] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#65b230] mx-auto mb-4"></div>
+          <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#49454f]">
             Loading customer pricing information...
           </p>
         </div>
@@ -794,183 +782,225 @@ export default function CustomerPricingPage() {
 
   if (!customer) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#fffbfe] flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 mb-4">Customer not found</p>
-          <Button onClick={handleBack}>Go Back</Button>
+          <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#49454f] mb-4">
+            Customer not found
+          </p>
+          <MuiButton
+            variant="contained"
+            onClick={handleBack}
+            sx={{
+              backgroundColor: "#65b230",
+              borderRadius: "100px",
+              textTransform: "none",
+              "&:hover": {
+                backgroundColor: "#4a8a1f",
+              },
+            }}
+          >
+            Go Back
+          </MuiButton>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-[#fffbfe] py-8">
       <div className="w-full max-w-[1800px] mx-auto px-2">
         {/* Header */}
         <div className="mb-8">
-          <Button
-            variant="ghost"
+          <MuiButton
+            variant="text"
             onClick={handleBack}
-            className="mb-4 flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+            sx={{
+              mb: 2,
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              color: "#49454f",
+              textTransform: "none",
+              "&:hover": {
+                backgroundColor: "rgba(101, 178, 48, 0.08)",
+              },
+            }}
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Back</span>
-          </Button>
+          </MuiButton>
 
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="font-['Roboto:Medium',_sans-serif] font-medium text-[32px] leading-[40px] text-[#1c1b1f] mb-2">
                 {customer?.customerName}
               </h1>
               <div className="flex items-center space-x-2">
                 {customer?.oracleCustomerId && (
-                  <Badge variant="secondary">
+                  <span className="inline-flex items-center bg-[rgba(158,158,158,0.1)] text-[#49454f] rounded-full px-3 py-1 text-xs font-medium">
                     Oracle: {customer.oracleCustomerId}
-                  </Badge>
+                  </span>
                 )}
               </div>
             </div>
           </div>
         </div>
-        <Card>
-          <CardHeader>
+
+        <div className="bg-white border border-[#b9b9b9] rounded shadow-sm">
+          <div className="p-6 border-b border-[#b9b9b9]">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center space-x-2">
-                <span>All Pricing Items</span>
-                <Badge variant="outline">
+              <div className="flex items-center space-x-2">
+                <span className="font-['Roboto:Medium',_sans-serif] font-medium text-[22px] leading-[28px] text-[#1c1b1f]">
+                  All Pricing Items
+                </span>
+                <span className="inline-flex items-center bg-[rgba(158,158,158,0.1)] text-[#49454f] rounded-full px-3 py-1 text-xs font-medium border border-[#b9b9b9]">
                   {filteredPriceItems.length} items
-                </Badge>
-              </CardTitle>
+                </span>
+              </div>
               <div className="flex space-x-2">
                 <div className="flex items-center space-x-2">
-                  <Button
-                    variant="default"
-                    size="sm"
+                  <MuiButton
+                    variant="contained"
+                    size="small"
                     onClick={() => setCreatePricingDialogOpen(true)}
-                    className="flex items-center space-x-2"
+                    sx={{
+                      backgroundColor: "#65b230",
+                      borderRadius: "100px",
+                      textTransform: "none",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      "&:hover": {
+                        backgroundColor: "#4a8a1f",
+                      },
+                    }}
                   >
                     <Plus className="h-4 w-4" />
                     <span>Create New Pricing</span>
-                  </Button>
+                  </MuiButton>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
+                <MuiButton
+                  variant="outlined"
+                  size="small"
                   onClick={handleExportToExcel}
-                  className="flex items-center space-x-2"
+                  sx={{
+                    borderRadius: "100px",
+                    textTransform: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    borderColor: "#b9b9b9",
+                    color: "#49454f",
+                    "&:hover": {
+                      borderColor: "#65b230",
+                      color: "#65b230",
+                    },
+                  }}
                 >
                   <Download className="h-4 w-4" />
                   <span>Export Excel</span>
-                </Button>
-                <PricingFullScreenModal
-                  open={createPricingDialogOpen}
-                  onOpenChange={setCreatePricingDialogOpen}
-                  customerId={customerId}
-                  priceHeaders={priceHeaders}
-                  onSuccess={() => {
-                    // Refresh data after import
-                    customerService
-                      .getCustomerPriceHeaders(customerId)
-                      .then((headersResponse) => {
-                        if (headersResponse.success) {
-                          setPriceHeaders(headersResponse.data);
-                          // Reload all price items
-                          const allItems: PriceItem[] = [];
-                          Promise.all(
-                            headersResponse.data.map((header) =>
-                              customerService.getPriceHeaderItems(
-                                header.priceHeaderId
-                              )
-                            )
-                          ).then((results) => {
-                            results.forEach((itemsResponse) => {
-                              if (itemsResponse.success) {
-                                allItems.push(...itemsResponse.data);
-                              }
-                            });
-                            setAllPriceItems(allItems);
-                          });
-                        }
-                      });
-                  }}
-                />
+                </MuiButton>
               </div>
             </div>
-            {/* Filters just below the heading */}
-            <Sheet>
+
+            {/* Filters */}
+            <div className="p-6">
               <div className="flex flex-wrap gap-4 items-end mb-4 mt-4">
                 {/* Quote Number/Name Filter */}
                 <div>
-                  <Label>Quote Number/Name</Label>
-                  <Input
+                  <TextField
+                    label="Quote Number/Name"
                     placeholder="Quote number or name..."
                     value={filters.quoteName}
                     onChange={(e) =>
                       setFilters((f) => ({ ...f, quoteName: e.target.value }))
                     }
-                    className="w-56"
+                    variant="outlined"
+                    size="small"
+                    sx={{ width: "224px" }}
                   />
                 </div>
                 {/* Status Filter */}
                 <div>
-                  <Label>Status</Label>
-                  <Select
-                    value={filters.status}
-                    onValueChange={(value) =>
-                      setFilters((f) => ({ ...f, status: value }))
-                    }
-                  >
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="All" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All</SelectItem>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="In-Progress">In-Progress</SelectItem>
-                      <SelectItem value="New">New</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormControl size="small" sx={{ width: "160px" }}>
+                    <InputLabel>Status</InputLabel>
+                    <Select
+                      value={filters.status}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, status: e.target.value }))
+                      }
+                      label="Status"
+                    >
+                      <MenuItem value="all">All</MenuItem>
+                      <MenuItem value="Active">Active</MenuItem>
+                      <MenuItem value="In-Progress">In-Progress</MenuItem>
+                      <MenuItem value="New">New</MenuItem>
+                    </Select>
+                  </FormControl>
                 </div>
                 {/* Date Range Filter */}
                 <div>
-                  <Label>Effective Date</Label>
-                  <div className="flex gap-2">
-                    <Input
+                  <div className="flex gap-2 items-center">
+                    <TextField
+                      label="Effective Date"
                       type="date"
                       value={filters.dateFrom}
                       onChange={(e) =>
                         setFilters((f) => ({ ...f, dateFrom: e.target.value }))
                       }
-                      className="w-36"
+                      variant="outlined"
+                      size="small"
+                      InputLabelProps={{ shrink: true }}
+                      inputProps={{
+                        style: { paddingTop: "16px", paddingBottom: "16px" },
+                      }}
+                      sx={{ width: "144px" }}
                     />
-                    <span className="self-center">to</span>
-                    <Input
+                    <span className="self-center text-[#49454f]">to</span>
+                    <TextField
                       type="date"
                       value={filters.dateTo}
                       onChange={(e) =>
                         setFilters((f) => ({ ...f, dateTo: e.target.value }))
                       }
-                      className="w-36"
+                      variant="outlined"
+                      size="small"
+                      InputLabelProps={{ shrink: true }}
+                      inputProps={{
+                        style: { paddingTop: "16px", paddingBottom: "16px" },
+                      }}
+                      sx={{ width: "144px" }}
                     />
                   </div>
                 </div>
                 {/* More Filters Button */}
-                <SheetTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700"
-                  >
-                    More Filters
-                  </Button>
-                </SheetTrigger>
+                <MuiButton
+                  variant="outlined"
+                  onClick={() => setAdvancedFiltersOpen(true)}
+                  sx={{
+                    borderRadius: "100px",
+                    textTransform: "none",
+                    borderColor: "#b9b9b9",
+                    color: "#49454f",
+                    backgroundColor: "#f5f5f5",
+                    "&:hover": {
+                      borderColor: "#65b230",
+                      color: "#65b230",
+                      backgroundColor: "#f0f8f0",
+                    },
+                  }}
+                >
+                  More Filters
+                </MuiButton>
               </div>
+
               {/* Active Filters Chips */}
               {Object.entries(filters).some(
                 ([key, value]) =>
                   ["all", "", undefined, null].indexOf(value as any) === -1
               ) && (
                 <div className="mb-4">
-                  <div className="flex flex-wrap gap-2 items-center p-3 rounded-md bg-primary-0-shaded-6 border border-primary-1/20">
+                  <div className="flex flex-wrap gap-2 items-center p-3 rounded-md bg-[rgba(101,178,48,0.08)] border border-[rgba(101,178,48,0.2)]">
                     {Object.entries(filters)
                       .filter(
                         ([key, value]) =>
@@ -980,14 +1010,14 @@ export default function CustomerPricingPage() {
                       .map(([key, value]) => (
                         <span
                           key={key}
-                          className="inline-flex items-center bg-white text-neutral-0 rounded px-2 py-1 text-xs font-medium shadow-sm"
+                          className="inline-flex items-center bg-white text-[#1c1b1f] rounded px-2 py-1 text-xs font-medium shadow-sm"
                         >
                           {key
                             .replace(/([A-Z])/g, " $1")
                             .replace(/^./, (str) => str.toUpperCase())}
                           : {value}
                           <button
-                            className="ml-1 text-neutral-0 hover:text-neutral-1"
+                            className="ml-1 text-[#1c1b1f] hover:text-[#65b230]"
                             onClick={() =>
                               setFilters((f) => ({
                                 ...f,
@@ -1005,289 +1035,387 @@ export default function CustomerPricingPage() {
                           </button>
                         </span>
                       ))}
-                    <Button
-                      variant="ghost"
-                      className="ml-2 text-xs h-7 px-3"
+                    <MuiButton
+                      variant="text"
+                      size="small"
                       onClick={clearFilters}
+                      sx={{
+                        ml: 1,
+                        fontSize: "12px",
+                        height: "28px",
+                        px: 1.5,
+                        color: "#49454f",
+                        textTransform: "none",
+                        "&:hover": {
+                          backgroundColor: "rgba(101, 178, 48, 0.08)",
+                        },
+                      }}
                     >
                       Clear Filters
-                    </Button>
+                    </MuiButton>
                   </div>
                 </div>
               )}
-              <SheetContent
-                side="right"
-                className="max-w-md w-full flex flex-col"
-              >
-                <SheetHeader>
-                  <SheetTitle>Advanced Filters</SheetTitle>
-                </SheetHeader>
-                <div className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto">
-                  {/* Clear Filters Button - positioned at top for easy access */}
-                  <div className="flex justify-end pb-2 border-b border-gray-200">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearFilters}
-                      className="text-sm"
-                    >
-                      Clear All Filters
-                    </Button>
-                  </div>
-                  {/* Product Filter */}
-                  <div>
-                    <Label>Product</Label>
-                    <Input
-                      placeholder="Product name..."
-                      value={filters.productName}
-                      onChange={(e) =>
-                        setFilters((f) => ({
-                          ...f,
-                          productName: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  {/* Generator */}
-                  <div>
-                    <Label>Generator</Label>
-                    <Input
-                      placeholder="Generator..."
-                      value={filters.generator || ""}
-                      onChange={(e) =>
-                        setFilters((f) => ({ ...f, generator: e.target.value }))
-                      }
-                    />
-                  </div>
-                  {/* Facility */}
-                  <div>
-                    <Label>Facility</Label>
-                    <Input
-                      placeholder="Facility..."
-                      value={filters.facility || ""}
-                      onChange={(e) =>
-                        setFilters((f) => ({ ...f, facility: e.target.value }))
-                      }
-                    />
-                  </div>
-                  {/* Contract Number */}
-                  <div>
-                    <Label>Contract Number</Label>
-                    <Input
-                      placeholder="Contract number..."
-                      value={filters.contractNumber || ""}
-                      onChange={(e) =>
-                        setFilters((f) => ({
-                          ...f,
-                          contractNumber: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  {/* Container Size */}
-                  <div>
-                    <Label>Container Size</Label>
-                    <Input
-                      placeholder="Container size..."
-                      value={filters.containerSize || ""}
-                      onChange={(e) =>
-                        setFilters((f) => ({
-                          ...f,
-                          containerSize: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  {/* Unit of Measure (UOM) */}
-                  <div>
-                    <Label>Unit of Measure (UOM)</Label>
-                    <Input
-                      placeholder="UOM..."
-                      value={filters.uom}
-                      onChange={(e) =>
-                        setFilters((f) => ({ ...f, uom: e.target.value }))
-                      }
-                    />
-                  </div>
-                  {/* Project Name */}
-                  <div>
-                    <Label>Project Name</Label>
-                    <Input
-                      placeholder="Project name..."
-                      value={filters.projectName}
-                      onChange={(e) =>
-                        setFilters((f) => ({
-                          ...f,
-                          projectName: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  {/* Pricing Tier */}
-                  <div>
-                    <Label>Pricing Tier</Label>
-                    <Input
-                      placeholder="Pricing tier..."
-                      value={filters.pricingTier || ""}
-                      onChange={(e) =>
-                        setFilters((f) => ({
-                          ...f,
-                          pricingTier: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  {/* Profile ID */}
-                  <div>
-                    <Label>Profile ID</Label>
-                    <Input
-                      placeholder="Profile ID..."
-                      value={filters.profileId || ""}
-                      onChange={(e) =>
-                        setFilters((f) => ({ ...f, profileId: e.target.value }))
-                      }
-                    />
-                  </div>
-                  {/* Created By */}
-                  <div>
-                    <Label>Created By</Label>
-                    <Input
-                      placeholder="Created by..."
-                      value={filters.createdBy || ""}
-                      onChange={(e) =>
-                        setFilters((f) => ({ ...f, createdBy: e.target.value }))
-                      }
-                    />
-                  </div>
-                  {/* Sales Rep */}
-                  <div>
-                    <Label>Sales Rep</Label>
-                    <Input
-                      placeholder="Sales rep..."
-                      value={filters.salesRep || ""}
-                      onChange={(e) =>
-                        setFilters((f) => ({ ...f, salesRep: e.target.value }))
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="sticky bottom-0 left-0 w-full bg-background border-t flex gap-2 p-4 z-10">
-                  <Button
-                    className="flex-1"
-                    onClick={() => sheetCloseRef.current?.click()}
-                  >
-                    Apply Filters
-                  </Button>
-                  <SheetClose asChild>
-                    <Button
-                      ref={sheetCloseRef}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      Cancel
-                    </Button>
-                  </SheetClose>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </CardHeader>
-          <CardContent>
-            {/* View toggle */}
-            {/* Remove the viewMode state and toggle buttons */}
-            {/* Only render the table view for price items */}
-            {/* Remove all code related to the card view */}
+            </div>
 
             {/* Pricing Items Table */}
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Quote</TableHead>
-                    <TableHead>Active Dates</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Profile</TableHead>
-                    <TableHead>Generator</TableHead>
-                    <TableHead>Contract</TableHead>
-
-                    <TableHead>Container Size</TableHead>
-                    <TableHead>UOM</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Minimum</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredPriceItems.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={10}
-                        className="text-center py-8 text-gray-500"
-                      >
-                        No pricing items found matching your filters.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    Object.entries(groupedByQuote).map(([quote, items]) => [
-                      // Quote header row: quote name in first cell, rest blank but styled
-                      <TableRow key={quote + "-header"}>
-                        <TableCell className="bg-gray-100 font-bold text-lg text-gray-900">
-                          <button
-                            onClick={() => {
-                              // Find the price header ID for this quote
-                              // First try to match by headerName, then by finding items with this quote name
-                              const priceHeader =
-                                priceHeaders.find(
-                                  (header) => header.headerName === quote
-                                ) ||
-                                priceHeaders.find((header) =>
-                                  items.some(
-                                    (item) =>
-                                      item.priceHeaderId ===
-                                      header.priceHeaderId
-                                  )
-                                );
-                              if (priceHeader) {
-                                router.push(
-                                  `/customer-pricing/${customerId}/quote/${priceHeader.priceHeaderId}`
-                                );
-                              }
-                            }}
-                            className="hover:text-primary-1 hover:underline cursor-pointer transition-colors"
+            <div className="p-6">
+              <div className="overflow-x-auto">
+                <div className="bg-white border border-[#b9b9b9] rounded">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-[rgba(0,0,0,0.06)] border-b border-[#b9b9b9]">
+                        <th className="font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px] py-[20.18px] px-6 text-left">
+                          Quote
+                        </th>
+                        <th className="font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px] py-[20.18px] px-6 text-left">
+                          Active Dates
+                        </th>
+                        <th className="font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px] py-[20.18px] px-6 text-left">
+                          Status
+                        </th>
+                        <th className="font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px] py-[20.18px] px-6 text-left">
+                          Profile
+                        </th>
+                        <th className="font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px] py-[20.18px] px-6 text-left">
+                          Generator
+                        </th>
+                        <th className="font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px] py-[20.18px] px-6 text-left">
+                          Contract
+                        </th>
+                        <th className="font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px] py-[20.18px] px-6 text-left">
+                          Container Size
+                        </th>
+                        <th className="font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px] py-[20.18px] px-6 text-left">
+                          UOM
+                        </th>
+                        <th className="font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px] py-[20.18px] px-6 text-left">
+                          Price
+                        </th>
+                        <th className="font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px] py-[20.18px] px-6 text-left">
+                          Minimum
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredPriceItems.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={10}
+                            className="text-center py-8 font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#49454f]"
                           >
-                            {quote}
-                          </button>
-                        </TableCell>
-                        {Array.from({ length: 9 }).map((_, i) => (
-                          <TableCell key={i} className="bg-gray-100" />
-                        ))}
-                      </TableRow>,
-                      // Quote line items
-                      ...items.map((item) => (
-                        <TableRow key={item.priceItemId}>
-                          <TableCell />
-                          <TableCell>
-                            {item.effectiveDate} - {item.expirationDate}
-                          </TableCell>
-                          <TableCell>{getStatusBadge(item.status)}</TableCell>
-                          <TableCell>{item.profileId || "-"}</TableCell>
-                          <TableCell>{item.generatorId || "-"}</TableCell>
-                          <TableCell>{item.contractId || "-"}</TableCell>
-                          <TableCell>{item.containerSize || "-"}</TableCell>
-                          <TableCell>{item.uom || "-"}</TableCell>
-                          <TableCell>
-                            {formatCurrency(item.unitPrice)}
-                          </TableCell>
-                          <TableCell>
-                            {formatCurrency(item.minimumPrice)}
-                          </TableCell>
-                        </TableRow>
-                      )),
-                    ])
-                  )}
-                </TableBody>
-              </Table>
+                            No pricing items found matching your filters.
+                          </td>
+                        </tr>
+                      ) : (
+                        Object.entries(groupedByQuote)
+                          .map(([quote, items]) => [
+                            // Quote header row: quote name in first cell, rest blank but styled
+                            <tr
+                              key={quote + "-header"}
+                              className="border-[#b9b9b9]"
+                            >
+                              <td className="bg-[#f5f5f5] font-['Roboto:Medium',_sans-serif] font-medium text-[18px] leading-[24px] text-[#1c1b1f] py-[26.27px] px-6">
+                                <button
+                                  onClick={() => {
+                                    // Find the price header ID for this quote
+                                    // First try to match by headerName, then by finding items with this quote name
+                                    const priceHeader =
+                                      priceHeaders.find(
+                                        (header) => header.headerName === quote
+                                      ) ||
+                                      priceHeaders.find((header) =>
+                                        items.some(
+                                          (item) =>
+                                            item.priceHeaderId ===
+                                            header.priceHeaderId
+                                        )
+                                      );
+                                    if (priceHeader) {
+                                      router.push(
+                                        `/customer-pricing/${customerId}/quote/${priceHeader.priceHeaderId}`
+                                      );
+                                    }
+                                  }}
+                                  className="hover:text-[#65b230] hover:underline cursor-pointer transition-colors"
+                                >
+                                  {quote}
+                                </button>
+                              </td>
+                              {Array.from({ length: 9 }).map((_, i) => (
+                                <td
+                                  key={i}
+                                  className="bg-[#f5f5f5] py-[26.27px] px-6"
+                                />
+                              ))}
+                            </tr>,
+                            // Quote line items
+                            ...items.map((item) => (
+                              <tr
+                                key={item.priceItemId}
+                                className="border-[#b9b9b9]"
+                              >
+                                <td className="py-[26.27px] px-6" />
+                                <td className="py-[26.27px] px-6 font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#1c1b1f]">
+                                  {item.effectiveDate} - {item.expirationDate}
+                                </td>
+                                <td className="py-[26.27px] px-6">
+                                  {getStatusBadge(item.status)}
+                                </td>
+                                <td className="py-[26.27px] px-6 font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#1c1b1f]">
+                                  {item.profileId || "-"}
+                                </td>
+                                <td className="py-[26.27px] px-6 font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#1c1b1f]">
+                                  {item.generatorId || "-"}
+                                </td>
+                                <td className="py-[26.27px] px-6 font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#1c1b1f]">
+                                  {item.contractId || "-"}
+                                </td>
+                                <td className="py-[26.27px] px-6 font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#1c1b1f]">
+                                  {item.containerSize || "-"}
+                                </td>
+                                <td className="py-[26.27px] px-6 font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#1c1b1f]">
+                                  {item.uom || "-"}
+                                </td>
+                                <td className="py-[26.27px] px-6 font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#1c1b1f]">
+                                  {formatCurrency(item.unitPrice)}
+                                </td>
+                                <td className="py-[26.27px] px-6 font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#1c1b1f]">
+                                  {formatCurrency(item.minimumPrice)}
+                                </td>
+                              </tr>
+                            )),
+                          ])
+                          .flat()
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+
+        {/* Advanced Filters Dialog */}
+        <Dialog
+          open={advancedFiltersOpen}
+          onClose={() => setAdvancedFiltersOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle
+            sx={{
+              fontFamily: "Roboto:Medium, sans-serif",
+              fontWeight: 500,
+              fontSize: "22px",
+              lineHeight: "28px",
+              color: "#1c1b1f",
+            }}
+          >
+            Advanced Filters
+          </DialogTitle>
+          <DialogContent sx={{ p: 3 }}>
+            <div className="flex flex-col gap-4">
+              {/* Clear Filters Button - positioned at top for easy access */}
+              <div className="flex justify-end pb-2 border-b border-[#b9b9b9]">
+                <MuiButton
+                  variant="text"
+                  size="small"
+                  onClick={clearFilters}
+                  sx={{
+                    fontSize: "14px",
+                    color: "#49454f",
+                    textTransform: "none",
+                    "&:hover": {
+                      backgroundColor: "rgba(101, 178, 48, 0.08)",
+                    },
+                  }}
+                >
+                  Clear All Filters
+                </MuiButton>
+              </div>
+              {/* Product Filter */}
+              <TextField
+                label="Product"
+                placeholder="Product name..."
+                value={filters.productName}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    productName: e.target.value,
+                  }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+              {/* Generator */}
+              <TextField
+                label="Generator"
+                placeholder="Generator..."
+                value={filters.generator || ""}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, generator: e.target.value }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+              {/* Facility */}
+              <TextField
+                label="Facility"
+                placeholder="Facility..."
+                value={filters.facility || ""}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, facility: e.target.value }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+              {/* Contract Number */}
+              <TextField
+                label="Contract Number"
+                placeholder="Contract number..."
+                value={filters.contractNumber || ""}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    contractNumber: e.target.value,
+                  }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+              {/* Container Size */}
+              <TextField
+                label="Container Size"
+                placeholder="Container size..."
+                value={filters.containerSize || ""}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    containerSize: e.target.value,
+                  }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+              {/* Unit of Measure (UOM) */}
+              <TextField
+                label="Unit of Measure (UOM)"
+                placeholder="UOM..."
+                value={filters.uom}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, uom: e.target.value }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+              {/* Project Name */}
+              <TextField
+                label="Project Name"
+                placeholder="Project name..."
+                value={filters.projectName}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    projectName: e.target.value,
+                  }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+              {/* Pricing Tier */}
+              <TextField
+                label="Pricing Tier"
+                placeholder="Pricing tier..."
+                value={filters.pricingTier || ""}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    pricingTier: e.target.value,
+                  }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+              {/* Profile ID */}
+              <TextField
+                label="Profile ID"
+                placeholder="Profile ID..."
+                value={filters.profileId || ""}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, profileId: e.target.value }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+              {/* Created By */}
+              <TextField
+                label="Created By"
+                placeholder="Created by..."
+                value={filters.createdBy || ""}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, createdBy: e.target.value }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+              {/* Sales Rep */}
+              <TextField
+                label="Sales Rep"
+                placeholder="Sales rep..."
+                value={filters.salesRep || ""}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, salesRep: e.target.value }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+            </div>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, gap: 2 }}>
+            <MuiButton
+              variant="outlined"
+              onClick={() => setAdvancedFiltersOpen(false)}
+              sx={{
+                borderRadius: "100px",
+                textTransform: "none",
+                borderColor: "#b9b9b9",
+                color: "#49454f",
+                "&:hover": {
+                  borderColor: "#65b230",
+                  color: "#65b230",
+                },
+              }}
+            >
+              Cancel
+            </MuiButton>
+            <MuiButton
+              variant="contained"
+              onClick={() => setAdvancedFiltersOpen(false)}
+              sx={{
+                backgroundColor: "#65b230",
+                borderRadius: "100px",
+                textTransform: "none",
+                "&:hover": {
+                  backgroundColor: "#4a8a1f",
+                },
+              }}
+            >
+              Apply Filters
+            </MuiButton>
+          </DialogActions>
+        </Dialog>
 
         {/* Pricing Upload Dialog */}
         <PricingFullScreenModal

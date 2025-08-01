@@ -25,6 +25,14 @@ export interface PriceItemResponse {
 export interface CustomerInfo {
   customerId: string;
   customerName: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  // Legacy fields for backward compatibility
   oracleCustomerId?: string;
   customerCode?: string;
   contactEmail?: string;
@@ -40,6 +48,9 @@ export interface PriceHeader {
   effectiveDate: string;
   expirationDate: string;
   status: "active" | "in-progress" | "new";
+  createdAt?: string;
+  updatedAt?: string;
+  // Legacy fields for backward compatibility
   termsAndConditionsId?: string;
   invoiceMinimum?: number;
   container55gMinimum?: number;
@@ -75,8 +86,11 @@ export interface PriceItem {
   vendorId?: string;
   containerSize?: string;
   billingUom?: string;
-  // Additional fields from the original pricing system
   pricingType?: string;
+  facilityName?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  // Legacy fields for backward compatibility
   pricePriority?: string;
   productId?: string;
   regionId?: string;
@@ -209,7 +223,7 @@ export class CustomerService {
           priceItemId: `PI-${headerSuffix}-001`,
           priceHeaderId: priceHeaderId,
           productName: "Hazardous Waste Disposal",
-          region: "Northeast",
+          region: "NY",
           unitPrice: 125.5,
           minimumPrice: 500.0,
           effectiveDate: "2024-01-01",
@@ -217,20 +231,22 @@ export class CustomerService {
           status: "active",
           quoteName: "Q-2024-001",
           projectName: "Acme Corp Cleanup",
-          uom: "Per Ton",
-          contractId: "CON-001",
-          generatorId: "GEN-001",
+          uom: "TON",
+          contractId: "GOV-2024-001",
+          generatorId: "GEN-ACME-001",
           vendorId: "VEND-001",
           containerSize: "55 Gallon",
           billingUom: "Per Container",
           pricingType: "Regional",
+          facilityName: "Acme Manufacturing Facility",
+          profileId: "PROF-001",
           pricePriority: "1",
         },
         {
           priceItemId: `PI-${headerSuffix}-002`,
           priceHeaderId: priceHeaderId,
           productName: "Recycling Services",
-          region: "Northeast",
+          region: "CA",
           unitPrice: 85.25,
           minimumPrice: 300.0,
           effectiveDate: "2024-01-01",
@@ -238,20 +254,22 @@ export class CustomerService {
           status: "active",
           quoteName: "Q-2024-002",
           projectName: "Tech Solutions Recycling",
-          uom: "Per Ton",
-          contractId: "CON-002",
-          generatorId: "GEN-002",
+          uom: "TON",
+          contractId: "GOV-2024-002",
+          generatorId: "GEN-TECH-001",
           vendorId: "VEND-002",
           containerSize: "30 Gallon",
           billingUom: "Per Container",
           pricingType: "Product-specific",
+          facilityName: "Tech Solutions Campus",
+          profileId: "PROF-002",
           pricePriority: "2",
         },
         {
           priceItemId: `PI-${headerSuffix}-003`,
           priceHeaderId: priceHeaderId,
           productName: "Waste Transportation",
-          region: "Northeast",
+          region: "TX",
           unitPrice: 45.75,
           minimumPrice: 200.0,
           effectiveDate: "2024-01-01",
@@ -259,20 +277,22 @@ export class CustomerService {
           status: "active",
           quoteName: "Q-2024-003",
           projectName: "Global Industries Transport",
-          uom: "Per Mile",
-          contractId: "CON-003",
-          generatorId: "GEN-003",
+          uom: "MILE",
+          contractId: "GOV-2024-003",
+          generatorId: "GEN-GLOBAL-001",
           vendorId: "VEND-003",
           containerSize: "20 Gallon",
           billingUom: "Per Trip",
           pricingType: "Regional",
+          facilityName: "Global Industries Plant",
+          profileId: "PROF-003",
           pricePriority: "3",
         },
         {
           priceItemId: `PI-${headerSuffix}-004`,
           priceHeaderId: priceHeaderId,
           productName: "Hazardous Waste Disposal",
-          region: "Southeast",
+          region: "FL",
           unitPrice: 135.0,
           minimumPrice: 550.0,
           effectiveDate: "2024-01-01",
@@ -280,20 +300,22 @@ export class CustomerService {
           status: "in-progress",
           quoteName: "Q-2024-004",
           projectName: "Clean Earth Southeast",
-          uom: "Per Ton",
-          contractId: "CON-004",
-          generatorId: "GEN-004",
+          uom: "TON",
+          contractId: "GOV-2024-004",
+          generatorId: "GEN-SOUTH-001",
           vendorId: "VEND-004",
           containerSize: "55 Gallon",
           billingUom: "Per Container",
           pricingType: "Regional",
+          facilityName: "Southern Processing Center",
+          profileId: "PROF-004",
           pricePriority: "1",
         },
         {
           priceItemId: `PI-${headerSuffix}-005`,
           priceHeaderId: priceHeaderId,
           productName: "Environmental Consulting",
-          region: "Northeast",
+          region: "NJ",
           unitPrice: 150.0,
           minimumPrice: 750.0,
           effectiveDate: "2024-02-01",
@@ -301,13 +323,15 @@ export class CustomerService {
           status: "active",
           quoteName: "Q-2024-005",
           projectName: "Eco Solutions Consulting",
-          uom: "Per Hour",
-          contractId: "CON-005",
-          generatorId: "GEN-005",
+          uom: "HOUR",
+          contractId: "GOV-2024-005",
+          generatorId: "GEN-ECO-001",
           vendorId: "VEND-005",
           containerSize: "N/A",
           billingUom: "Per Hour",
           pricingType: "Profile-specific",
+          facilityName: "Eco Solutions Office",
+          profileId: "PROF-005",
           pricePriority: "1",
         },
       ];

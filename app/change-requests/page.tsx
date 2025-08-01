@@ -2,36 +2,6 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-
 import {
   ArrowLeft,
   Search,
@@ -50,6 +20,13 @@ import {
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
+import {
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+} from "@mui/material";
 
 // Interface for price change request data
 interface PriceChangeRequest {
@@ -456,84 +433,76 @@ export default function PriceChangeRequestsPage() {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       Draft: {
-        variant: "outline" as const,
         label: "Draft",
-        className: "bg-gray-100 text-gray-800 border-gray-200",
+        className: "bg-[rgba(158,158,158,0.1)] text-[#616161]",
       },
       Submitted: {
-        variant: "secondary" as const,
         label: "Submitted",
-        className: "bg-blue-100 text-blue-800 border-blue-200",
+        className: "bg-[rgba(25,118,210,0.1)] text-[#1976d2]",
       },
       "In Review": {
-        variant: "outline" as const,
         label: "In Review",
-        className: "bg-yellow-100 text-yellow-800 border-yellow-200",
+        className: "bg-[rgba(255,152,0,0.1)] text-[#f57c00]",
       },
       Approved: {
-        variant: "default" as const,
         label: "Approved",
-        className: "bg-green-100 text-green-800 border-green-200",
+        className: "bg-[rgba(76,175,80,0.1)] text-[#2e7d32]",
       },
       "In Progress": {
-        variant: "outline" as const,
         label: "In Progress",
-        className: "bg-orange-100 text-orange-800 border-orange-200",
+        className: "bg-[rgba(255,111,0,0.1)] text-[#ef6c00]",
       },
       Completed: {
-        variant: "default" as const,
         label: "Completed",
-        className: "bg-green-600 text-white border-green-600",
+        className: "bg-[#65b230] text-white",
       },
       Rejected: {
-        variant: "destructive" as const,
         label: "Rejected",
-        className: "bg-red-100 text-red-800 border-red-200",
+        className: "bg-[rgba(244,67,54,0.1)] text-[#d32f2f]",
       },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || {
-      variant: "outline" as const,
       label: status,
-      className: "",
+      className: "bg-[rgba(158,158,158,0.1)] text-[#616161]",
     };
 
     return (
-      <Badge variant={config.variant} className={config.className}>
+      <span
+        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-['Roboto:Medium',_sans-serif] font-medium ${config.className}`}
+      >
         {config.label}
-      </Badge>
+      </span>
     );
   };
 
   const getRequestTypeBadge = (type: string) => {
     const typeConfig = {
       Customer: {
-        variant: "secondary" as const,
         label: "Customer",
-        className: "bg-blue-100 text-blue-800 border-blue-200",
+        className: "bg-[rgba(25,118,210,0.1)] text-[#1976d2]",
       },
       "Multiple Customers": {
-        variant: "outline" as const,
         label: "Multiple",
-        className: "bg-purple-100 text-purple-800 border-purple-200",
+        className: "bg-[rgba(156,39,176,0.1)] text-[#7b1fa2]",
       },
       "General/Global": {
-        variant: "outline" as const,
         label: "Global",
-        className: "bg-orange-100 text-orange-800 border-orange-200",
+        className: "bg-[rgba(255,152,0,0.1)] text-[#f57c00]",
       },
     };
 
     const config = typeConfig[type as keyof typeof typeConfig] || {
-      variant: "outline" as const,
       label: type,
-      className: "",
+      className: "bg-[rgba(158,158,158,0.1)] text-[#616161]",
     };
 
     return (
-      <Badge variant={config.variant} className={config.className}>
+      <span
+        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-['Roboto:Medium',_sans-serif] font-medium ${config.className}`}
+      >
         {config.label}
-      </Badge>
+      </span>
     );
   };
 
@@ -547,12 +516,14 @@ export default function PriceChangeRequestsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-[#fffbfe] py-8">
         <div className="w-full max-w-[1800px] mx-auto px-2">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading price change requests...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#65b230] mx-auto mb-4"></div>
+              <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#1c1b1f]">
+                Loading price change requests...
+              </p>
             </div>
           </div>
         </div>
@@ -561,154 +532,181 @@ export default function PriceChangeRequestsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-[#fffbfe] py-8">
       <div className="w-full max-w-[1800px] mx-auto px-2">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="font-['Roboto:Medium',_sans-serif] font-medium text-[32px] leading-[40px] text-[#1c1b1f] mb-2">
                 Price Change Requests
               </h1>
               <div className="flex items-center space-x-4 my-2">
-                <Badge
-                  variant="default"
-                  className="bg-green-600 text-white border-green-600 shadow-sm font-medium px-3 py-1"
-                >
+                <span className="inline-flex items-center bg-[rgba(101,178,48,0.1)] text-[#2e7d32] rounded-full px-3 py-1 text-sm font-['Roboto:Medium',_sans-serif] font-medium">
                   {
                     requests.filter((r) => r.assignedTo === "Sarah Johnson")
                       .length
                   }{" "}
                   assigned to me
-                </Badge>
-                <Badge
-                  variant="secondary"
-                  className="bg-gray-100 text-gray-800 border-gray-300 shadow-sm font-medium px-3 py-1"
-                >
+                </span>
+                <span className="inline-flex items-center bg-[rgba(25,118,210,0.1)] text-[#1976d2] rounded-full px-3 py-1 text-sm font-['Roboto:Medium',_sans-serif] font-medium">
                   {requests.length} total requests
-                </Badge>
+                </span>
               </div>
-              <p className="text-gray-600">
+              <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#49454f]">
                 Create and manage formal requests for pricing changes across
                 customers and services
               </p>
             </div>
-            <Button
+            <button
               onClick={handleCreateRequest}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-2 bg-[#65b230] hover:bg-[#4a8a1f] text-white font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[20px] px-4 py-2 rounded-full shadow-sm transition-colors duration-200"
             >
               <Plus className="h-4 w-4" />
               <span>New Request</span>
-            </Button>
+            </button>
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
+        {/* Main Content Card */}
+        <div className="bg-white rounded-lg shadow-sm border border-[#e0e0e0]">
+          {/* Filters Header */}
+          <div className="p-6 border-b border-[#e0e0e0]">
+            <h2 className="font-['Roboto:Medium',_sans-serif] font-medium text-[20px] leading-[28px] text-[#1c1b1f] mb-4">
+              Filters
+            </h2>
+
             {/* Filters */}
-            <div className="flex flex-wrap gap-4 items-end mb-4 mt-4">
+            <div className="flex flex-wrap gap-4 items-end mb-4">
               {/* Subject Filter */}
-              <div>
-                <Label>Subject</Label>
-                <Input
-                  placeholder="Search subjects..."
+              <div className="w-48">
+                <TextField
+                  label="Subject"
+                  variant="outlined"
+                  fullWidth
                   value={filters.subject}
                   onChange={(e) =>
-                    setFilters((f) => ({ ...f, subject: e.target.value }))
+                    setFilters((f) => ({
+                      ...f,
+                      subject: e.target.value,
+                    }))
                   }
-                  className="w-48"
+                  InputProps={{
+                    style: {
+                      fontVariationSettings: "'wdth' 100",
+                    },
+                  }}
                 />
               </div>
 
               {/* Request Type Filter */}
-              <div>
-                <Label>Request Type</Label>
-                <Select
-                  value={filters.requestType}
-                  onValueChange={(value) =>
-                    setFilters((f) => ({ ...f, requestType: value }))
-                  }
-                >
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="All" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="Customer">Customer</SelectItem>
-                    <SelectItem value="Multiple Customers">Multiple</SelectItem>
-                    <SelectItem value="General/Global">Global</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="w-40">
+                <FormControl variant="outlined" fullWidth>
+                  <InputLabel id="request-type-label">Request Type</InputLabel>
+                  <Select
+                    labelId="request-type-label"
+                    value={filters.requestType}
+                    onChange={(e) =>
+                      setFilters((f) => ({
+                        ...f,
+                        requestType: e.target.value as string,
+                      }))
+                    }
+                    label="Request Type"
+                    style={{ fontVariationSettings: "'wdth' 100" }}
+                  >
+                    <MenuItem value="all">All</MenuItem>
+                    <MenuItem value="Customer">Customer</MenuItem>
+                    <MenuItem value="Multiple Customers">
+                      Multiple Customers
+                    </MenuItem>
+                    <MenuItem value="General/Global">General/Global</MenuItem>
+                  </Select>
+                </FormControl>
               </div>
 
               {/* Status Filter */}
-              <div>
-                <Label>Status</Label>
-                <Select
-                  value={filters.status}
-                  onValueChange={(value) =>
-                    setFilters((f) => ({ ...f, status: value }))
-                  }
-                >
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="All" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="Draft">Draft</SelectItem>
-                    <SelectItem value="Submitted">Submitted</SelectItem>
-                    <SelectItem value="In Review">In Review</SelectItem>
-                    <SelectItem value="Approved">Approved</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Completed">Completed</SelectItem>
-                    <SelectItem value="Rejected">Rejected</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="w-40">
+                <FormControl variant="outlined" fullWidth>
+                  <InputLabel id="status-label">Status</InputLabel>
+                  <Select
+                    labelId="status-label"
+                    value={filters.status}
+                    onChange={(e) =>
+                      setFilters((f) => ({
+                        ...f,
+                        status: e.target.value as string,
+                      }))
+                    }
+                    label="Status"
+                    style={{ fontVariationSettings: "'wdth' 100" }}
+                  >
+                    <MenuItem value="all">All</MenuItem>
+                    <MenuItem value="Draft">Draft</MenuItem>
+                    <MenuItem value="Submitted">Submitted</MenuItem>
+                    <MenuItem value="In Review">In Review</MenuItem>
+                    <MenuItem value="Approved">Approved</MenuItem>
+                    <MenuItem value="In Progress">In Progress</MenuItem>
+                    <MenuItem value="Completed">Completed</MenuItem>
+                    <MenuItem value="Rejected">Rejected</MenuItem>
+                  </Select>
+                </FormControl>
               </div>
 
               {/* Assigned To Filter */}
-              <div>
-                <Label>Assigned To</Label>
-                <Select
-                  value={filters.assignedTo}
-                  onValueChange={(value) =>
-                    setFilters((f) => ({ ...f, assignedTo: value }))
-                  }
-                >
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="All team members" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All team members</SelectItem>
-                    <SelectItem value="Sarah Johnson">Sarah Johnson</SelectItem>
-                    <SelectItem value="David Brown">David Brown</SelectItem>
-                    <SelectItem value="Michael Chen">Michael Chen</SelectItem>
-                    <SelectItem value="Emily Rodriguez">
-                      Emily Rodriguez
-                    </SelectItem>
-                    <SelectItem value="Alex Thompson">Alex Thompson</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="w-48">
+                <FormControl variant="outlined" fullWidth>
+                  <InputLabel id="assigned-to-label">Assigned To</InputLabel>
+                  <Select
+                    labelId="assigned-to-label"
+                    value={filters.assignedTo}
+                    onChange={(e) =>
+                      setFilters((f) => ({
+                        ...f,
+                        assignedTo: e.target.value as string,
+                      }))
+                    }
+                    label="Assigned To"
+                    style={{ fontVariationSettings: "'wdth' 100" }}
+                  >
+                    <MenuItem value="all">All team members</MenuItem>
+                    <MenuItem value="Sarah Johnson">Sarah Johnson</MenuItem>
+                    <MenuItem value="David Brown">David Brown</MenuItem>
+                    <MenuItem value="Michael Chen">Michael Chen</MenuItem>
+                    <MenuItem value="Emily Rodriguez">Emily Rodriguez</MenuItem>
+                    <MenuItem value="Alex Thompson">Alex Thompson</MenuItem>
+                  </Select>
+                </FormControl>
               </div>
 
               {/* Customer Filter */}
-              <div>
-                <Label>Customer</Label>
-                <Input
-                  placeholder="Search customers..."
+              <div className="w-48">
+                <TextField
+                  label="Customer"
+                  variant="outlined"
+                  fullWidth
                   value={filters.customer}
                   onChange={(e) =>
-                    setFilters((f) => ({ ...f, customer: e.target.value }))
+                    setFilters((f) => ({
+                      ...f,
+                      customer: e.target.value,
+                    }))
                   }
-                  className="w-48"
+                  InputProps={{
+                    style: {
+                      fontVariationSettings: "'wdth' 100",
+                    },
+                  }}
                 />
               </div>
 
               {/* Submitted Date Range Filter */}
-              <div>
-                <Label>Submitted Date</Label>
-                <div className="flex gap-2">
-                  <Input
+              <div className="flex gap-2">
+                <div className="w-36">
+                  <TextField
+                    label="From"
+                    variant="outlined"
+                    fullWidth
                     type="date"
                     value={filters.submittedDateFrom}
                     onChange={(e) =>
@@ -717,10 +715,30 @@ export default function PriceChangeRequestsPage() {
                         submittedDateFrom: e.target.value,
                       }))
                     }
-                    className="w-36"
+                    InputProps={{
+                      style: {
+                        fontVariationSettings: "'wdth' 100",
+                      },
+                      inputProps: {
+                        style: {
+                          paddingTop: "16px",
+                          paddingBottom: "16px",
+                        },
+                      },
+                    }}
+                    InputLabelProps={{
+                      shrink: true,
+                    }}
                   />
-                  <span className="self-center">to</span>
-                  <Input
+                </div>
+                <span className="self-center font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#49454f]">
+                  to
+                </span>
+                <div className="w-36">
+                  <TextField
+                    label="To"
+                    variant="outlined"
+                    fullWidth
                     type="date"
                     value={filters.submittedDateTo}
                     onChange={(e) =>
@@ -729,7 +747,20 @@ export default function PriceChangeRequestsPage() {
                         submittedDateTo: e.target.value,
                       }))
                     }
-                    className="w-36"
+                    InputProps={{
+                      style: {
+                        fontVariationSettings: "'wdth' 100",
+                      },
+                      inputProps: {
+                        style: {
+                          paddingTop: "16px",
+                          paddingBottom: "16px",
+                        },
+                      },
+                    }}
+                    InputLabelProps={{
+                      shrink: true,
+                    }}
                   />
                 </div>
               </div>
@@ -741,7 +772,7 @@ export default function PriceChangeRequestsPage() {
                 ["all", "", undefined, null].indexOf(value as any) === -1
             ) && (
               <div className="mb-4">
-                <div className="flex flex-wrap gap-2 items-center p-3 rounded-md bg-primary-0-shaded-6 border border-primary-1/20">
+                <div className="flex flex-wrap gap-2 items-center p-3 rounded-md bg-[#f5f5f5] border border-[#e0e0e0]">
                   {Object.entries(filters)
                     .filter(
                       ([key, value]) =>
@@ -751,14 +782,14 @@ export default function PriceChangeRequestsPage() {
                     .map(([key, value]) => (
                       <span
                         key={key}
-                        className="inline-flex items-center bg-white text-neutral-0 rounded px-2 py-1 text-xs font-medium shadow-sm"
+                        className="inline-flex items-center bg-white text-[#1c1b1f] rounded-full px-3 py-1 text-xs font-['Roboto:Medium',_sans-serif] font-medium shadow-sm border border-[#e0e0e0]"
                       >
                         {key
                           .replace(/([A-Z])/g, " $1")
                           .replace(/^./, (str) => str.toUpperCase())}
                         : {value}
                         <button
-                          className="ml-1 text-neutral-0 hover:text-neutral-1"
+                          className="ml-2 text-[#49454f] hover:text-[#1c1b1f]"
                           onClick={() =>
                             setFilters((f) => ({
                               ...f,
@@ -776,27 +807,26 @@ export default function PriceChangeRequestsPage() {
                         </button>
                       </span>
                     ))}
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <button
                     onClick={clearFilters}
-                    className="text-neutral-0 hover:text-neutral-1 h-6 px-2"
+                    className="text-[#1976d2] hover:text-[#1565c0] font-['Roboto:Medium',_sans-serif] font-medium text-sm px-3 py-1 rounded hover:bg-[rgba(25,118,210,0.1)] transition-colors duration-200"
                   >
                     Clear Filters
-                  </Button>
+                  </button>
                 </div>
               </div>
             )}
-          </CardHeader>
+          </div>
 
-          <CardContent>
+          {/* Table Content */}
+          <div className="p-6">
             {filteredRequests.length === 0 ? (
               <div className="text-center py-12">
-                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <FileText className="h-12 w-12 text-[#bdbdbd] mx-auto mb-4" />
+                <h3 className="font-['Roboto:Medium',_sans-serif] font-medium text-[20px] leading-[28px] text-[#1c1b1f] mb-2">
                   No price change requests found
                 </h3>
-                <p className="text-gray-600">
+                <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#49454f]">
                   {Object.entries(filters).some(
                     ([key, value]) =>
                       ["all", "", undefined, null].indexOf(value as any) === -1
@@ -807,127 +837,148 @@ export default function PriceChangeRequestsPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Request ID</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Assigned To</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Submitted Date</TableHead>
-                      <TableHead>Attachments</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredRequests.map((request) => (
-                      <TableRow
-                        key={request.requestId}
-                        className="cursor-pointer transition-colors hover:bg-gray-50"
-                        onClick={() => handleRequestClick(request)}
-                      >
-                        <TableCell>
-                          <div className="font-medium text-blue-600 hover:text-blue-800">
-                            {request.requestId}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="max-w-xs">
-                            <div className="font-medium text-gray-900 truncate">
-                              {request.subject}
+                <div className="bg-white border border-[#b9b9b9] rounded">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-[rgba(0,0,0,0.06)] border-b border-[#b9b9b9]">
+                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
+                          Request ID
+                        </th>
+                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
+                          Subject
+                        </th>
+                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
+                          Type
+                        </th>
+                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
+                          Customer
+                        </th>
+                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
+                          Assigned To
+                        </th>
+                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
+                          Status
+                        </th>
+                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
+                          Submitted Date
+                        </th>
+                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
+                          Attachments
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRequests.map((request) => (
+                        <tr
+                          key={request.requestId}
+                          className="cursor-pointer transition-colors hover:bg-[#f5f5f5] border-b border-[#b9b9b9]"
+                          onClick={() => handleRequestClick(request)}
+                        >
+                          <td className="py-[26.27px] px-6">
+                            <div className="font-['Roboto:Medium',_sans-serif] font-medium text-[16px] leading-[22.86px] text-[#1976d2] hover:text-[#1565c0]">
+                              {request.requestId}
                             </div>
-                            {request.description && (
-                              <div className="text-sm text-gray-500 truncate">
-                                {request.description}
+                          </td>
+                          <td className="py-[26.27px] px-6">
+                            <div className="max-w-xs">
+                              <div className="font-['Roboto:Medium',_sans-serif] font-medium text-[16px] leading-[22.86px] text-[#1c1b1f] truncate">
+                                {request.subject}
                               </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {getRequestTypeBadge(request.requestType)}
-                        </TableCell>
-                        <TableCell>
-                          {request.customerName ? (
-                            <div className="flex items-center space-x-2">
-                              <span>{request.customerName}</span>
-                              <Badge
-                                variant="secondary"
-                                className="uppercase text-xs px-2 py-0.5 bg-gray-100 text-gray-700 border-gray-300"
-                              >
-                                {request.customerId}
-                              </Badge>
+                              {request.description && (
+                                <div className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#49454f] truncate">
+                                  {request.description}
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <span className="text-gray-400 italic">
-                              {request.requestType === "Multiple Customers"
-                                ? "Multiple"
-                                : "Global"}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <User className="h-4 w-4 text-gray-500" />
-                            <span>{request.assignedTo}</span>
-                            {request.assignedTo === "Sarah Johnson" && (
-                              <Badge
-                                variant="secondary"
-                                className="text-xs bg-green-600 text-white"
-                              >
-                                Me
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>{getStatusBadge(request.status)}</TableCell>
-                        <TableCell>
-                          {formatDate(request.submittedDate)}
-                        </TableCell>
-                        <TableCell>
-                          {request.attachments.length > 0 ? (
-                            <div className="flex items-center space-x-1">
-                              <Paperclip className="h-4 w-4 text-gray-500" />
-                              <span className="text-sm text-gray-600">
-                                {request.attachments.length}
+                          </td>
+                          <td className="py-[26.27px] px-6">
+                            {getRequestTypeBadge(request.requestType)}
+                          </td>
+                          <td className="py-[26.27px] px-6">
+                            {request.customerName ? (
+                              <div className="flex items-center space-x-2">
+                                <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#1c1b1f]">
+                                  {request.customerName}
+                                </span>
+                                <span className="inline-flex items-center bg-[#f5f5f5] text-[#49454f] rounded-full px-2 py-0.5 text-xs font-['Roboto:Medium',_sans-serif] font-medium uppercase">
+                                  {request.customerId}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#bdbdbd] italic">
+                                {request.requestType === "Multiple Customers"
+                                  ? "Multiple"
+                                  : "Global"}
                               </span>
+                            )}
+                          </td>
+                          <td className="py-[26.27px] px-6">
+                            <div className="flex items-center space-x-2">
+                              <User className="h-4 w-4 text-[#49454f]" />
+                              <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#1c1b1f]">
+                                {request.assignedTo}
+                              </span>
+                              {request.assignedTo === "Sarah Johnson" && (
+                                <span className="inline-flex items-center bg-[#65b230] text-white rounded-full px-2 py-0.5 text-xs font-['Roboto:Medium',_sans-serif] font-medium">
+                                  Me
+                                </span>
+                              )}
                             </div>
-                          ) : (
-                            <span className="text-gray-400 text-sm">None</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                          </td>
+                          <td className="py-[26.27px] px-6">
+                            {getStatusBadge(request.status)}
+                          </td>
+                          <td className="py-[26.27px] px-6">
+                            <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#1c1b1f]">
+                              {formatDate(request.submittedDate)}
+                            </span>
+                          </td>
+                          <td className="py-[26.27px] px-6">
+                            {request.attachments.length > 0 ? (
+                              <div className="flex items-center space-x-1">
+                                <Paperclip className="h-4 w-4 text-[#49454f]" />
+                                <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#49454f]">
+                                  {request.attachments.length}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#bdbdbd]">
+                                None
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Create Request Modal */}
-        <Dialog
-          open={createModal.isOpen}
-          onOpenChange={(open) =>
-            setCreateModal((prev) => ({ ...prev, isOpen: open }))
-          }
-        >
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create New Price Change Request</DialogTitle>
-              <DialogDescription>
-                Create a formal request for pricing changes. All fields marked
-                with * are required.
-              </DialogDescription>
-            </DialogHeader>
+        {createModal.isOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4">
+              {/* Modal Header */}
+              <div className="p-6 border-b border-[#e0e0e0]">
+                <h2 className="font-['Roboto:Medium',_sans-serif] font-medium text-[24px] leading-[32px] text-[#1c1b1f] mb-2">
+                  Create New Price Change Request
+                </h2>
+                <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#49454f]">
+                  Create a formal request for pricing changes. All fields marked
+                  with * are required.
+                </p>
+              </div>
 
-            <div className="space-y-6">
-              {/* Subject */}
-              <div>
-                <Label htmlFor="subject">Subject *</Label>
-                <Input
-                  id="subject"
-                  placeholder="Brief summary of the change request"
+              {/* Modal Content */}
+              <div className="p-6 space-y-6">
+                {/* Subject */}
+                <TextField
+                  label="Subject *"
+                  variant="outlined"
+                  fullWidth
                   value={createModal.subject}
                   onChange={(e) =>
                     setCreateModal((prev) => ({
@@ -935,15 +986,20 @@ export default function PriceChangeRequestsPage() {
                       subject: e.target.value,
                     }))
                   }
+                  InputProps={{
+                    style: {
+                      fontVariationSettings: "'wdth' 100",
+                    },
+                  }}
                 />
-              </div>
 
-              {/* Description */}
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Detailed explanation of the request and reasoning"
+                {/* Description */}
+                <TextField
+                  label="Description"
+                  variant="outlined"
+                  fullWidth
+                  multiline
+                  rows={4}
                   value={createModal.description}
                   onChange={(e) =>
                     setCreateModal((prev) => ({
@@ -951,134 +1007,155 @@ export default function PriceChangeRequestsPage() {
                       description: e.target.value,
                     }))
                   }
-                  rows={4}
+                  InputProps={{
+                    style: {
+                      fontVariationSettings: "'wdth' 100",
+                    },
+                  }}
                 />
-              </div>
 
-              {/* Request Type */}
-              <div>
-                <Label htmlFor="requestType">Request Type *</Label>
-                <Select
-                  value={createModal.requestType}
-                  onValueChange={(
-                    value: "Customer" | "Multiple Customers" | "General/Global"
-                  ) =>
-                    setCreateModal((prev) => ({
-                      ...prev,
-                      requestType: value,
-                      customerId: value !== "Customer" ? "" : prev.customerId,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select request type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Customer">Customer</SelectItem>
-                    <SelectItem value="Multiple Customers">
-                      Multiple Customers
-                    </SelectItem>
-                    <SelectItem value="General/Global">
-                      General/Global
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Customer (only show if Request Type is Customer) */}
-              {createModal.requestType === "Customer" && (
-                <div>
-                  <Label htmlFor="customer">Customer *</Label>
+                {/* Request Type */}
+                <FormControl variant="outlined" fullWidth>
+                  <InputLabel id="create-request-type-label">
+                    Request Type *
+                  </InputLabel>
                   <Select
-                    value={createModal.customerId}
-                    onValueChange={(value) =>
-                      setCreateModal((prev) => ({ ...prev, customerId: value }))
-                    }
+                    labelId="create-request-type-label"
+                    value={createModal.requestType}
+                    onChange={(e) => {
+                      const value = e.target.value as
+                        | "Customer"
+                        | "Multiple Customers"
+                        | "General/Global";
+                      setCreateModal((prev) => ({
+                        ...prev,
+                        requestType: value,
+                        customerId: value !== "Customer" ? "" : prev.customerId,
+                      }));
+                    }}
+                    label="Request Type *"
+                    style={{ fontVariationSettings: "'wdth' 100" }}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CUSTOMERS.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
+                    <MenuItem value="Customer">Customer</MenuItem>
+                    <MenuItem value="Multiple Customers">
+                      Multiple Customers
+                    </MenuItem>
+                    <MenuItem value="General/Global">General/Global</MenuItem>
                   </Select>
-                </div>
-              )}
+                </FormControl>
 
-              {/* Assigned To */}
-              <div>
-                <Label htmlFor="assignedTo">Assigned To *</Label>
-                <Select
-                  value={createModal.assignedTo}
-                  onValueChange={(value) =>
-                    setCreateModal((prev) => ({ ...prev, assignedTo: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select team member" />
-                  </SelectTrigger>
-                  <SelectContent>
+                {/* Customer (only show if Request Type is Customer) */}
+                {createModal.requestType === "Customer" && (
+                  <FormControl variant="outlined" fullWidth>
+                    <InputLabel id="create-customer-label">
+                      Customer *
+                    </InputLabel>
+                    <Select
+                      labelId="create-customer-label"
+                      value={createModal.customerId}
+                      onChange={(e) =>
+                        setCreateModal((prev) => ({
+                          ...prev,
+                          customerId: e.target.value as string,
+                        }))
+                      }
+                      label="Customer *"
+                      style={{ fontVariationSettings: "'wdth' 100" }}
+                    >
+                      <MenuItem value="">Select customer</MenuItem>
+                      {CUSTOMERS.map((customer) => (
+                        <MenuItem key={customer.id} value={customer.id}>
+                          {customer.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
+
+                {/* Assigned To */}
+                <FormControl variant="outlined" fullWidth>
+                  <InputLabel id="create-assigned-to-label">
+                    Assigned To *
+                  </InputLabel>
+                  <Select
+                    labelId="create-assigned-to-label"
+                    value={createModal.assignedTo}
+                    onChange={(e) =>
+                      setCreateModal((prev) => ({
+                        ...prev,
+                        assignedTo: e.target.value as string,
+                      }))
+                    }
+                    label="Assigned To *"
+                    style={{ fontVariationSettings: "'wdth' 100" }}
+                  >
+                    <MenuItem value="">Select team member</MenuItem>
                     {TEAM_MEMBERS.map((member) => (
-                      <SelectItem key={member} value={member}>
+                      <MenuItem key={member} value={member}>
                         {member}
-                      </SelectItem>
+                      </MenuItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </Select>
+                </FormControl>
+
+                {/* Attachments */}
+                <div>
+                  <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
+                    Attachments
+                  </label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="file"
+                        multiple
+                        onChange={handleFileUpload}
+                        className="flex-1 font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#000000] bg-transparent border border-[#b9b9b9] rounded px-3 py-2 focus:outline-none focus:border-[#65b230] focus:ring-1 focus:ring-[#65b230]"
+                      />
+                      <Upload className="h-4 w-4 text-[#49454f]" />
+                    </div>
+
+                    {createModal.attachments.length > 0 && (
+                      <div className="space-y-1">
+                        {createModal.attachments.map((file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-2 bg-[#f5f5f5] rounded border border-[#e0e0e0]"
+                          >
+                            <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#1c1b1f]">
+                              {file.name}
+                            </span>
+                            <button
+                              onClick={() => removeAttachment(index)}
+                              className="h-6 w-6 p-0 text-[#49454f] hover:text-[#1c1b1f] transition-colors duration-200"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Attachments */}
-              <div>
-                <Label>Attachments</Label>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      type="file"
-                      multiple
-                      onChange={handleFileUpload}
-                      className="flex-1"
-                    />
-                    <Upload className="h-4 w-4 text-gray-500" />
-                  </div>
-
-                  {createModal.attachments.length > 0 && (
-                    <div className="space-y-1">
-                      {createModal.attachments.map((file, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between p-2 bg-gray-50 rounded"
-                        >
-                          <span className="text-sm text-gray-700">
-                            {file.name}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeAttachment(index)}
-                            className="h-6 w-6 p-0"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              {/* Modal Footer */}
+              <div className="p-6 border-t border-[#e0e0e0] flex justify-end space-x-3">
+                <button
+                  onClick={handleCreateCancel}
+                  className="px-4 py-2 border border-[#b9b9b9] text-[#1c1b1f] font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[20px] rounded-lg hover:bg-[#f5f5f5] transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateSubmit}
+                  className="px-4 py-2 bg-[#65b230] hover:bg-[#4a8a1f] text-white font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[20px] rounded-lg transition-colors duration-200"
+                >
+                  Create Request
+                </button>
               </div>
             </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={handleCreateCancel}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateSubmit}>Create Request</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </div>
+        )}
       </div>
     </div>
   );

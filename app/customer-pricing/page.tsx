@@ -151,6 +151,8 @@ export default function AllCustomerPricingPage() {
     uom: "",
     unitPrice: "",
     minimumPrice: "",
+    effectiveDate: "",
+    expirationDate: "",
   });
 
   // State for tracking new and modified rows
@@ -431,6 +433,8 @@ export default function AllCustomerPricingPage() {
         uom: item.uom,
         unitPrice: unitPrice,
         minimumPrice: minimumPrice,
+        effectiveDate: header?.effectiveDate || "",
+        expirationDate: header?.expirationDate || "",
         header: header,
       };
     });
@@ -451,6 +455,8 @@ export default function AllCustomerPricingPage() {
         uom: "",
         unitPrice: "",
         minimumPrice: "",
+        effectiveDate: "",
+        expirationDate: "",
         header: null,
         isNewEntry: true,
       };
@@ -740,6 +746,12 @@ export default function AllCustomerPricingPage() {
             ...(bulkEditForm.minimumPrice && {
               minimumPrice: parseFloat(bulkEditForm.minimumPrice),
             }),
+            ...(bulkEditForm.effectiveDate && {
+              effectiveDate: bulkEditForm.effectiveDate,
+            }),
+            ...(bulkEditForm.expirationDate && {
+              expirationDate: bulkEditForm.expirationDate,
+            }),
           };
 
           // Track modified rows and columns for highlighting
@@ -751,6 +763,8 @@ export default function AllCustomerPricingPage() {
           if (bulkEditForm.uom) modifiedFields.add("uom");
           if (bulkEditForm.unitPrice) modifiedFields.add("unitPrice");
           if (bulkEditForm.minimumPrice) modifiedFields.add("minimumPrice");
+          if (bulkEditForm.effectiveDate) modifiedFields.add("effectiveDate");
+          if (bulkEditForm.expirationDate) modifiedFields.add("expirationDate");
 
           if (modifiedFields.size > 0) {
             console.log(
@@ -776,6 +790,8 @@ export default function AllCustomerPricingPage() {
       uom: "",
       unitPrice: "",
       minimumPrice: "",
+      effectiveDate: "",
+      expirationDate: "",
     });
     setApplyChangesDialogOpen(false);
     setSelectedRows([] as any);
@@ -788,6 +804,8 @@ export default function AllCustomerPricingPage() {
       uom: "",
       unitPrice: "",
       minimumPrice: "",
+      effectiveDate: "",
+      expirationDate: "",
     });
     setApplyChangesDialogOpen(false);
   };
@@ -1051,6 +1069,7 @@ export default function AllCustomerPricingPage() {
           customer?.status === "inactive"
             ? `${params.value} (Inactive)`
             : params.value;
+
         return (
           <div
             style={{
@@ -1132,7 +1151,24 @@ export default function AllCustomerPricingPage() {
       flex: 0,
       minWidth: 100,
       editable: isEditMode,
-      renderCell: (params: any) => formatCurrency(params.value),
+      renderCell: (params: any) => {
+        const price = formatCurrency(params.value);
+        const effectiveDate = params.row.effectiveDate;
+        const expirationDate = params.row.expirationDate;
+
+        return (
+          <div style={{ lineHeight: "1.2" }}>
+            <div style={{ fontWeight: "500" }}>{price}</div>
+            {effectiveDate && expirationDate && (
+              <div
+                style={{ fontSize: "0.75em", color: "#888", marginTop: "2px" }}
+              >
+                {formatDate(effectiveDate)} - {formatDate(expirationDate)}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       field: "uom",
@@ -1246,6 +1282,12 @@ export default function AllCustomerPricingPage() {
         UOM: item.uom || "",
         Price: item.unitPrice,
         Minimum: item.minimumPrice,
+        "Effective Date": header?.effectiveDate
+          ? formatDate(header.effectiveDate)
+          : "",
+        "Expiration Date": header?.expirationDate
+          ? formatDate(header.expirationDate)
+          : "",
       };
     });
 
@@ -1730,7 +1772,7 @@ export default function AllCustomerPricingPage() {
                       rows={rows || []}
                       columns={columns || []}
                       getRowId={(row) => row.id}
-                      density="standard"
+                      density="comfortable"
                       editMode={isEditMode ? "row" : undefined}
                       processRowUpdate={
                         isEditMode ? processRowUpdate : undefined
@@ -2911,6 +2953,42 @@ export default function AllCustomerPricingPage() {
                 fullWidth
                 placeholder="Keep existing"
                 inputProps={{ min: 0, step: 0.01 }}
+              />
+
+              {/* Effective Date */}
+              <TextField
+                label="Effective Date"
+                type="date"
+                value={bulkEditForm.effectiveDate}
+                onChange={(e) =>
+                  setBulkEditForm((prev) => ({
+                    ...prev,
+                    effectiveDate: e.target.value,
+                  }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                placeholder="Keep existing"
+                InputLabelProps={{ shrink: true }}
+              />
+
+              {/* Expiration Date */}
+              <TextField
+                label="Expiration Date"
+                type="date"
+                value={bulkEditForm.expirationDate}
+                onChange={(e) =>
+                  setBulkEditForm((prev) => ({
+                    ...prev,
+                    expirationDate: e.target.value,
+                  }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                placeholder="Keep existing"
+                InputLabelProps={{ shrink: true }}
               />
             </div>
           </DialogContent>

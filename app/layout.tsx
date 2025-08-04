@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Pricing Entry",
-  description: "Created with v0",
-  generator: "v0.dev",
+  title: "Clean Earth Pricing",
+  description: "Clean Earth Pricing Entry System",
+  generator: "Clean Earth",
 };
 
 export default function RootLayout({

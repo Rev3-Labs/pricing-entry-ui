@@ -1039,7 +1039,7 @@ export default function PriceChangeRequestDetailsPage() {
                                       Tech Solutions Inc
                                     </MenuItem>
                                     <MenuItem value="CUST-003">
-                                      Utah State Agencies
+                                      Utah State Agencies (Inactive)
                                     </MenuItem>
                                   </Select>
                                 </FormControl>

@@ -23,7 +23,7 @@ export interface PriceHeader {
   description?: string;
   effectiveDate: string;
   expirationDate: string;
-  status: "active" | "in-progress" | "new";
+  status: "active" | "inactive" | "in-progress" | "new";
   createdAt?: string;
   updatedAt?: string;
   // Legacy fields for backward compatibility
@@ -52,7 +52,7 @@ export interface PriceItem {
   minimumPrice: number;
   effectiveDate: string;
   expirationDate: string;
-  status: "active" | "in-progress" | "new";
+  status: "active" | "inactive" | "in-progress" | "new";
   quoteName?: string;
   projectName?: string;
   uom?: string;
@@ -62,6 +62,7 @@ export interface PriceItem {
   containerSize?: string;
   billingUom?: string;
   pricingType?: string;
+  facilityName?: string;
   createdAt?: string;
   updatedAt?: string;
   // Legacy fields for backward compatibility
@@ -119,7 +120,7 @@ const productNames = [
 ];
 
 const regions = ["North", "South", "East", "West", "Central"];
-const statuses = ["active", "in-progress", "new"];
+const statuses = ["active", "inactive", "in-progress", "new"];
 const uomOptions = ["Each", "Gallon", "Pound", "Container", "Ton"];
 const containerSizes = ["5G", "15G", "20G", "30G", "55G", "Tri-Wall", "275G"];
 const pricingTypes = ["Standard", "Premium", "Bulk", "Contract", "Spot"];
@@ -293,7 +294,11 @@ export function generateSampleData() {
         description: `Pricing header for ${
           customer.customerName
         } - ${generateProjectName()}`,
-        status: randomElement(statuses),
+        status: randomElement(statuses) as
+          | "active"
+          | "inactive"
+          | "in-progress"
+          | "new",
         effectiveDate: randomDate(
           new Date("2023-01-01"),
           new Date("2025-12-31")
@@ -329,7 +334,11 @@ export function generateSampleData() {
             new Date("2024-01-01"),
             new Date("2026-12-31")
           ),
-          status: randomElement(statuses),
+          status: randomElement(statuses) as
+            | "active"
+            | "inactive"
+            | "in-progress"
+            | "new",
           contractId: Math.random() > 0.3 ? generateContractId() : undefined,
           profileId: Math.random() > 0.3 ? generateProfileId() : undefined,
           generatorId: Math.random() > 0.5 ? generateGeneratorId() : undefined,
@@ -442,8 +451,6 @@ export function loadSampleDataFromLocalStorage() {
       priceHeaders: priceHeaders.length,
       priceItems: processedPriceItems.length,
     });
-
-    // Debug: Check a few price items to verify numeric values
 
     return {
       customers,

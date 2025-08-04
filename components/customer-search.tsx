@@ -13,6 +13,7 @@ export interface Customer {
   customerName: string;
   oracleCustomerId?: string;
   customerCode?: string;
+  status?: string;
 }
 
 interface CustomerSearchProps {
@@ -172,6 +173,11 @@ export function CustomerSearch({
                       {customer.customerCode && (
                         <Badge variant="outline" className="text-xs">
                           Code: {customer.customerCode}
+                        </Badge>
+                      )}
+                      {customer.status === "inactive" && (
+                        <Badge variant="destructive" className="text-xs">
+                          (Inactive)
                         </Badge>
                       )}
                     </div>

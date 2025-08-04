@@ -229,13 +229,13 @@ const TEAM_MEMBERS = [
 
 // Available customers
 const CUSTOMERS = [
-  { id: "CUST-001", name: "Acme Corporation" },
-  { id: "CUST-002", name: "Tech Solutions Inc" },
-  { id: "CUST-003", name: "Green Energy Co" },
-  { id: "CUST-004", name: "Industrial Cleanup Ltd" },
-  { id: "CUST-005", name: "Environmental Services LLC" },
-  { id: "CUST-006", name: "Waste Management Corp" },
-  { id: "CUST-007", name: "Clean Energy Solutions" },
+  { id: "CUST-001", name: "Acme Corporation", status: "active" },
+  { id: "CUST-002", name: "Tech Solutions Inc", status: "active" },
+  { id: "CUST-003", name: "Green Energy Co", status: "inactive" },
+  { id: "CUST-004", name: "Industrial Cleanup Ltd", status: "active" },
+  { id: "CUST-005", name: "Environmental Services LLC", status: "active" },
+  { id: "CUST-006", name: "Waste Management Corp", status: "inactive" },
+  { id: "CUST-007", name: "Clean Energy Solutions", status: "active" },
 ];
 
 export default function PriceChangeRequestsPage() {
@@ -1146,6 +1146,7 @@ export default function PriceChangeRequestsPage() {
                       {CUSTOMERS.map((customer) => (
                         <MenuItem key={customer.id} value={customer.id}>
                           {customer.name}
+                          {customer.status === "inactive" && " (Inactive)"}
                         </MenuItem>
                       ))}
                     </Select>

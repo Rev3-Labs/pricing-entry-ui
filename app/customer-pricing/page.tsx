@@ -71,19 +71,15 @@ interface FilterState {
   customerName: string;
   contractNumber: string;
   profileId: string;
-  itemNumber: string;
   productName: string;
-  region: string;
   status: string;
   dateFrom: string;
   dateTo: string;
   uom: string;
-  quoteName: string;
   projectName: string;
   generator?: string;
   facility?: string;
   containerSize?: string;
-  pricingTier?: string;
   createdBy?: string;
   salesRep?: string;
   priceRange?: {
@@ -111,15 +107,13 @@ export default function AllCustomerPricingPage() {
     customerName: "",
     contractNumber: "",
     profileId: "",
-    itemNumber: "",
     productName: "",
-    region: "all",
     status: "all",
     dateFrom: "",
     dateTo: "",
     uom: "all",
-    quoteName: "",
     projectName: "",
+    containerSize: "all",
   });
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<string>("all");
@@ -147,6 +141,9 @@ export default function AllCustomerPricingPage() {
 
   // New state for edit mode dialogs
   const [applyChangesDialogOpen, setApplyChangesDialogOpen] = useState(false);
+  const [exitEditModeConfirmOpen, setExitEditModeConfirmOpen] = useState(false);
+  const [submitPriceChangeConfirmOpen, setSubmitPriceChangeConfirmOpen] =
+    useState(false);
 
   // State for bulk edit form
   const [bulkEditForm, setBulkEditForm] = useState({
@@ -177,7 +174,11 @@ export default function AllCustomerPricingPage() {
   // Helper functions to get unique values for dropdowns
   const getUniqueCustomers = (): string[] => {
     const customers = allPricingData.customers
-      .map((c) => c.customerName)
+      .map((c) =>
+        c.status === "inactive"
+          ? `${c.customerName} (Inactive)`
+          : c.customerName
+      )
       .filter((name): name is string => Boolean(name));
     return [...new Set(customers)].sort();
   };
@@ -303,31 +304,14 @@ export default function AllCustomerPricingPage() {
             .toLowerCase()
             .includes(filters.profileId.toLowerCase()));
 
-      const matchesItemNumber =
-        !filters.itemNumber ||
-        (item.priceItemId &&
-          item.priceItemId
-            .toLowerCase()
-            .includes(filters.itemNumber.toLowerCase()));
-
       const matchesProductName =
         !filters.productName ||
         item.productName
           .toLowerCase()
           .includes(filters.productName.toLowerCase());
 
-      const matchesRegion =
-        filters.region === "all" || item.region === filters.region;
-
       const matchesStatus =
         filters.status === "all" || item.status === filters.status;
-
-      const matchesQuoteName =
-        !filters.quoteName ||
-        (item.quoteName &&
-          item.quoteName
-            .toLowerCase()
-            .includes(filters.quoteName.toLowerCase()));
 
       const matchesProjectName =
         !filters.projectName ||
@@ -347,18 +331,19 @@ export default function AllCustomerPricingPage() {
             .includes(filters.generator.toLowerCase()));
 
       const matchesContainerSize =
+        filters.containerSize === "all" ||
         !filters.containerSize ||
         (item.containerSize &&
           item.containerSize
             .toLowerCase()
             .includes(filters.containerSize.toLowerCase()));
 
-      const matchesPricingTier =
-        !filters.pricingTier ||
-        (item.pricingType &&
-          item.pricingType
+      const matchesFacility =
+        !filters.facility ||
+        (item.facilityName &&
+          item.facilityName
             .toLowerCase()
-            .includes(filters.pricingTier.toLowerCase()));
+            .includes(filters.facility.toLowerCase()));
 
       // Date filtering
       let matchesDateRange = true;
@@ -391,16 +376,13 @@ export default function AllCustomerPricingPage() {
         matchesCustomerName &&
         matchesContractNumber &&
         matchesProfileId &&
-        matchesItemNumber &&
         matchesProductName &&
-        matchesRegion &&
         matchesStatus &&
-        matchesQuoteName &&
         matchesProjectName &&
         matchesUOM &&
         matchesGenerator &&
         matchesContainerSize &&
-        matchesPricingTier &&
+        matchesFacility &&
         matchesDateRange &&
         matchesPriceRange
       );
@@ -694,6 +676,7 @@ export default function AllCustomerPricingPage() {
 
     // Compare each field to detect changes
     const fieldsToTrack = [
+      "customerName",
       "productName",
       "containerSize",
       "facilityName",
@@ -713,6 +696,10 @@ export default function AllCustomerPricingPage() {
 
     // If any fields were modified, track them
     if (modifiedFields.size > 0) {
+      console.log(
+        `Row ${newRow.id} modified fields:`,
+        Array.from(modifiedFields)
+      );
       setModifiedRows((prev) => new Set([...prev, newRow.id]));
       setModifiedColumns((prev) => {
         const newMap = new Map(prev);
@@ -755,8 +742,27 @@ export default function AllCustomerPricingPage() {
             }),
           };
 
-          // Track modified rows for highlighting
+          // Track modified rows and columns for highlighting
           setModifiedRows((prev) => new Set([...prev, item.priceItemId]));
+
+          // Track which specific columns were modified
+          const modifiedFields = new Set<string>();
+          if (bulkEditForm.containerSize) modifiedFields.add("containerSize");
+          if (bulkEditForm.uom) modifiedFields.add("uom");
+          if (bulkEditForm.unitPrice) modifiedFields.add("unitPrice");
+          if (bulkEditForm.minimumPrice) modifiedFields.add("minimumPrice");
+
+          if (modifiedFields.size > 0) {
+            console.log(
+              `Bulk edit - Row ${item.priceItemId} modified fields:`,
+              Array.from(modifiedFields)
+            );
+            setModifiedColumns((prev) => {
+              const newMap = new Map(prev);
+              newMap.set(item.priceItemId, modifiedFields);
+              return newMap;
+            });
+          }
 
           return updatedItem;
         }
@@ -784,6 +790,57 @@ export default function AllCustomerPricingPage() {
       minimumPrice: "",
     });
     setApplyChangesDialogOpen(false);
+  };
+
+  const handleExitEditMode = () => {
+    const hasPendingChanges =
+      (newRows && newRows.size > 0) || (modifiedRows && modifiedRows.size > 0);
+
+    if (hasPendingChanges) {
+      setExitEditModeConfirmOpen(true);
+    } else {
+      // No pending changes, exit immediately
+      exitEditMode();
+    }
+  };
+
+  const exitEditMode = () => {
+    setIsEditMode(false);
+    setSelectedRows([] as any);
+    setNewRows(new Set());
+    setModifiedRows(new Set());
+    setModifiedColumns(new Map());
+    setCurrentPriceChangeConfig(null);
+    setExitEditModeConfirmOpen(false);
+    toast.info("Exited edit mode");
+  };
+
+  const handleSubmitPriceChange = () => {
+    setSubmitPriceChangeConfirmOpen(true);
+  };
+
+  const submitPriceChange = () => {
+    const totalChanges =
+      (newRows ? newRows.size : 0) + (modifiedRows ? modifiedRows.size : 0);
+
+    // TODO: Implement actual price change submission logic here
+    // This would typically involve:
+    // 1. Validating all changes
+    // 2. Sending data to backend API
+    // 3. Handling success/error responses
+
+    toast.success(
+      `Successfully submitted price change with ${totalChanges} modified entries`
+    );
+
+    // Reset edit mode after successful submission
+    setIsEditMode(false);
+    setSelectedRows([] as any);
+    setNewRows(new Set());
+    setModifiedRows(new Set());
+    setModifiedColumns(new Map());
+    setCurrentPriceChangeConfig(null);
+    setSubmitPriceChangeConfirmOpen(false);
   };
 
   // Sample price change requests data (using same data as change-requests route)
@@ -976,15 +1033,39 @@ export default function AllCustomerPricingPage() {
     {
       field: "customerName",
       headerName: "Customer",
-      width: 200,
+      width: 250,
       flex: 1,
-      minWidth: 150,
+      minWidth: 200,
       editable: true,
       type: "singleSelect",
       valueOptions: getUniqueCustomers().map((value) => ({
         value,
         label: value,
       })),
+      renderCell: (params: any) => {
+        const customerId = params.row.customerId;
+        const customer = allPricingData?.customers?.find(
+          (c) => c.customerId === customerId
+        );
+        const displayName =
+          customer?.status === "inactive"
+            ? `${params.value} (Inactive)`
+            : params.value;
+        return (
+          <div
+            style={{
+              whiteSpace: "pre-wrap",
+              wordWrap: "break-word",
+              lineHeight: "1.2",
+            }}
+          >
+            <div style={{ fontWeight: "500" }}>{displayName}</div>
+            <div style={{ fontSize: "0.8em", color: "#666" }}>
+              ID: {customerId}
+            </div>
+          </div>
+        );
+      },
     },
     {
       field: "productName",
@@ -1080,15 +1161,15 @@ export default function AllCustomerPricingPage() {
       customerName: "",
       contractNumber: "",
       profileId: "",
-      itemNumber: "",
       productName: "",
-      region: "all",
       status: "all",
       dateFrom: "",
       dateTo: "",
       uom: "all",
-      quoteName: "",
       projectName: "",
+      generator: "",
+      facility: "",
+      containerSize: "all",
     });
   };
 
@@ -1225,17 +1306,7 @@ export default function AllCustomerPricingPage() {
               <div className="flex items-center space-x-2">
                 {isEditMode && (
                   <>
-                    <SecondaryButton
-                      onClick={() => {
-                        setIsEditMode(false);
-                        setSelectedRows([] as any);
-                        setNewRows(new Set());
-                        setModifiedRows(new Set());
-                        setCurrentPriceChangeConfig(null); // Clear the price change configuration
-                        toast.info("Exited edit mode");
-                      }}
-                      icon={X}
-                    >
+                    <SecondaryButton onClick={handleExitEditMode} icon={X}>
                       Exit Edit Mode
                     </SecondaryButton>
                     <PrimaryButton
@@ -1243,22 +1314,7 @@ export default function AllCustomerPricingPage() {
                         (!newRows || newRows.size === 0) &&
                         (!modifiedRows || modifiedRows.size === 0)
                       }
-                      onClick={() => {
-                        // TODO: Implement price change submission logic
-                        const totalChanges =
-                          (newRows ? newRows.size : 0) +
-                          (modifiedRows ? modifiedRows.size : 0);
-                        toast.success(
-                          `Submitting price change with ${totalChanges} modified entries`
-                        );
-                        // Here you would typically submit the changes to your backend
-                        // For now, we'll just exit edit mode
-                        setIsEditMode(false);
-                        setSelectedRows([] as any);
-                        setNewRows(new Set());
-                        setModifiedRows(new Set());
-                        setCurrentPriceChangeConfig(null);
-                      }}
+                      onClick={handleSubmitPriceChange}
                       icon={Check}
                     >
                       Submit Price Change (
@@ -1288,7 +1344,7 @@ export default function AllCustomerPricingPage() {
             <div className="p-6">
               <div className="flex flex-wrap gap-4 items-end mb-4 mt-4">
                 {/* Customer Filter */}
-                <div>
+                {/* <div>
                   <FormControl size="small" sx={{ width: "200px" }}>
                     <InputLabel>Customer</InputLabel>
                     <Select
@@ -1305,11 +1361,12 @@ export default function AllCustomerPricingPage() {
                           value={customer.customerId}
                         >
                           {customer.customerName}
+                          {customer.status === "inactive" && " (Inactive)"}
                         </MenuItem>
                       ))}
                     </Select>
                   </FormControl>
-                </div>
+                </div> */}
 
                 {/* Customer Name Search */}
                 <div>
@@ -1329,8 +1386,23 @@ export default function AllCustomerPricingPage() {
                   />
                 </div>
 
-                {/* Contract Number Filter */}
+                {/* Product Name Filter */}
                 <div>
+                  <TextField
+                    label="Product Name"
+                    placeholder="Product name..."
+                    value={filters.productName}
+                    onChange={(e) =>
+                      setFilters((f) => ({ ...f, productName: e.target.value }))
+                    }
+                    variant="outlined"
+                    size="small"
+                    sx={{ width: "150px" }}
+                  />
+                </div>
+
+                {/* Contract Number Filter */}
+                {/* <div>
                   <TextField
                     label="Contract Number"
                     placeholder="Contract number..."
@@ -1345,7 +1417,7 @@ export default function AllCustomerPricingPage() {
                     size="small"
                     sx={{ width: "180px" }}
                   />
-                </div>
+                </div> */}
 
                 {/* Profile ID Filter */}
                 <div>
@@ -1362,14 +1434,44 @@ export default function AllCustomerPricingPage() {
                   />
                 </div>
 
-                {/* Item Number Filter */}
+                {/* Generator Filter */}
                 <div>
                   <TextField
-                    label="Item Number"
-                    placeholder="Item number..."
-                    value={filters.itemNumber}
+                    label="Generator"
+                    placeholder="Generator..."
+                    value={filters.generator || ""}
                     onChange={(e) =>
-                      setFilters((f) => ({ ...f, itemNumber: e.target.value }))
+                      setFilters((f) => ({ ...f, generator: e.target.value }))
+                    }
+                    variant="outlined"
+                    size="small"
+                    sx={{ width: "150px" }}
+                  />
+                </div>
+
+                {/* Project Name Filter */}
+                <div>
+                  <TextField
+                    label="Project Name"
+                    placeholder="Project name..."
+                    value={filters.projectName}
+                    onChange={(e) =>
+                      setFilters((f) => ({ ...f, projectName: e.target.value }))
+                    }
+                    variant="outlined"
+                    size="small"
+                    sx={{ width: "150px" }}
+                  />
+                </div>
+
+                {/* Facility Filter */}
+                <div>
+                  <TextField
+                    label="Facility"
+                    placeholder="Facility..."
+                    value={filters.facility || ""}
+                    onChange={(e) =>
+                      setFilters((f) => ({ ...f, facility: e.target.value }))
                     }
                     variant="outlined"
                     size="small"
@@ -1378,23 +1480,22 @@ export default function AllCustomerPricingPage() {
                 </div>
 
                 {/* Status Filter */}
-                <div>
-                  <FormControl size="small" sx={{ width: "140px" }}>
-                    <InputLabel>Status</InputLabel>
-                    <Select
-                      value={filters.status}
-                      onChange={(e) =>
-                        setFilters((f) => ({ ...f, status: e.target.value }))
-                      }
-                      label="Status"
-                    >
-                      <MenuItem value="all">All</MenuItem>
-                      <MenuItem value="active">Active</MenuItem>
-                      <MenuItem value="in-progress">In Progress</MenuItem>
-                      <MenuItem value="new">New</MenuItem>
-                    </Select>
-                  </FormControl>
-                </div>
+
+                {/* <FormControl size="small" sx={{ width: "140px" }}>
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    value={filters.status}
+                    onChange={(e) =>
+                      setFilters((f) => ({ ...f, status: e.target.value }))
+                    }
+                    label="Status"
+                  >
+                    <MenuItem value="all">All</MenuItem>
+                    <MenuItem value="active">Active</MenuItem>
+                    <MenuItem value="in-progress">In Progress</MenuItem>
+                    <MenuItem value="new">New</MenuItem>
+                  </Select>
+                </FormControl> */}
 
                 {/* More Filters Button */}
                 <SecondaryButton
@@ -1499,7 +1600,10 @@ export default function AllCustomerPricingPage() {
                       >
                         Edit Mode
                       </Typography>
+                    </div>
 
+                    {/* Action Buttons - Always Accessible */}
+                    <div className="flex items-center space-x-3">
                       {/* Color Legend - Compact with Counts */}
                       <div className="flex items-center space-x-3 text-xs">
                         {newRows.size > 0 && (
@@ -1519,10 +1623,7 @@ export default function AllCustomerPricingPage() {
                           </div>
                         )}
                       </div>
-                    </div>
 
-                    {/* Action Buttons - Always Accessible */}
-                    <div className="flex items-center space-x-3">
                       <PrimaryButton
                         onClick={handleAddNewEntry}
                         disabled={!!newRowId}
@@ -1648,15 +1749,20 @@ export default function AllCustomerPricingPage() {
                         return "";
                       }}
                       getCellClassName={(params) => {
-                        // Check if this cell's column has been modified
-                        const modifiedFields = modifiedColumns.get(
-                          params.row.id
-                        );
-                        if (
-                          modifiedFields &&
-                          modifiedFields.has(params.field)
-                        ) {
-                          return "modified-cell";
+                        // Only show modified cells in bold when in edit mode
+                        if (isEditMode) {
+                          const modifiedFields = modifiedColumns.get(
+                            params.row.id
+                          );
+                          if (
+                            modifiedFields &&
+                            modifiedFields.has(params.field)
+                          ) {
+                            console.log(
+                              `Applying modified-cell class to row ${params.row.id}, field ${params.field}`
+                            );
+                            return "modified-cell";
+                          }
                         }
                         return "";
                       }}
@@ -1677,8 +1783,14 @@ export default function AllCustomerPricingPage() {
                           },
                         },
                         "& .modified-cell": {
-                          fontWeight: "bold",
-                          color: "#1c1b1f",
+                          fontWeight: "bold !important",
+                          color: "#1c1b1f !important",
+                        },
+                        "& .modified-cell .MuiDataGrid-cellContent": {
+                          fontWeight: "bold !important",
+                        },
+                        "& .modified-cell .MuiDataGrid-cellContent *": {
+                          fontWeight: "bold !important",
                         },
                         "& .MuiDataGrid-cell": {
                           fontSize: "0.875rem",
@@ -1727,6 +1839,12 @@ export default function AllCustomerPricingPage() {
           onClose={() => setAdvancedFiltersOpen(false)}
           maxWidth="md"
           fullWidth
+          PaperProps={{
+            sx: {
+              minWidth: "500px",
+              maxWidth: "600px",
+            },
+          }}
         >
           <DialogTitle
             sx={{
@@ -1739,104 +1857,50 @@ export default function AllCustomerPricingPage() {
           >
             Advanced Filters
           </DialogTitle>
-          <DialogContent sx={{ p: 3 }}>
-            <div className="grid grid-cols-2 gap-4">
-              {/* Product Filter */}
-              <TextField
-                label="Product Name"
-                placeholder="Product name..."
-                value={filters.productName}
-                onChange={(e) =>
-                  setFilters((f) => ({
-                    ...f,
-                    productName: e.target.value,
-                  }))
-                }
-                variant="outlined"
-                size="small"
-                fullWidth
-              />
-
-              {/* Region Filter */}
+          <DialogContent sx={{ p: 4 }}>
+            <div
+              className="py-2 grid grid-cols-1 gap-4"
+              style={{ minWidth: "400px" }}
+            >
+              {/* Container Size Filter */}
               <FormControl variant="outlined" size="small" fullWidth>
-                <InputLabel>Region</InputLabel>
-                <Select
-                  value={filters.region}
-                  onChange={(e) =>
-                    setFilters((f) => ({ ...f, region: e.target.value }))
-                  }
-                  label="Region"
+                <InputLabel
+                  sx={{
+                    fontSize: "14px",
+                    whiteSpace: "nowrap",
+                  }}
                 >
-                  <MenuItem value="all">All Regions</MenuItem>
-                  <MenuItem value="North">North</MenuItem>
-                  <MenuItem value="South">South</MenuItem>
-                  <MenuItem value="East">East</MenuItem>
-                  <MenuItem value="West">West</MenuItem>
-                  <MenuItem value="Central">Central</MenuItem>
+                  Container Size
+                </InputLabel>
+                <Select
+                  value={filters.containerSize || "all"}
+                  onChange={(e) =>
+                    setFilters((f) => ({
+                      ...f,
+                      containerSize: e.target.value,
+                    }))
+                  }
+                  label="Container Size"
+                >
+                  <MenuItem value="all">All Container Sizes</MenuItem>
+                  {getUniqueContainerSizes().map((size) => (
+                    <MenuItem key={size} value={size}>
+                      {size}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
 
-              {/* Quote Name Filter */}
-              <TextField
-                label="Quote Name"
-                placeholder="Quote name..."
-                value={filters.quoteName}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, quoteName: e.target.value }))
-                }
-                variant="outlined"
-                size="small"
-                fullWidth
-              />
-
-              {/* Project Name Filter */}
-              <TextField
-                label="Project Name"
-                placeholder="Project name..."
-                value={filters.projectName}
-                onChange={(e) =>
-                  setFilters((f) => ({
-                    ...f,
-                    projectName: e.target.value,
-                  }))
-                }
-                variant="outlined"
-                size="small"
-                fullWidth
-              />
-
-              {/* Generator Filter */}
-              <TextField
-                label="Generator"
-                placeholder="Generator..."
-                value={filters.generator || ""}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, generator: e.target.value }))
-                }
-                variant="outlined"
-                size="small"
-                fullWidth
-              />
-
-              {/* Container Size Filter */}
-              <TextField
-                label="Container Size"
-                placeholder="Container size..."
-                value={filters.containerSize || ""}
-                onChange={(e) =>
-                  setFilters((f) => ({
-                    ...f,
-                    containerSize: e.target.value,
-                  }))
-                }
-                variant="outlined"
-                size="small"
-                fullWidth
-              />
-
               {/* UOM Filter */}
               <FormControl variant="outlined" size="small" fullWidth>
-                <InputLabel>Unit of Measure</InputLabel>
+                <InputLabel
+                  sx={{
+                    fontSize: "14px",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Unit of Measure
+                </InputLabel>
                 <Select
                   value={filters.uom}
                   onChange={(e) =>
@@ -1853,25 +1917,9 @@ export default function AllCustomerPricingPage() {
                 </Select>
               </FormControl>
 
-              {/* Pricing Tier Filter */}
-              <TextField
-                label="Pricing Tier"
-                placeholder="Pricing tier..."
-                value={filters.pricingTier || ""}
-                onChange={(e) =>
-                  setFilters((f) => ({
-                    ...f,
-                    pricingTier: e.target.value,
-                  }))
-                }
-                variant="outlined"
-                size="small"
-                fullWidth
-              />
-
               {/* Date Range */}
-              <div className="col-span-2">
-                <div className="flex gap-4">
+              <div>
+                <div className="grid grid-cols-2 gap-4">
                   <TextField
                     label="Effective Date From"
                     type="date"
@@ -1900,8 +1948,8 @@ export default function AllCustomerPricingPage() {
               </div>
 
               {/* Price Range */}
-              <div className="col-span-2">
-                <div className="flex gap-4">
+              <div>
+                <div className="grid grid-cols-2 gap-4">
                   <TextField
                     label="Min Price"
                     type="number"
@@ -2872,6 +2920,127 @@ export default function AllCustomerPricingPage() {
             </SecondaryButton>
             <PrimaryButton onClick={handleApplyChangesSubmit}>
               Apply Changes
+            </PrimaryButton>
+          </DialogActions>
+        </Dialog>
+
+        {/* Exit Edit Mode Confirmation Dialog */}
+        <Dialog
+          open={exitEditModeConfirmOpen}
+          onClose={() => setExitEditModeConfirmOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle
+            sx={{
+              fontFamily: "Roboto:Medium, sans-serif",
+              fontWeight: 500,
+              fontSize: "22px",
+              lineHeight: "28px",
+              color: "#1c1b1f",
+            }}
+          >
+            Unsaved Changes
+          </DialogTitle>
+          <DialogContent sx={{ p: 3 }}>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              You have unsaved changes that will be lost if you exit edit mode:
+            </Typography>
+            <div className="space-y-2">
+              {newRows && newRows.size > 0 && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm">
+                    {newRows.size} new entr{newRows.size === 1 ? "y" : "ies"} to
+                    be added
+                  </span>
+                </div>
+              )}
+              {modifiedRows && modifiedRows.size > 0 && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                  <span className="text-sm">
+                    {modifiedRows.size} entr
+                    {modifiedRows.size === 1 ? "y" : "ies"} with modifications
+                  </span>
+                </div>
+              )}
+            </div>
+            <Typography variant="body2" sx={{ mt: 3, color: "#666" }}>
+              Are you sure you want to exit edit mode and lose these changes?
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, gap: 2 }}>
+            <SecondaryButton onClick={() => setExitEditModeConfirmOpen(false)}>
+              Cancel
+            </SecondaryButton>
+            <PrimaryButton
+              onClick={exitEditMode}
+              sx={{
+                backgroundColor: "#dc2626",
+                "&:hover": { backgroundColor: "#b91c1c" },
+              }}
+            >
+              Exit Without Saving
+            </PrimaryButton>
+          </DialogActions>
+        </Dialog>
+
+        {/* Submit Price Change Confirmation Dialog */}
+        <Dialog
+          open={submitPriceChangeConfirmOpen}
+          onClose={() => setSubmitPriceChangeConfirmOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle
+            sx={{
+              fontFamily: "Roboto:Medium, sans-serif",
+              fontWeight: 500,
+              fontSize: "22px",
+              lineHeight: "28px",
+              color: "#1c1b1f",
+            }}
+          >
+            Submit Price Change
+          </DialogTitle>
+          <DialogContent sx={{ p: 3 }}>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              You are about to submit the following changes:
+            </Typography>
+            <div className="space-y-2">
+              {newRows && newRows.size > 0 && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm">
+                    {newRows.size} new entr{newRows.size === 1 ? "y" : "ies"} to
+                    be added
+                  </span>
+                </div>
+              )}
+              {modifiedRows && modifiedRows.size > 0 && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                  <span className="text-sm">
+                    {modifiedRows.size} entr
+                    {modifiedRows.size === 1 ? "y" : "ies"} with modifications
+                  </span>
+                </div>
+              )}
+            </div>
+            <Typography variant="body2" sx={{ mt: 3, color: "#666" }}>
+              This action will submit all price modifications. Are you sure you
+              want to proceed?
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, gap: 1 }}>
+            <SecondaryButton
+              onClick={() => setSubmitPriceChangeConfirmOpen(false)}
+            >
+              Cancel
+            </SecondaryButton>
+            <PrimaryButton onClick={submitPriceChange}>
+              Submit Price Change
             </PrimaryButton>
           </DialogActions>
         </Dialog>

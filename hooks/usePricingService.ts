@@ -5,6 +5,7 @@ export interface Customer {
   customerId: number;
   customerName: string;
   customerCode: string;
+  status?: string;
 }
 
 export interface Product {
@@ -112,10 +113,30 @@ const mockApiCall = async <T>(
 };
 
 const mockCustomers: Customer[] = [
-  { customerId: 1, customerName: "Acme Corp", customerCode: "ACME" },
-  { customerId: 2, customerName: "Beta Industries", customerCode: "BETA" },
-  { customerId: 3, customerName: "Gamma Solutions", customerCode: "GAMMA" },
-  { customerId: 4, customerName: "Delta Enterprises", customerCode: "DELTA" },
+  {
+    customerId: 1,
+    customerName: "Acme Corp",
+    customerCode: "ACME",
+    status: "active",
+  },
+  {
+    customerId: 2,
+    customerName: "Beta Industries",
+    customerCode: "BETA",
+    status: "active",
+  },
+  {
+    customerId: 3,
+    customerName: "Gamma Solutions",
+    customerCode: "GAMMA",
+    status: "inactive",
+  },
+  {
+    customerId: 4,
+    customerName: "Delta Enterprises",
+    customerCode: "DELTA",
+    status: "active",
+  },
 ];
 
 const mockProducts: Product[] = [

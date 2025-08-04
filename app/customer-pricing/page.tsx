@@ -8,7 +8,6 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Button as MuiButton,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -24,7 +23,9 @@ import {
   FormControlLabel,
   FormLabel,
   Divider,
+  IconButton,
 } from "@mui/material";
+import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
 import { DataGrid, GridColDef, GridRowSelectionModel } from "@mui/x-data-grid";
 import {
   ArrowLeft,
@@ -158,38 +159,13 @@ export default function AllCustomerPricingPage() {
   // State for tracking new and modified rows
   const [newRows, setNewRows] = useState<Set<string>>(new Set());
   const [modifiedRows, setModifiedRows] = useState<Set<string>>(new Set());
+  const [modifiedColumns, setModifiedColumns] = useState<
+    Map<string, Set<string>>
+  >(new Map());
 
-  // State for inline editing
-  const [isAddingNewEntry, setIsAddingNewEntry] = useState(false);
-  const [newEntryData, setNewEntryData] = useState({
-    customerName: "",
-    productName: "",
-    profileId: "",
-    generatorId: "",
-    contractId: "",
-    projectName: "",
-    facilityName: "",
-    containerSize: "",
-    uom: "",
-    unitPrice: "",
-    minimumPrice: "",
-  });
-
-  // State for inline editing of the new row
-  const [editingNewRow, setEditingNewRow] = useState(false);
-  const [editingRowData, setEditingRowData] = useState({
-    customerName: "",
-    productName: "",
-    profileId: "",
-    generatorId: "",
-    contractId: "",
-    projectName: "",
-    facilityName: "",
-    containerSize: "",
-    uom: "",
-    unitPrice: "",
-    minimumPrice: "",
-  });
+  // State for row editing
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [newRowId, setNewRowId] = useState<string | null>(null);
 
   // State to store the current price change configuration
   const [currentPriceChangeConfig, setCurrentPriceChangeConfig] = useState<{
@@ -197,6 +173,28 @@ export default function AllCustomerPricingPage() {
     templateType: "standard" | "custom";
     customHeaderFields?: any;
   } | null>(null);
+
+  // Helper functions to get unique values for dropdowns
+  const getUniqueCustomers = (): string[] => {
+    const customers = allPricingData.customers
+      .map((c) => c.customerName)
+      .filter((name): name is string => Boolean(name));
+    return [...new Set(customers)].sort();
+  };
+
+  const getUniqueFacilities = (): string[] => {
+    const facilities = allPricingData.priceItems
+      .map((item) => item.facilityName)
+      .filter((name): name is string => Boolean(name));
+    return [...new Set(facilities)].sort();
+  };
+
+  const getUniqueContainerSizes = (): string[] => {
+    const containerSizes = allPricingData.priceItems
+      .map((item) => item.containerSize)
+      .filter((size): size is string => Boolean(size));
+    return [...new Set(containerSizes)].sort();
+  };
 
   // Custom header fields state
   const [customHeaderFields, setCustomHeaderFields] = useState({
@@ -214,6 +212,11 @@ export default function AllCustomerPricingPage() {
 
   // Load all pricing data
   useEffect(() => {
+    // Force clear localStorage to ensure fresh data
+    localStorage.removeItem("sampleCustomers");
+    localStorage.removeItem("samplePriceHeaders");
+    localStorage.removeItem("samplePriceItems");
+
     const loadAllPricingData = async () => {
       setIsLoading(true);
       try {
@@ -224,6 +227,18 @@ export default function AllCustomerPricingPage() {
         if (sampleData.customers.length === 0) {
           console.log("No sample data found, generating new sample data...");
           sampleData = saveSampleDataToLocalStorage();
+        }
+
+        // Debug: Check the first few price items to verify they have correct values
+        if (sampleData.priceItems.length > 0) {
+          console.log(
+            "Sample data loaded - first 3 price items:",
+            sampleData.priceItems.slice(0, 3).map((item) => ({
+              id: item.priceItemId,
+              unitPrice: item.unitPrice,
+              minimumPrice: item.minimumPrice,
+            }))
+          );
         }
 
         setAllPricingData({
@@ -416,6 +431,10 @@ export default function AllCustomerPricingPage() {
         (c) => c.customerId === header?.customerId
       );
 
+      // Force numeric values and ensure they are not zero unless actually zero
+      const unitPrice = parseFloat(String(item.unitPrice)) || 0;
+      const minimumPrice = parseFloat(String(item.minimumPrice)) || 0;
+
       return {
         id: item.priceItemId,
         customerId: customer?.customerId || "",
@@ -428,28 +447,28 @@ export default function AllCustomerPricingPage() {
         facilityName: item.facilityName,
         containerSize: item.containerSize,
         uom: item.uom,
-        unitPrice: item.unitPrice,
-        minimumPrice: item.minimumPrice,
+        unitPrice: unitPrice,
+        minimumPrice: minimumPrice,
         header: header,
       };
     });
 
     // Add new entry row at the top if in add mode
-    if (isAddingNewEntry) {
+    if (newRowId) {
       const newEntryRow = {
-        id: "new-entry-row",
+        id: newRowId,
         customerId: "",
-        customerName: editingRowData.customerName || "",
-        productName: editingRowData.productName || "",
-        profileId: editingRowData.profileId || "",
-        generatorId: editingRowData.generatorId || "",
-        contractId: editingRowData.contractId || "",
-        projectName: editingRowData.projectName || "",
-        facilityName: editingRowData.facilityName || "",
-        containerSize: editingRowData.containerSize || "",
-        uom: editingRowData.uom || "",
-        unitPrice: editingRowData.unitPrice || "",
-        minimumPrice: editingRowData.minimumPrice || "",
+        customerName: "",
+        productName: "",
+        profileId: "",
+        generatorId: "",
+        contractId: "",
+        projectName: "",
+        facilityName: "",
+        containerSize: "",
+        uom: "",
+        unitPrice: "",
+        minimumPrice: "",
         header: null,
         isNewEntry: true,
       };
@@ -461,8 +480,7 @@ export default function AllCustomerPricingPage() {
     filteredPriceItems,
     allPricingData.priceHeaders,
     allPricingData.customers,
-    isAddingNewEntry,
-    editingRowData,
+    newRowId,
   ]);
 
   const handleBack = () => {
@@ -581,173 +599,129 @@ export default function AllCustomerPricingPage() {
 
   // New handler functions for edit mode
   const handleAddNewEntry = () => {
-    setIsAddingNewEntry(true);
-    setEditingNewRow(true);
-    setNewEntryData({
-      customerName: "",
-      productName: "",
-      profileId: "",
-      generatorId: "",
-      contractId: "",
-      projectName: "",
-      facilityName: "",
-      containerSize: "",
-      uom: "",
-      unitPrice: "",
-      minimumPrice: "",
-    });
-    setEditingRowData({
-      customerName: "",
-      productName: "",
-      profileId: "",
-      generatorId: "",
-      contractId: "",
-      projectName: "",
-      facilityName: "",
-      containerSize: "",
-      uom: "",
-      unitPrice: "",
-      minimumPrice: "",
-    });
+    const newId = `new-${Date.now()}`;
+    setNewRowId(newId);
+    setEditingRowId(newId);
   };
 
   const handleSaveNewEntry = () => {
-    // Validate required fields
-    if (
-      !editingRowData.productName ||
-      !editingRowData.containerSize ||
-      !editingRowData.uom ||
-      !editingRowData.unitPrice ||
-      !editingRowData.minimumPrice
-    ) {
-      toast.error(
-        "Please fill in all required fields: Product Name, Container Size, UOM, Unit Price, and Minimum Price"
-      );
-      return;
-    }
-
-    // Validate numeric fields
-    if (
-      isNaN(parseFloat(editingRowData.unitPrice)) ||
-      parseFloat(editingRowData.unitPrice) < 0
-    ) {
-      toast.error("Unit Price must be a valid positive number");
-      return;
-    }
-
-    if (
-      isNaN(parseFloat(editingRowData.minimumPrice)) ||
-      parseFloat(editingRowData.minimumPrice) < 0
-    ) {
-      toast.error("Minimum Price must be a valid positive number");
-      return;
-    }
-
-    // Create new price item
-    const newPriceItem: PriceItem = {
-      priceItemId: `new-${Date.now()}`,
-      priceHeaderId: allPricingData.priceHeaders[0]?.priceHeaderId || "",
-      productName: editingRowData.productName,
-      region: "North", // Default region
-      unitPrice: parseFloat(editingRowData.unitPrice),
-      minimumPrice: parseFloat(editingRowData.minimumPrice),
-      effectiveDate: new Date().toISOString().split("T")[0],
-      expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0],
-      status: "new",
-      uom: editingRowData.uom,
-      containerSize: editingRowData.containerSize,
-      facilityName: editingRowData.facilityName,
-      projectName: editingRowData.projectName,
-      profileId: editingRowData.profileId,
-      generatorId: editingRowData.generatorId,
-      contractId: editingRowData.contractId,
-    };
-
-    // Add to existing data
-    setAllPricingData((prev) => ({
-      ...prev,
-      priceItems: [newPriceItem, ...prev.priceItems], // Add new items at the top
-    }));
-
-    // Track the new row for highlighting
-    setNewRows((prev) => new Set([...prev, newPriceItem.priceItemId]));
-
-    // Reset and exit add mode
-    setIsAddingNewEntry(false);
-    setEditingNewRow(false);
-    setNewEntryData({
-      customerName: "",
-      productName: "",
-      profileId: "",
-      generatorId: "",
-      contractId: "",
-      projectName: "",
-      facilityName: "",
-      containerSize: "",
-      uom: "",
-      unitPrice: "",
-      minimumPrice: "",
-    });
-    setEditingRowData({
-      customerName: "",
-      productName: "",
-      profileId: "",
-      generatorId: "",
-      contractId: "",
-      projectName: "",
-      facilityName: "",
-      containerSize: "",
-      uom: "",
-      unitPrice: "",
-      minimumPrice: "",
-    });
-    toast.success("New price entry added successfully");
+    // This will be handled by processRowUpdate
+    setEditingRowId(null);
+    setNewRowId(null);
   };
 
   const handleCancelNewEntry = () => {
-    setIsAddingNewEntry(false);
-    setEditingNewRow(false);
-    setNewEntryData({
-      customerName: "",
-      productName: "",
-      profileId: "",
-      generatorId: "",
-      contractId: "",
-      projectName: "",
-      facilityName: "",
-      containerSize: "",
-      uom: "",
-      unitPrice: "",
-      minimumPrice: "",
-    });
-    setEditingRowData({
-      customerName: "",
-      productName: "",
-      profileId: "",
-      generatorId: "",
-      contractId: "",
-      projectName: "",
-      facilityName: "",
-      containerSize: "",
-      uom: "",
-      unitPrice: "",
-      minimumPrice: "",
-    });
+    setEditingRowId(null);
+    setNewRowId(null);
   };
 
-  const handleEditNewRowData = (field: string, value: string) => {
-    setEditingRowData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+  // Process row updates for editing
+  const processRowUpdate = (newRow: any, oldRow: any) => {
+    // If this is a new row being added
+    if (newRow.isNewEntry) {
+      // Validate required fields
+      if (
+        !newRow.productName ||
+        !newRow.containerSize ||
+        !newRow.uom ||
+        !newRow.unitPrice ||
+        !newRow.minimumPrice
+      ) {
+        toast.error(
+          "Please fill in all required fields: Product Name, Container Size, UOM, Unit Price, and Minimum Price"
+        );
+        return oldRow;
+      }
 
-    // Also update the newEntryData to keep them in sync
-    setNewEntryData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+      // Validate numeric fields
+      if (
+        isNaN(parseFloat(newRow.unitPrice)) ||
+        parseFloat(newRow.unitPrice) < 0
+      ) {
+        toast.error("Unit Price must be a valid positive number");
+        return oldRow;
+      }
+
+      if (
+        isNaN(parseFloat(newRow.minimumPrice)) ||
+        parseFloat(newRow.minimumPrice) < 0
+      ) {
+        toast.error("Minimum Price must be a valid positive number");
+        return oldRow;
+      }
+
+      // Create new price item
+      const newPriceItem: PriceItem = {
+        priceItemId: `new-${Date.now()}`,
+        priceHeaderId: allPricingData.priceHeaders[0]?.priceHeaderId || "",
+        productName: newRow.productName,
+        region: "North", // Default region
+        unitPrice: parseFloat(newRow.unitPrice),
+        minimumPrice: parseFloat(newRow.minimumPrice),
+        effectiveDate: new Date().toISOString().split("T")[0],
+        expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0],
+        status: "new",
+        uom: newRow.uom,
+        containerSize: newRow.containerSize,
+        facilityName: newRow.facilityName,
+        projectName: newRow.projectName,
+        profileId: newRow.profileId,
+        generatorId: newRow.generatorId,
+        contractId: newRow.contractId,
+      };
+
+      // Add to existing data
+      setAllPricingData((prev) => ({
+        ...prev,
+        priceItems: [newPriceItem, ...prev.priceItems], // Add new items at the top
+      }));
+
+      // Track the new row for highlighting
+      setNewRows((prev) => new Set([...prev, newPriceItem.priceItemId]));
+
+      // Reset editing state
+      setEditingRowId(null);
+      setNewRowId(null);
+
+      toast.success("New price entry added successfully");
+      return newRow;
+    }
+
+    // For existing rows, track which columns were modified
+    const modifiedFields = new Set<string>();
+
+    // Compare each field to detect changes
+    const fieldsToTrack = [
+      "productName",
+      "containerSize",
+      "facilityName",
+      "projectName",
+      "profileId",
+      "generatorId",
+      "unitPrice",
+      "minimumPrice",
+      "uom",
+    ];
+
+    fieldsToTrack.forEach((field) => {
+      if (newRow[field] !== oldRow[field]) {
+        modifiedFields.add(field);
+      }
+    });
+
+    // If any fields were modified, track them
+    if (modifiedFields.size > 0) {
+      setModifiedRows((prev) => new Set([...prev, newRow.id]));
+      setModifiedColumns((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(newRow.id, modifiedFields);
+        return newMap;
+      });
+    }
+
+    return newRow;
   };
 
   const handleApplyChanges = () => {
@@ -939,7 +913,7 @@ export default function AllCustomerPricingPage() {
           {
             field: "selection",
             headerName: "",
-            width: 50,
+            width: 60,
             flex: 0,
             sortable: false,
             filterable: false,
@@ -1006,22 +980,11 @@ export default function AllCustomerPricingPage() {
       flex: 1,
       minWidth: 150,
       editable: true,
-      renderCell: (params) => {
-        if (params.row.isNewEntry && editingNewRow) {
-          return (
-            <input
-              type="text"
-              value={editingRowData.customerName}
-              onChange={(e) =>
-                handleEditNewRowData("customerName", e.target.value)
-              }
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              placeholder="Enter customer name"
-            />
-          );
-        }
-        return params.value || "";
-      },
+      type: "singleSelect",
+      valueOptions: getUniqueCustomers().map((value) => ({
+        value,
+        label: value,
+      })),
     },
     {
       field: "productName",
@@ -1030,22 +993,6 @@ export default function AllCustomerPricingPage() {
       flex: 0,
       minWidth: 80,
       editable: true,
-      renderCell: (params) => {
-        if (params.row.isNewEntry && editingNewRow) {
-          return (
-            <input
-              type="text"
-              value={editingRowData.productName}
-              onChange={(e) =>
-                handleEditNewRowData("productName", e.target.value)
-              }
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              placeholder="Enter product name"
-            />
-          );
-        }
-        return params.value || "";
-      },
     },
     {
       field: "profileId",
@@ -1054,22 +1001,6 @@ export default function AllCustomerPricingPage() {
       flex: 0.5,
       minWidth: 100,
       editable: true,
-      renderCell: (params) => {
-        if (params.row.isNewEntry && editingNewRow) {
-          return (
-            <input
-              type="text"
-              value={editingRowData.profileId}
-              onChange={(e) =>
-                handleEditNewRowData("profileId", e.target.value)
-              }
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              placeholder="Enter profile ID"
-            />
-          );
-        }
-        return params.value || "";
-      },
     },
     {
       field: "generatorId",
@@ -1078,24 +1009,7 @@ export default function AllCustomerPricingPage() {
       flex: 0.5,
       minWidth: 100,
       editable: true,
-      renderCell: (params) => {
-        if (params.row.isNewEntry && editingNewRow) {
-          return (
-            <input
-              type="text"
-              value={editingRowData.generatorId}
-              onChange={(e) =>
-                handleEditNewRowData("generatorId", e.target.value)
-              }
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              placeholder="Enter generator ID"
-            />
-          );
-        }
-        return params.value || "";
-      },
     },
-
     {
       field: "projectName",
       headerName: "Project",
@@ -1103,22 +1017,6 @@ export default function AllCustomerPricingPage() {
       flex: 1,
       minWidth: 120,
       editable: true,
-      renderCell: (params) => {
-        if (params.row.isNewEntry && editingNewRow) {
-          return (
-            <input
-              type="text"
-              value={editingRowData.projectName}
-              onChange={(e) =>
-                handleEditNewRowData("projectName", e.target.value)
-              }
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              placeholder="Enter project name"
-            />
-          );
-        }
-        return params.value || "";
-      },
     },
     {
       field: "facilityName",
@@ -1127,22 +1025,11 @@ export default function AllCustomerPricingPage() {
       flex: 1,
       minWidth: 120,
       editable: true,
-      renderCell: (params) => {
-        if (params.row.isNewEntry && editingNewRow) {
-          return (
-            <input
-              type="text"
-              value={editingRowData.facilityName}
-              onChange={(e) =>
-                handleEditNewRowData("facilityName", e.target.value)
-              }
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              placeholder="Enter facility name"
-            />
-          );
-        }
-        return params.value || "";
-      },
+      type: "singleSelect",
+      valueOptions: getUniqueFacilities().map((value) => ({
+        value,
+        label: value,
+      })),
     },
     {
       field: "containerSize",
@@ -1151,22 +1038,11 @@ export default function AllCustomerPricingPage() {
       flex: 0.8,
       minWidth: 110,
       editable: true,
-      renderCell: (params) => {
-        if (params.row.isNewEntry && editingNewRow) {
-          return (
-            <input
-              type="text"
-              value={editingRowData.containerSize}
-              onChange={(e) =>
-                handleEditNewRowData("containerSize", e.target.value)
-              }
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              placeholder="Enter container size"
-            />
-          );
-        }
-        return params.value || "";
-      },
+      type: "singleSelect",
+      valueOptions: getUniqueContainerSizes().map((value) => ({
+        value,
+        label: value,
+      })),
     },
     {
       field: "unitPrice",
@@ -1174,25 +1050,8 @@ export default function AllCustomerPricingPage() {
       width: 120,
       flex: 0,
       minWidth: 100,
-      type: "number",
-      editable: true,
-      renderCell: (params) => {
-        if (params.row.isNewEntry && editingNewRow) {
-          return (
-            <input
-              type="number"
-              step="0.01"
-              value={editingRowData.unitPrice}
-              onChange={(e) =>
-                handleEditNewRowData("unitPrice", e.target.value)
-              }
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              placeholder="0.00"
-            />
-          );
-        }
-        return params.value ? formatCurrency(params.value) : "";
-      },
+      editable: isEditMode,
+      renderCell: (params: any) => formatCurrency(params.value),
     },
     {
       field: "uom",
@@ -1201,25 +1060,8 @@ export default function AllCustomerPricingPage() {
       flex: 0,
       minWidth: 80,
       editable: true,
-      renderCell: (params) => {
-        if (params.row.isNewEntry && editingNewRow) {
-          return (
-            <select
-              value={editingRowData.uom}
-              onChange={(e) => handleEditNewRowData("uom", e.target.value)}
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-            >
-              <option value="">Select UOM</option>
-              <option value="Each">Each</option>
-              <option value="Gallon">Gallon</option>
-              <option value="Pound">Pound</option>
-              <option value="Container">Container</option>
-              <option value="Ton">Ton</option>
-            </select>
-          );
-        }
-        return params.value || "";
-      },
+      type: "singleSelect",
+      valueOptions: ["Each", "Gallon", "Pound", "Container", "Ton"],
     },
     {
       field: "minimumPrice",
@@ -1227,25 +1069,8 @@ export default function AllCustomerPricingPage() {
       width: 120,
       flex: 0,
       minWidth: 100,
-      type: "number",
-      editable: true,
-      renderCell: (params) => {
-        if (params.row.isNewEntry && editingNewRow) {
-          return (
-            <input
-              type="number"
-              step="0.01"
-              value={editingRowData.minimumPrice}
-              onChange={(e) =>
-                handleEditNewRowData("minimumPrice", e.target.value)
-              }
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-              placeholder="0.00"
-            />
-          );
-        }
-        return params.value ? formatCurrency(params.value) : "";
-      },
+      editable: isEditMode,
+      renderCell: (params: any) => formatCurrency(params.value),
     },
   ];
 
@@ -1372,25 +1197,6 @@ export default function AllCustomerPricingPage() {
       <div className="w-full max-w-[1800px] mx-auto px-2">
         {/* Header */}
         <div className="mb-8">
-          <MuiButton
-            variant="text"
-            onClick={handleBack}
-            sx={{
-              mb: 2,
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              color: "#49454f",
-              textTransform: "none",
-              "&:hover": {
-                backgroundColor: "rgba(101, 178, 48, 0.08)",
-              },
-            }}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back</span>
-          </MuiButton>
-
           <div className="flex items-center justify-between">
             <div>
               <h1 className="font-['Roboto:Medium',_sans-serif] font-medium text-[32px] leading-[40px] text-[#1c1b1f] mb-2">
@@ -1401,58 +1207,6 @@ export default function AllCustomerPricingPage() {
                 View and filter pricing entries across all customers, contracts,
                 profiles, and item numbers
               </p>
-            </div>
-            <div className="flex space-x-2">
-              <MuiButton
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  const newData = saveSampleDataToLocalStorage();
-                  setAllPricingData({
-                    customers: newData.customers,
-                    priceHeaders: newData.priceHeaders,
-                    priceItems: newData.priceItems,
-                  });
-                  toast.success("Sample data regenerated successfully");
-                }}
-                sx={{
-                  borderRadius: "100px",
-                  textTransform: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  borderColor: "#b9b9b9",
-                  color: "#49454f",
-                  "&:hover": {
-                    borderColor: "#65b230",
-                    color: "#65b230",
-                  },
-                }}
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span>Regenerate Data</span>
-              </MuiButton>
-              <MuiButton
-                variant="outlined"
-                size="small"
-                onClick={handleExportToExcel}
-                sx={{
-                  borderRadius: "100px",
-                  textTransform: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  borderColor: "#b9b9b9",
-                  color: "#49454f",
-                  "&:hover": {
-                    borderColor: "#65b230",
-                    color: "#65b230",
-                  },
-                }}
-              >
-                <Download className="h-4 w-4" />
-                <span>Export Excel</span>
-              </MuiButton>
             </div>
           </div>
         </div>
@@ -1467,28 +1221,11 @@ export default function AllCustomerPricingPage() {
                 <span className="inline-flex items-center bg-[rgba(158,158,158,0.1)] text-[#49454f] rounded-full px-3 py-1 text-xs font-medium border border-[#b9b9b9]">
                   {filteredPriceItems.length} items
                 </span>
-                {isEditMode && (
-                  <Chip
-                    label="EDIT MODE"
-                    color="success"
-                    size="small"
-                    sx={{
-                      backgroundColor: "#65b230",
-                      color: "white",
-                      fontWeight: 600,
-                      "& .MuiChip-label": {
-                        fontSize: "12px",
-                      },
-                    }}
-                  />
-                )}
               </div>
               <div className="flex items-center space-x-2">
                 {isEditMode && (
                   <>
-                    <MuiButton
-                      variant="outlined"
-                      size="small"
+                    <SecondaryButton
                       onClick={() => {
                         setIsEditMode(false);
                         setSelectedRows([] as any);
@@ -1497,26 +1234,11 @@ export default function AllCustomerPricingPage() {
                         setCurrentPriceChangeConfig(null); // Clear the price change configuration
                         toast.info("Exited edit mode");
                       }}
-                      sx={{
-                        borderRadius: "100px",
-                        textTransform: "none",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        borderColor: "#b9b9b9",
-                        color: "#49454f",
-                        "&:hover": {
-                          borderColor: "#65b230",
-                          color: "#65b230",
-                        },
-                      }}
+                      icon={X}
                     >
-                      <X className="h-4 w-4" />
-                      <span>Exit Edit Mode</span>
-                    </MuiButton>
-                    <MuiButton
-                      variant="contained"
-                      size="small"
+                      Exit Edit Mode
+                    </SecondaryButton>
+                    <PrimaryButton
                       disabled={
                         (!newRows || newRows.size === 0) &&
                         (!modifiedRows || modifiedRows.size === 0)
@@ -1537,60 +1259,27 @@ export default function AllCustomerPricingPage() {
                         setModifiedRows(new Set());
                         setCurrentPriceChangeConfig(null);
                       }}
-                      sx={{
-                        backgroundColor:
-                          (!newRows || newRows.size === 0) &&
-                          (!modifiedRows || modifiedRows.size === 0)
-                            ? "#b9b9b9"
-                            : "#65b230",
-                        borderRadius: "100px",
-                        textTransform: "none",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        "&:hover": {
-                          backgroundColor:
-                            (!newRows || newRows.size === 0) &&
-                            (!modifiedRows || modifiedRows.size === 0)
-                              ? "#b9b9b9"
-                              : "#4a8a1f",
-                        },
-                        "&:disabled": {
-                          backgroundColor: "#b9b9b9",
-                          color: "#666",
-                        },
-                      }}
+                      icon={Check}
                     >
-                      <Check className="h-4 w-4" />
-                      <span>
-                        Submit Price Change (
-                        {(newRows ? newRows.size : 0) +
-                          (modifiedRows ? modifiedRows.size : 0)}
-                        )
-                      </span>
-                    </MuiButton>
+                      Submit Price Change (
+                      {(newRows ? newRows.size : 0) +
+                        (modifiedRows ? modifiedRows.size : 0)}
+                      )
+                    </PrimaryButton>
                   </>
                 )}
                 {!isEditMode && (
-                  <MuiButton
-                    variant="contained"
-                    size="small"
-                    onClick={handleNewPriceChange}
-                    sx={{
-                      backgroundColor: "#65b230",
-                      borderRadius: "100px",
-                      textTransform: "none",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      "&:hover": {
-                        backgroundColor: "#4a8a1f",
-                      },
-                    }}
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>New Price Change</span>
-                  </MuiButton>
+                  <>
+                    <SecondaryButton
+                      onClick={handleExportToExcel}
+                      icon={Download}
+                    >
+                      Export Excel
+                    </SecondaryButton>
+                    <PrimaryButton onClick={handleNewPriceChange} icon={Plus}>
+                      New Price Change
+                    </PrimaryButton>
+                  </>
                 )}
               </div>
             </div>
@@ -1708,24 +1397,17 @@ export default function AllCustomerPricingPage() {
                 </div>
 
                 {/* More Filters Button */}
-                <MuiButton
-                  variant="outlined"
+                <SecondaryButton
                   onClick={() => setAdvancedFiltersOpen(true)}
                   sx={{
-                    borderRadius: "100px",
-                    textTransform: "none",
-                    borderColor: "#b9b9b9",
-                    color: "#49454f",
                     backgroundColor: "#f5f5f5",
                     "&:hover": {
-                      borderColor: "#65b230",
-                      color: "#65b230",
                       backgroundColor: "#f0f8f0",
                     },
                   }}
                 >
                   More Filters
-                </MuiButton>
+                </SecondaryButton>
               </div>
 
               {/* Active Filters Chips */}
@@ -1750,8 +1432,8 @@ export default function AllCustomerPricingPage() {
                             .replace(/([A-Z])/g, " $1")
                             .replace(/^./, (str) => str.toUpperCase())}
                           : {value}
-                          <button
-                            className="ml-1 text-[#1c1b1f] hover:text-[#65b230]"
+                          <IconButton
+                            size="small"
                             onClick={() =>
                               setFilters((f) => ({
                                 ...f,
@@ -1765,29 +1447,29 @@ export default function AllCustomerPricingPage() {
                               }))
                             }
                             aria-label={`Remove filter ${key}`}
+                            sx={{
+                              ml: 0.5,
+                              color: "#1c1b1f",
+                              "&:hover": {
+                                color: "#65b230",
+                              },
+                            }}
                           >
                             ×
-                          </button>
+                          </IconButton>
                         </span>
                       ))}
-                    <MuiButton
-                      variant="text"
-                      size="small"
+                    <SecondaryButton
                       onClick={clearFilters}
                       sx={{
                         ml: 1,
                         fontSize: "12px",
                         height: "28px",
                         px: 1.5,
-                        color: "#49454f",
-                        textTransform: "none",
-                        "&:hover": {
-                          backgroundColor: "rgba(101, 178, 48, 0.08)",
-                        },
                       }}
                     >
                       Clear Filters
-                    </MuiButton>
+                    </SecondaryButton>
                   </div>
                 </div>
               )}
@@ -1795,230 +1477,125 @@ export default function AllCustomerPricingPage() {
 
             {/* Pricing Items Table */}
             <div className="p-6">
-              {/* Edit Mode Actions - Moved above the grid */}
+              {/* Edit Mode Actions - Sticky positioned */}
               {isEditMode && (
-                <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                  {/* Price Change Configuration Summary */}
-                  {currentPriceChangeConfig && (
-                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div
+                  className="sticky top-0 z-40 mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg shadow-sm"
+                  style={{
+                    backgroundColor: "rgba(249, 250, 251, 0.98)",
+                    backdropFilter: "blur(8px)",
+                  }}
+                >
+                  {/* Essential Edit Mode Actions - Always Visible */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-4">
                       <Typography
-                        variant="subtitle2"
+                        variant="h6"
                         sx={{
-                          color: "#1976d2",
+                          color: "#1c1b1f",
                           fontWeight: 600,
-                          fontSize: "14px",
-                          mb: 2,
+                          fontSize: "16px",
                         }}
                       >
-                        Active Price Change Configuration
+                        Edit Mode
                       </Typography>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "#666", display: "block" }}
-                          >
-                            Template Type
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            sx={{ color: "#1c1b1f", fontWeight: 500 }}
-                          >
-                            {currentPriceChangeConfig.templateType ===
-                            "standard"
-                              ? "Standard Template"
-                              : "Custom Template"}
-                          </Typography>
-                        </div>
 
-                        <div>
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "#666", display: "block" }}
-                          >
-                            Change Requests
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            sx={{ color: "#1c1b1f", fontWeight: 500 }}
-                          >
-                            {currentPriceChangeConfig.selectedRequests.length}{" "}
-                            selected
-                          </Typography>
-                        </div>
-                      </div>
-                      {currentPriceChangeConfig.templateType === "custom" &&
-                        currentPriceChangeConfig.customHeaderFields && (
-                          <div className="mt-3 pt-3 border-t border-blue-200">
-                            <Typography
-                              variant="caption"
-                              sx={{ color: "#666", display: "block", mb: 1 }}
-                            >
-                              Custom Header Settings
-                            </Typography>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-                              <div>
-                                <span className="text-gray-600">EEI:</span>{" "}
-                                <span className="font-medium">
-                                  {
-                                    currentPriceChangeConfig.customHeaderFields
-                                      .eei
-                                  }
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-600">
-                                  Fuel Surcharge:
-                                </span>{" "}
-                                <span className="font-medium">
-                                  {
-                                    currentPriceChangeConfig.customHeaderFields
-                                      .fuelSurcharge
-                                  }
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-600">
-                                  Invoice Minimum:
-                                </span>{" "}
-                                <span className="font-medium">
-                                  $
-                                  {
-                                    currentPriceChangeConfig.customHeaderFields
-                                      .invoiceMinimum
-                                  }
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-600">
-                                  Container Conversion:
-                                </span>{" "}
-                                <span className="font-medium">
-                                  {
-                                    currentPriceChangeConfig.customHeaderFields
-                                      .containerConversion
-                                  }
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-600">
-                                  Item Minimums:
-                                </span>{" "}
-                                <span className="font-medium">
-                                  {
-                                    currentPriceChangeConfig.customHeaderFields
-                                      .itemMinimums
-                                  }
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-600">
-                                  Economic Adjustment:
-                                </span>{" "}
-                                <span className="font-medium">
-                                  {
-                                    currentPriceChangeConfig.customHeaderFields
-                                      .economicAdjustmentFee
-                                  }
-                                  %
-                                </span>
-                              </div>
-                            </div>
+                      {/* Color Legend - Compact with Counts */}
+                      <div className="flex items-center space-x-3 text-xs">
+                        {newRows.size > 0 && (
+                          <div className="flex items-center space-x-1">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span className="text-gray-600">
+                              New ({newRows.size})
+                            </span>
                           </div>
                         )}
+                        {modifiedRows.size > 0 && (
+                          <div className="flex items-center space-x-1">
+                            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                            <span className="text-gray-600">
+                              Modified ({modifiedRows.size})
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons - Always Accessible */}
+                    <div className="flex items-center space-x-3">
+                      <PrimaryButton
+                        onClick={handleAddNewEntry}
+                        disabled={!!newRowId}
+                        icon={Plus}
+                        size="small"
+                      >
+                        {newRowId ? "Adding..." : "Add Entry"}
+                      </PrimaryButton>
+                      <SecondaryButton
+                        onClick={handleApplyChanges}
+                        disabled={getSelectedRowIds().length === 0}
+                        icon={PenSquare}
+                        size="small"
+                      >
+                        Edit ({getSelectedRowIds().length})
+                      </SecondaryButton>
+                    </div>
+                  </div>
+
+                  {/* Save/Cancel buttons when editing new entry */}
+                  {newRowId && (
+                    <div className="flex items-center space-x-3 pt-2 border-t border-gray-200">
+                      <PrimaryButton
+                        onClick={handleSaveNewEntry}
+                        size="small"
+                        sx={{
+                          backgroundColor: "#65b230",
+                          "&:hover": {
+                            backgroundColor: "#4a8a1f",
+                          },
+                        }}
+                      >
+                        Save Entry
+                      </PrimaryButton>
+                      <SecondaryButton
+                        onClick={handleCancelNewEntry}
+                        size="small"
+                        sx={{
+                          borderColor: "#b9b9b9",
+                          color: "#49454f",
+                          "&:hover": {
+                            borderColor: "#65b230",
+                            color: "#65b230",
+                          },
+                        }}
+                      >
+                        Cancel
+                      </SecondaryButton>
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between mb-4">
-                    <Typography
-                      variant="h6"
-                      sx={{
-                        color: "#1c1b1f",
-                        fontWeight: 600,
-                        fontSize: "16px",
-                      }}
-                    >
-                      Edit Mode Actions
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        color: "#49454f",
-                        fontSize: "14px",
-                      }}
-                    >
-                      {editingNewRow
-                        ? "Fill in the new row details below and click Save to add the entry"
-                        : "Select rows to apply changes or add new entries"}
-                    </Typography>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <MuiButton
-                      variant="contained"
-                      size="small"
-                      onClick={handleAddNewEntry}
-                      disabled={editingNewRow}
-                      sx={{
-                        backgroundColor: editingNewRow ? "#b9b9b9" : "#65b230",
-                        borderRadius: "100px",
-                        textTransform: "none",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        "&:hover": {
-                          backgroundColor: editingNewRow
-                            ? "#b9b9b9"
-                            : "#4a8a1f",
-                        },
-                        "&:disabled": {
-                          backgroundColor: "#b9b9b9",
-                        },
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                      <span>
-                        {editingNewRow
-                          ? "Adding New Entry..."
-                          : "Add New Price Entry"}
-                      </span>
-                    </MuiButton>
-                    <MuiButton
-                      variant="outlined"
-                      size="small"
-                      onClick={handleApplyChanges}
-                      disabled={getSelectedRowIds().length === 0}
-                      sx={{
-                        borderRadius: "100px",
-                        textTransform: "none",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        borderColor:
-                          getSelectedRowIds().length === 0
-                            ? "#b9b9b9"
-                            : "#65b230",
-                        color:
-                          getSelectedRowIds().length === 0
-                            ? "#b9b9b9"
-                            : "#65b230",
-                        "&:hover": {
-                          backgroundColor:
-                            getSelectedRowIds().length === 0
-                              ? "transparent"
-                              : "rgba(101, 178, 48, 0.08)",
-                        },
-                        "&:disabled": {
-                          borderColor: "#b9b9b9",
-                          color: "#b9b9b9",
-                        },
-                      }}
-                    >
-                      <PenSquare className="h-4 w-4" />
-                      <span>
-                        Edit Selected Rows ({getSelectedRowIds().length})
-                      </span>
-                    </MuiButton>
-                  </div>
+                  {/* Price Change Configuration - Compact Summary */}
+                  {currentPriceChangeConfig && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: "#666",
+                            fontSize: "12px",
+                            fontWeight: 500,
+                          }}
+                        >
+                          Price Header Configuration:{" "}
+                          {currentPriceChangeConfig.templateType === "standard"
+                            ? "Standard"
+                            : "Custom"}{" "}
+                          • {currentPriceChangeConfig.selectedRequests.length}{" "}
+                          change request
+                        </Typography>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2047,28 +1624,61 @@ export default function AllCustomerPricingPage() {
                     Loading pricing data...
                   </div>
                 ) : (
-                  <div style={{ width: "100%" }}>
+                  <div style={{ width: "100%", height: "600px" }}>
                     <DataGrid
                       rows={rows || []}
                       columns={columns || []}
                       getRowId={(row) => row.id}
-                      autoHeight={true}
                       density="standard"
-                      editMode="cell"
-                      isCellEditable={(params: any) => {
-                        // Only allow editing for the new entry row when in editing mode
-                        return params.row.isNewEntry && editingNewRow;
-                      }}
+                      editMode={isEditMode ? "row" : undefined}
+                      processRowUpdate={
+                        isEditMode ? processRowUpdate : undefined
+                      }
                       getRowClassName={(params) => {
-                        // Add special styling for the new entry row
-                        return params.row.isNewEntry && editingNewRow
-                          ? "new-entry-row"
-                          : "";
+                        // Add special styling for different row types
+                        if (params.row.isNewEntry) {
+                          return "new-entry-row";
+                        }
+                        if (newRows.has(params.row.id)) {
+                          return "new-row";
+                        }
+                        if (modifiedRows.has(params.row.id)) {
+                          return "modified-row";
+                        }
+                        return "";
+                      }}
+                      getCellClassName={(params) => {
+                        // Check if this cell's column has been modified
+                        const modifiedFields = modifiedColumns.get(
+                          params.row.id
+                        );
+                        if (
+                          modifiedFields &&
+                          modifiedFields.has(params.field)
+                        ) {
+                          return "modified-cell";
+                        }
+                        return "";
                       }}
                       sx={{
                         "& .new-entry-row": {
                           backgroundColor: "#f0f9ff",
-                          border: "2px solid #3b82f6",
+                        },
+                        "& .new-row": {
+                          backgroundColor: "#f0fff4",
+                          "&:hover": {
+                            backgroundColor: "#ecfdf5",
+                          },
+                        },
+                        "& .modified-row": {
+                          backgroundColor: "#fef3c7",
+                          "&:hover": {
+                            backgroundColor: "#fefce8",
+                          },
+                        },
+                        "& .modified-cell": {
+                          fontWeight: "bold",
+                          color: "#1c1b1f",
                         },
                         "& .MuiDataGrid-cell": {
                           fontSize: "0.875rem",
@@ -2076,17 +1686,32 @@ export default function AllCustomerPricingPage() {
                           display: "flex",
                           alignItems: "center",
                         },
+                        "& .MuiDataGrid-cell:first-of-type": {
+                          padding: "12px 8px",
+                          minWidth: "60px",
+                          maxWidth: "60px",
+                        },
                         "& .MuiDataGrid-columnHeader": {
                           fontSize: "0.875rem",
                           padding: "12px 16px",
                           backgroundColor: "#E0E0E0",
                           borderBottom: "2px solid #65B230 !important",
                         },
+                        "& .MuiDataGrid-columnHeader:first-of-type": {
+                          padding: "12px 8px",
+                          minWidth: "60px",
+                          maxWidth: "60px",
+                        },
                         "& .MuiDataGrid-columnHeaders": {
                           borderBottom: "2px solid #65B230 !important",
+                          position: "sticky",
+                          top: 0,
+                          zIndex: 1,
+                          backgroundColor: "#E0E0E0",
                         },
                       }}
-                      disableRowSelectionOnClick={true}
+                      disableRowSelectionOnClick={!isEditMode}
+                      isCellEditable={() => isEditMode}
                       disableColumnMenu={true}
                     />
                   </div>
@@ -2318,36 +1943,12 @@ export default function AllCustomerPricingPage() {
             </div>
           </DialogContent>
           <DialogActions sx={{ p: 3, gap: 2 }}>
-            <MuiButton
-              variant="outlined"
-              onClick={() => setAdvancedFiltersOpen(false)}
-              sx={{
-                borderRadius: "100px",
-                textTransform: "none",
-                borderColor: "#b9b9b9",
-                color: "#49454f",
-                "&:hover": {
-                  borderColor: "#65b230",
-                  color: "#65b230",
-                },
-              }}
-            >
+            <SecondaryButton onClick={() => setAdvancedFiltersOpen(false)}>
               Cancel
-            </MuiButton>
-            <MuiButton
-              variant="contained"
-              onClick={() => setAdvancedFiltersOpen(false)}
-              sx={{
-                backgroundColor: "#65b230",
-                borderRadius: "100px",
-                textTransform: "none",
-                "&:hover": {
-                  backgroundColor: "#4a8a1f",
-                },
-              }}
-            >
+            </SecondaryButton>
+            <PrimaryButton onClick={() => setAdvancedFiltersOpen(false)}>
               Apply Filters
-            </MuiButton>
+            </PrimaryButton>
           </DialogActions>
         </Dialog>
 
@@ -2567,42 +2168,16 @@ export default function AllCustomerPricingPage() {
               ))}
             </Box>
           </DialogContent>
-          <DialogActions sx={{ p: 3, gap: 2 }}>
-            <MuiButton
-              variant="outlined"
-              onClick={handleCancelPriceChange}
-              sx={{
-                borderRadius: "100px",
-                textTransform: "none",
-                borderColor: "#b9b9b9",
-                color: "#49454f",
-                "&:hover": {
-                  borderColor: "#65b230",
-                  color: "#65b230",
-                },
-              }}
-            >
+          <DialogActions sx={{ p: 3, gap: 1 }}>
+            <SecondaryButton onClick={handleCancelPriceChange}>
               Cancel
-            </MuiButton>
-            <MuiButton
-              variant="contained"
+            </SecondaryButton>
+            <PrimaryButton
               onClick={handleCreatePriceChange}
               disabled={selectedPriceChangeRequests.length === 0}
-              sx={{
-                backgroundColor: "#65b230",
-                borderRadius: "100px",
-                textTransform: "none",
-                "&:hover": {
-                  backgroundColor: "#4a8a1f",
-                },
-                "&:disabled": {
-                  backgroundColor: "#e0e0e0",
-                  color: "#9e9e9e",
-                },
-              }}
             >
-              Create Price Change
-            </MuiButton>
+              Continue
+            </PrimaryButton>
           </DialogActions>
         </Dialog>
 
@@ -2825,26 +2400,12 @@ export default function AllCustomerPricingPage() {
                       >
                         Standard Template Settings
                       </Typography>
-                      <MuiButton
-                        variant="outlined"
-                        size="small"
+                      <SecondaryButton
                         onClick={() => setTemplateType("custom")}
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                          textTransform: "none",
-                          borderColor: "#65b230",
-                          color: "#65b230",
-                          "&:hover": {
-                            borderColor: "#4a8a1f",
-                            backgroundColor: "rgba(101,178,48,0.04)",
-                          },
-                        }}
+                        icon={Settings}
                       >
-                        <Settings size={16} />
-                        <span>Edit Header</span>
-                      </MuiButton>
+                        Edit Header
+                      </SecondaryButton>
                     </Box>
                     <Box
                       sx={{
@@ -2981,26 +2542,12 @@ export default function AllCustomerPricingPage() {
                   >
                     Custom Header Settings
                   </Typography>
-                  <MuiButton
-                    variant="outlined"
-                    size="small"
+                  <SecondaryButton
                     onClick={() => setTemplateType("standard")}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      textTransform: "none",
-                      borderColor: "#65b230",
-                      color: "#65b230",
-                      "&:hover": {
-                        borderColor: "#4a8a1f",
-                        backgroundColor: "rgba(101,178,48,0.04)",
-                      },
-                    }}
+                    icon={RotateCcw}
                   >
-                    <RotateCcw size={16} />
-                    <span>Reset to Standard</span>
-                  </MuiButton>
+                    Reset to Standard
+                  </SecondaryButton>
                 </Box>
                 <Box
                   sx={{
@@ -3202,41 +2749,13 @@ export default function AllCustomerPricingPage() {
               </Box>
             )}
           </DialogContent>
-          <DialogActions sx={{ p: 3, gap: 2 }}>
-            <MuiButton
-              variant="outlined"
-              onClick={handleBackToPriceChangeSelection}
-              sx={{
-                borderRadius: "100px",
-                textTransform: "none",
-                borderColor: "#b9b9b9",
-                color: "#49454f",
-                "&:hover": {
-                  borderColor: "#65b230",
-                  color: "#65b230",
-                },
-              }}
-            >
+          <DialogActions sx={{ p: 3, gap: 1 }}>
+            <SecondaryButton onClick={handleBackToPriceChangeSelection}>
               Back to Selection
-            </MuiButton>
-            <MuiButton
-              variant="contained"
-              onClick={handlePriceChangeConfigSubmit}
-              sx={{
-                backgroundColor: "#65b230",
-                borderRadius: "100px",
-                textTransform: "none",
-                "&:hover": {
-                  backgroundColor: "#4a8a1f",
-                },
-                "&:disabled": {
-                  backgroundColor: "#e0e0e0",
-                  color: "#9e9e9e",
-                },
-              }}
-            >
-              Create Price Changes
-            </MuiButton>
+            </SecondaryButton>
+            <PrimaryButton onClick={handlePriceChangeConfigSubmit}>
+              Begin Price Change
+            </PrimaryButton>
           </DialogActions>
         </Dialog>
 
@@ -3348,36 +2867,12 @@ export default function AllCustomerPricingPage() {
             </div>
           </DialogContent>
           <DialogActions sx={{ p: 3, gap: 2 }}>
-            <MuiButton
-              variant="outlined"
-              onClick={handleApplyChangesCancel}
-              sx={{
-                borderRadius: "100px",
-                textTransform: "none",
-                borderColor: "#b9b9b9",
-                color: "#49454f",
-                "&:hover": {
-                  borderColor: "#65b230",
-                  color: "#65b230",
-                },
-              }}
-            >
+            <SecondaryButton onClick={handleApplyChangesCancel}>
               Cancel
-            </MuiButton>
-            <MuiButton
-              variant="contained"
-              onClick={handleApplyChangesSubmit}
-              sx={{
-                backgroundColor: "#65b230",
-                borderRadius: "100px",
-                textTransform: "none",
-                "&:hover": {
-                  backgroundColor: "#4a8a1f",
-                },
-              }}
-            >
+            </SecondaryButton>
+            <PrimaryButton onClick={handleApplyChangesSubmit}>
               Apply Changes
-            </MuiButton>
+            </PrimaryButton>
           </DialogActions>
         </Dialog>
       </div>

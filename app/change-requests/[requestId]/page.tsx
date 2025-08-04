@@ -1315,7 +1315,10 @@ export default function PriceChangeRequestDetailsPage() {
                           fullWidth
                           className="flex items-center space-x-2"
                           style={{
-                            backgroundColor: "#65b230",
+                            backgroundColor:
+                              !newNote.trim() || isAddingNote
+                                ? "#cccccc"
+                                : "#65b230",
                             color: "white",
                             fontFamily: "Roboto, sans-serif",
                             fontWeight: 500,
@@ -1323,6 +1326,10 @@ export default function PriceChangeRequestDetailsPage() {
                             lineHeight: "21px",
                             textTransform: "uppercase",
                             letterSpacing: "0.1px",
+                            cursor:
+                              !newNote.trim() || isAddingNote
+                                ? "not-allowed"
+                                : "pointer",
                           }}
                         >
                           <Plus className="h-4 w-4" />

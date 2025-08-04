@@ -22,11 +22,7 @@ export default function LandingPage() {
   };
 
   const handleViewCustomerPricing = () => {
-    router.push("/customer-pricing/1");
-  };
-
-  const handleCustomerSearch = () => {
-    router.push("/customer-search");
+    router.push("/customer-pricing");
   };
 
   return (
@@ -56,9 +52,9 @@ export default function LandingPage() {
                     <FileText className="h-6 w-6 text-blue-600" />
                   </div>
                   <div>
-                    <CardTitle className="text-xl">View Price Queue</CardTitle>
+                    <CardTitle className="text-xl">Change Requests</CardTitle>
                     <p className="text-sm text-gray-500 mt-1">
-                      Review quotes requiring attention
+                      View Price Change Requests Flow
                     </p>
                   </div>
                 </div>
@@ -79,11 +75,9 @@ export default function LandingPage() {
                     <Building2 className="h-6 w-6 text-green-600" />
                   </div>
                   <div>
-                    <CardTitle className="text-xl">
-                      View Customer Pricing
-                    </CardTitle>
+                    <CardTitle className="text-xl">Pricing Entry</CardTitle>
                     <p className="text-sm text-gray-500 mt-1">
-                      Manage customer pricing
+                      View Pricing Entry Flow
                     </p>
                   </div>
                 </div>

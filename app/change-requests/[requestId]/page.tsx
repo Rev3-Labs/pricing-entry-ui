@@ -694,7 +694,7 @@ export default function PriceChangeRequestDetailsPage() {
 
     return (
       <div
-        className={`flex items-center px-3 py-1 rounded-[50px] ${config.bgColor} ${config.className}`}
+        className={`flex max-w-fit items-center px-3 py-1 rounded-[50px] ${config.bgColor} ${config.className}`}
       >
         <span className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px]">
           {config.label}
@@ -822,26 +822,19 @@ export default function PriceChangeRequestDetailsPage() {
                   </div>
 
                   {/* Metadata Rows */}
-                  <div className="flex gap-12">
-                    <div className="flex grow">
-                      <div className="w-32">
-                        <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#63666a]">
-                          Submitted By:
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-[#63666a]" />
-                        <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
-                          {request.submittedBy}
-                        </span>
-                      </div>
+                  <div className="flex gap-8">
+                    <div className="flex gap-2 place-items-center">
+                      <User className="h-4 w-4 text-[#63666a]" />
+
+                      <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#63666a]">
+                        Submitted By
+                      </span>
+
+                      <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
+                        {request.submittedBy}
+                      </span>
                     </div>
                     <div className="flex grow">
-                      <div className="w-[143.99px]">
-                        <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#63666a]">
-                          Submitted Date:
-                        </span>
-                      </div>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-[#63666a]" />
                         <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
@@ -850,48 +843,6 @@ export default function PriceChangeRequestDetailsPage() {
                       </div>
                     </div>
                   </div>
-
-                  {request.customerName && (
-                    <div className="flex gap-12">
-                      <div className="flex grow">
-                        <div className="w-32">
-                          <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#63666a]">
-                            Customer:
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
-                            {request.customerName}
-                          </span>
-                          <div className="bg-[rgba(101,178,48,0.1)] px-2 py-1 rounded-[50px]">
-                            <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[12px] leading-[20px] text-[#1c1b1f]">
-                              {request.customerId}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex grow">
-                        <div className="w-[143.99px]">
-                          <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#63666a]">
-                            Assigned To:
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-[#63666a]" />
-                          <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
-                            {request.assignedTo}
-                          </span>
-                          {request.assignedTo === "Sarah Johnson" && (
-                            <div className="bg-[#65b230] px-2 py-1 rounded-[50px]">
-                              <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[12px] leading-[20px] text-[#ffffff]">
-                                Me
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

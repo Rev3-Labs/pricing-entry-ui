@@ -1,56 +1,108 @@
-import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
-import { cva, type VariantProps } from "class-variance-authority";
+import React from "react";
+import {
+  Button as MuiButton,
+  ButtonProps as MuiButtonProps,
+} from "@mui/material";
+import { LucideIcon } from "lucide-react";
 
-import { cn } from "@/lib/utils";
-
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary-1 text-neutral-4 hover:bg-primary-1/90",
-        destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-);
-
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
-  asChild?: boolean;
+interface ButtonProps extends Omit<MuiButtonProps, "variant"> {
+  variant?: "primary" | "secondary";
+  icon?: LucideIcon;
+  iconPosition?: "left" | "right";
+  children: React.ReactNode;
 }
 
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
-    return (
-      <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
-        ref={ref}
-        {...props}
-      />
-    );
-  }
-);
-Button.displayName = "Button";
+export const Button: React.FC<ButtonProps> = ({
+  variant = "primary",
+  icon: Icon,
+  iconPosition = "left",
+  children,
+  sx,
+  ...props
+}) => {
+  const baseStyles = {
+    borderRadius: "100px",
+    textTransform: "none" as const,
+    display: "flex",
+    alignItems: "center",
+    gap: 1,
+    px: 2,
+    py: 1,
+    fontSize: "14px",
+    fontWeight: 500,
+  };
 
-export { Button, buttonVariants };
+  const variantStyles = {
+    primary: {
+      backgroundColor: "#65b230",
+      color: "white",
+      "&:hover": {
+        backgroundColor: "#4a8a1f",
+      },
+      "&:disabled": {
+        backgroundColor: "#b9b9b9",
+        color: "#666",
+      },
+    },
+    secondary: {
+      borderColor: "#b9b9b9",
+      color: "#49454f",
+      "&:hover": {
+        borderColor: "#65b230",
+        color: "#65b230",
+        backgroundColor: "rgba(101, 178, 48, 0.04)",
+      },
+      "&:disabled": {
+        borderColor: "#b9b9b9",
+        color: "#b9b9b9",
+      },
+    },
+  };
+
+  const renderContent = () => {
+    if (Icon) {
+      if (iconPosition === "right") {
+        return (
+          <>
+            <span>{children}</span>
+            <Icon className="h-4 w-4" />
+          </>
+        );
+      } else {
+        return (
+          <>
+            <Icon className="h-4 w-4" />
+            <span>{children}</span>
+          </>
+        );
+      }
+    }
+    return <span>{children}</span>;
+  };
+
+  return (
+    <MuiButton
+      variant={variant === "primary" ? "contained" : "outlined"}
+      sx={{
+        ...baseStyles,
+        ...variantStyles[variant],
+        ...sx,
+      }}
+      {...props}
+    >
+      {renderContent()}
+    </MuiButton>
+  );
+};
+
+// Convenience components for common use cases
+export const PrimaryButton: React.FC<Omit<ButtonProps, "variant">> = (
+  props
+) => <Button variant="primary" {...props} />;
+
+export const SecondaryButton: React.FC<Omit<ButtonProps, "variant">> = (
+  props
+) => <Button variant="secondary" {...props} />;
+
+// Export the base Button component as default
+export default Button;

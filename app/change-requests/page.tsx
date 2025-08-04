@@ -26,7 +26,11 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Button as MuiButton,
+  IconButton,
 } from "@mui/material";
+import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
+import { DataGrid, GridColDef } from "@mui/x-data-grid";
 
 // Interface for price change request data
 interface PriceChangeRequest {
@@ -514,6 +518,144 @@ export default function PriceChangeRequestsPage() {
     }
   };
 
+  // Define columns for DataGrid
+  const columns: GridColDef[] = [
+    {
+      field: "requestId",
+      headerName: "Request ID",
+      width: 150,
+      flex: 0,
+      renderCell: (params) => (
+        <div className="font-['Roboto:Medium',_sans-serif] font-medium text-[16px] leading-[22.86px] text-[#1976d2] hover:text-[#1565c0] cursor-pointer">
+          {params.value}
+        </div>
+      ),
+    },
+    {
+      field: "subject",
+      headerName: "Subject",
+      width: 300,
+      flex: 1,
+      minWidth: 250,
+      renderCell: (params) => (
+        <div className="max-w-xs">
+          <div className="font-['Roboto:Medium',_sans-serif] font-medium text-[16px] leading-[22.86px] text-[#1c1b1f] truncate">
+            {params.value}
+          </div>
+          {params.row.description && (
+            <div className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#49454f] truncate">
+              {params.row.description}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      field: "requestType",
+      headerName: "Type",
+      width: 120,
+      flex: 0,
+      renderCell: (params) => getRequestTypeBadge(params.value),
+    },
+    {
+      field: "customerName",
+      headerName: "Customer",
+      width: 280,
+      flex: 0,
+      renderCell: (params) => {
+        if (params.value) {
+          return (
+            <div className="flex items-center space-x-2">
+              <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#1c1b1f]">
+                {params.value}
+              </span>
+              <span className="inline-flex items-center bg-[#f5f5f5] text-[#49454f] rounded-full px-2 py-0.5 text-xs font-['Roboto:Medium',_sans-serif] font-medium uppercase">
+                {params.row.customerId}
+              </span>
+            </div>
+          );
+        } else {
+          return (
+            <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#bdbdbd] italic">
+              {params.row.requestType === "Multiple Customers"
+                ? "Multiple"
+                : "Global"}
+            </span>
+          );
+        }
+      },
+    },
+    {
+      field: "assignedTo",
+      headerName: "Assigned To",
+      width: 220,
+      flex: 0,
+      renderCell: (params) => (
+        <div className="flex items-center space-x-2">
+          <User className="h-4 w-4 text-[#49454f]" />
+          <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#1c1b1f]">
+            {params.value}
+          </span>
+          {params.value === "Sarah Johnson" && (
+            <span className="inline-flex items-center bg-[#65b230] text-white rounded-full px-2 py-0.5 text-xs font-['Roboto:Medium',_sans-serif] font-medium">
+              Me
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      field: "status",
+      headerName: "Status",
+      width: 120,
+      flex: 0,
+      renderCell: (params) => getStatusBadge(params.value),
+    },
+    {
+      field: "submittedDate",
+      headerName: "Submitted Date",
+      width: 140,
+      flex: 0,
+      renderCell: (params) => (
+        <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#1c1b1f]">
+          {formatDate(params.value)}
+        </span>
+      ),
+    },
+    {
+      field: "attachments",
+      headerName: "Attachments",
+      width: 120,
+      flex: 0,
+      renderCell: (params) => {
+        if (params.value && params.value.length > 0) {
+          return (
+            <div className="flex items-center space-x-1">
+              <Paperclip className="h-4 w-4 text-[#49454f]" />
+              <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#49454f]">
+                {params.value.length}
+              </span>
+            </div>
+          );
+        } else {
+          return (
+            <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#bdbdbd]">
+              None
+            </span>
+          );
+        }
+      },
+    },
+  ];
+
+  // Transform filtered requests into DataGrid rows
+  const rows = useMemo(() => {
+    return filteredRequests.map((request) => ({
+      id: request.requestId,
+      ...request,
+    }));
+  }, [filteredRequests]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#fffbfe] py-8">
@@ -558,13 +700,9 @@ export default function PriceChangeRequestsPage() {
                 customers and services
               </p>
             </div>
-            <button
-              onClick={handleCreateRequest}
-              className="flex items-center space-x-2 bg-[#65b230] hover:bg-[#4a8a1f] text-white font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[20px] px-4 py-2 rounded-full shadow-sm transition-colors duration-200"
-            >
-              <Plus className="h-4 w-4" />
-              <span>New Request</span>
-            </button>
+            <PrimaryButton onClick={handleCreateRequest} icon={Plus}>
+              New Request
+            </PrimaryButton>
           </div>
         </div>
 
@@ -788,8 +926,8 @@ export default function PriceChangeRequestsPage() {
                           .replace(/([A-Z])/g, " $1")
                           .replace(/^./, (str) => str.toUpperCase())}
                         : {value}
-                        <button
-                          className="ml-2 text-[#49454f] hover:text-[#1c1b1f]"
+                        <IconButton
+                          size="small"
                           onClick={() =>
                             setFilters((f) => ({
                               ...f,
@@ -802,17 +940,34 @@ export default function PriceChangeRequestsPage() {
                             }))
                           }
                           aria-label={`Remove filter ${key}`}
+                          sx={{
+                            ml: 1,
+                            color: "#49454f",
+                            "&:hover": {
+                              color: "#1c1b1f",
+                            },
+                          }}
                         >
                           <X className="h-3 w-3" />
-                        </button>
+                        </IconButton>
                       </span>
                     ))}
-                  <button
+                  <MuiButton
+                    variant="text"
+                    size="small"
                     onClick={clearFilters}
-                    className="text-[#1976d2] hover:text-[#1565c0] font-['Roboto:Medium',_sans-serif] font-medium text-sm px-3 py-1 rounded hover:bg-[rgba(25,118,210,0.1)] transition-colors duration-200"
+                    sx={{
+                      color: "#1976d2",
+                      textTransform: "none",
+                      fontSize: "14px",
+                      "&:hover": {
+                        color: "#1565c0",
+                        backgroundColor: "rgba(25,118,210,0.1)",
+                      },
+                    }}
                   >
                     Clear Filters
-                  </button>
+                  </MuiButton>
                 </div>
               </div>
             )}
@@ -836,122 +991,47 @@ export default function PriceChangeRequestsPage() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <div className="bg-white border border-[#b9b9b9] rounded">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-[rgba(0,0,0,0.06)] border-b border-[#b9b9b9]">
-                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
-                          Request ID
-                        </th>
-                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
-                          Subject
-                        </th>
-                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
-                          Type
-                        </th>
-                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
-                          Customer
-                        </th>
-                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
-                          Assigned To
-                        </th>
-                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
-                          Status
-                        </th>
-                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
-                          Submitted Date
-                        </th>
-                        <th className="text-left py-[20.18px] px-6 font-['Arial:Narrow',_sans-serif] font-normal text-[12px] leading-[17.14px] text-[#49454f] tracking-[0.3px]">
-                          Attachments
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredRequests.map((request) => (
-                        <tr
-                          key={request.requestId}
-                          className="cursor-pointer transition-colors hover:bg-[#f5f5f5] border-b border-[#b9b9b9]"
-                          onClick={() => handleRequestClick(request)}
-                        >
-                          <td className="py-[26.27px] px-6">
-                            <div className="font-['Roboto:Medium',_sans-serif] font-medium text-[16px] leading-[22.86px] text-[#1976d2] hover:text-[#1565c0]">
-                              {request.requestId}
-                            </div>
-                          </td>
-                          <td className="py-[26.27px] px-6">
-                            <div className="max-w-xs">
-                              <div className="font-['Roboto:Medium',_sans-serif] font-medium text-[16px] leading-[22.86px] text-[#1c1b1f] truncate">
-                                {request.subject}
-                              </div>
-                              {request.description && (
-                                <div className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#49454f] truncate">
-                                  {request.description}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-[26.27px] px-6">
-                            {getRequestTypeBadge(request.requestType)}
-                          </td>
-                          <td className="py-[26.27px] px-6">
-                            {request.customerName ? (
-                              <div className="flex items-center space-x-2">
-                                <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#1c1b1f]">
-                                  {request.customerName}
-                                </span>
-                                <span className="inline-flex items-center bg-[#f5f5f5] text-[#49454f] rounded-full px-2 py-0.5 text-xs font-['Roboto:Medium',_sans-serif] font-medium uppercase">
-                                  {request.customerId}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#bdbdbd] italic">
-                                {request.requestType === "Multiple Customers"
-                                  ? "Multiple"
-                                  : "Global"}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-[26.27px] px-6">
-                            <div className="flex items-center space-x-2">
-                              <User className="h-4 w-4 text-[#49454f]" />
-                              <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#1c1b1f]">
-                                {request.assignedTo}
-                              </span>
-                              {request.assignedTo === "Sarah Johnson" && (
-                                <span className="inline-flex items-center bg-[#65b230] text-white rounded-full px-2 py-0.5 text-xs font-['Roboto:Medium',_sans-serif] font-medium">
-                                  Me
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-[26.27px] px-6">
-                            {getStatusBadge(request.status)}
-                          </td>
-                          <td className="py-[26.27px] px-6">
-                            <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#1c1b1f]">
-                              {formatDate(request.submittedDate)}
-                            </span>
-                          </td>
-                          <td className="py-[26.27px] px-6">
-                            {request.attachments.length > 0 ? (
-                              <div className="flex items-center space-x-1">
-                                <Paperclip className="h-4 w-4 text-[#49454f]" />
-                                <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#49454f]">
-                                  {request.attachments.length}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#bdbdbd]">
-                                None
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <div style={{ width: "100%" }}>
+                <DataGrid
+                  rows={rows || []}
+                  columns={columns || []}
+                  getRowId={(row) => row.id}
+                  autoHeight={true}
+                  density="standard"
+                  onRowClick={(params) => {
+                    const request = filteredRequests.find(
+                      (r) => r.requestId === params.id
+                    );
+                    if (request) {
+                      handleRequestClick(request);
+                    }
+                  }}
+                  sx={{
+                    "& .MuiDataGrid-cell": {
+                      fontSize: "0.875rem",
+                      padding: "12px 16px",
+                      display: "flex",
+                      alignItems: "center",
+                      cursor: "pointer",
+                    },
+                    "& .MuiDataGrid-columnHeader": {
+                      fontSize: "0.875rem",
+                      padding: "12px 16px",
+                      backgroundColor: "#E0E0E0",
+                      borderBottom: "2px solid #65B230 !important",
+                    },
+                    "& .MuiDataGrid-columnHeaders": {
+                      borderBottom: "2px solid #65B230 !important",
+                    },
+                    "& .MuiDataGrid-row:hover": {
+                      backgroundColor: "#f5f5f5",
+                    },
+                    border: "1px solid #b9b9b9",
+                    borderRadius: "4px",
+                  }}
+                  disableRowSelectionOnClick={true}
+                  disableColumnMenu={true}
+                />
               </div>
             )}
           </div>
@@ -1124,12 +1204,18 @@ export default function PriceChangeRequestsPage() {
                             <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#1c1b1f]">
                               {file.name}
                             </span>
-                            <button
+                            <IconButton
+                              size="small"
                               onClick={() => removeAttachment(index)}
-                              className="h-6 w-6 p-0 text-[#49454f] hover:text-[#1c1b1f] transition-colors duration-200"
+                              sx={{
+                                color: "#49454f",
+                                "&:hover": {
+                                  color: "#1c1b1f",
+                                },
+                              }}
                             >
                               <X className="h-3 w-3" />
-                            </button>
+                            </IconButton>
                           </div>
                         ))}
                       </div>
@@ -1140,18 +1226,12 @@ export default function PriceChangeRequestsPage() {
 
               {/* Modal Footer */}
               <div className="p-6 border-t border-[#e0e0e0] flex justify-end space-x-3">
-                <button
-                  onClick={handleCreateCancel}
-                  className="px-4 py-2 border border-[#b9b9b9] text-[#1c1b1f] font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[20px] rounded-lg hover:bg-[#f5f5f5] transition-colors duration-200"
-                >
+                <SecondaryButton onClick={handleCreateCancel}>
                   Cancel
-                </button>
-                <button
-                  onClick={handleCreateSubmit}
-                  className="px-4 py-2 bg-[#65b230] hover:bg-[#4a8a1f] text-white font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[20px] rounded-lg transition-colors duration-200"
-                >
+                </SecondaryButton>
+                <PrimaryButton onClick={handleCreateSubmit}>
                   Create Request
-                </button>
+                </PrimaryButton>
               </div>
             </div>
           </div>

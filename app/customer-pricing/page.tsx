@@ -86,6 +86,7 @@ interface FilterState {
     min?: string;
     max?: string;
   };
+  showModifiedOnly?: boolean;
 }
 
 interface AllPricingData {
@@ -114,6 +115,7 @@ export default function AllCustomerPricingPage() {
     uom: "all",
     projectName: "",
     containerSize: "all",
+    showModifiedOnly: false,
   });
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<string>("all");
@@ -150,10 +152,22 @@ export default function AllCustomerPricingPage() {
     containerSize: "",
     uom: "",
     unitPrice: "",
+    unitPricePercentageIncrease: "",
     minimumPrice: "",
+    minimumPricePercentageIncrease: "",
     effectiveDate: "",
     expirationDate: "",
   });
+
+  // State for unit price edit mode
+  const [unitPriceEditMode, setUnitPriceEditMode] = useState<
+    "absolute" | "percentage"
+  >("absolute");
+
+  // State for minimum price edit mode
+  const [minimumPriceEditMode, setMinimumPriceEditMode] = useState<
+    "absolute" | "percentage"
+  >("absolute");
 
   // State for tracking new and modified rows
   const [newRows, setNewRows] = useState<Set<string>>(new Set());
@@ -161,6 +175,18 @@ export default function AllCustomerPricingPage() {
   const [modifiedColumns, setModifiedColumns] = useState<
     Map<string, Set<string>>
   >(new Map());
+
+  // Ensure modified rows filter is reset when not in edit mode
+  useEffect(() => {
+    if (!isEditMode && filters.showModifiedOnly) {
+      setFilters((prev) => ({ ...prev, showModifiedOnly: false }));
+    }
+  }, [isEditMode, filters.showModifiedOnly]);
+
+  // Reset modified rows filter on component mount
+  useEffect(() => {
+    setFilters((prev) => ({ ...prev, showModifiedOnly: false }));
+  }, []);
 
   // State for row editing
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
@@ -172,6 +198,54 @@ export default function AllCustomerPricingPage() {
     templateType: "standard" | "custom";
     customHeaderFields?: any;
   } | null>(null);
+
+  // Helper function to calculate unit price preview for percentage increase
+  const getUnitPricePreview = (
+    percentageIncrease: string,
+    selectedRows: any[]
+  ): string => {
+    if (!percentageIncrease || selectedRows.length === 0) return "";
+
+    const percentage = parseFloat(percentageIncrease);
+    if (isNaN(percentage)) return "";
+
+    // Get the first selected row's current unit price for preview
+    const selectedIds = getSelectedRowIds();
+    const firstSelectedItem = allPricingData.priceItems.find(
+      (item) => item.priceItemId === selectedIds[0]
+    );
+
+    if (!firstSelectedItem) return "";
+
+    const newPrice = firstSelectedItem.unitPrice * (1 + percentage / 100);
+    return `Preview: $${newPrice.toFixed(
+      2
+    )} (from $${firstSelectedItem.unitPrice.toFixed(2)})`;
+  };
+
+  // Helper function to calculate minimum price preview for percentage increase
+  const getMinimumPricePreview = (
+    percentageIncrease: string,
+    selectedRows: any[]
+  ): string => {
+    if (!percentageIncrease || selectedRows.length === 0) return "";
+
+    const percentage = parseFloat(percentageIncrease);
+    if (isNaN(percentage)) return "";
+
+    // Get the first selected row's current minimum price for preview
+    const selectedIds = getSelectedRowIds();
+    const firstSelectedItem = allPricingData.priceItems.find(
+      (item) => item.priceItemId === selectedIds[0]
+    );
+
+    if (!firstSelectedItem) return "";
+
+    const newPrice = firstSelectedItem.minimumPrice * (1 + percentage / 100);
+    return `Preview: $${newPrice.toFixed(
+      2
+    )} (from $${firstSelectedItem.minimumPrice.toFixed(2)})`;
+  };
 
   // Helper functions to get unique values for dropdowns
   const getUniqueCustomers = (): string[] => {
@@ -373,6 +447,13 @@ export default function AllCustomerPricingPage() {
           item.unitPrice <= parseFloat(filters.priceRange.max);
       }
 
+      // Modified rows filtering (only when in edit mode)
+      let matchesModifiedOnly = true;
+      if (filters.showModifiedOnly && isEditMode) {
+        matchesModifiedOnly =
+          newRows.has(item.priceItemId) || modifiedRows.has(item.priceItemId);
+      }
+
       return (
         matchesCustomer &&
         matchesCustomerName &&
@@ -386,10 +467,11 @@ export default function AllCustomerPricingPage() {
         matchesContainerSize &&
         matchesFacility &&
         matchesDateRange &&
-        matchesPriceRange
+        matchesPriceRange &&
+        matchesModifiedOnly
       );
     });
-  }, [allPricingData, filters]);
+  }, [allPricingData, filters, isEditMode, newRows, modifiedRows]);
 
   // Transform filtered items into DataGrid rows
   const rows = useMemo(() => {
@@ -692,6 +774,8 @@ export default function AllCustomerPricingPage() {
       "unitPrice",
       "minimumPrice",
       "uom",
+      "effectiveDate",
+      "expirationDate",
     ];
 
     fieldsToTrack.forEach((field) => {
@@ -712,6 +796,35 @@ export default function AllCustomerPricingPage() {
         newMap.set(newRow.id, modifiedFields);
         return newMap;
       });
+
+      // Also update the header if effective or expiration dates are changed
+      if (
+        modifiedFields.has("effectiveDate") ||
+        modifiedFields.has("expirationDate")
+      ) {
+        const header = allPricingData.priceHeaders.find(
+          (h) => h.priceHeaderId === newRow.header?.priceHeaderId
+        );
+        if (header) {
+          const updatedHeader = {
+            ...header,
+            ...(modifiedFields.has("effectiveDate") && {
+              effectiveDate: newRow.effectiveDate,
+            }),
+            ...(modifiedFields.has("expirationDate") && {
+              expirationDate: newRow.expirationDate,
+            }),
+          };
+
+          // Update the header in the data
+          setAllPricingData((prev) => ({
+            ...prev,
+            priceHeaders: prev.priceHeaders.map((h) =>
+              h.priceHeaderId === header.priceHeaderId ? updatedHeader : h
+            ),
+          }));
+        }
+      }
     }
 
     return newRow;
@@ -734,18 +847,47 @@ export default function AllCustomerPricingPage() {
       ...prev,
       priceItems: prev.priceItems.map((item) => {
         if (selectedIds.includes(item.priceItemId)) {
+          // Calculate new unit price based on percentage increase or absolute value
+          let newUnitPrice = item.unitPrice;
+          if (bulkEditForm.unitPricePercentageIncrease) {
+            const percentageIncrease = parseFloat(
+              bulkEditForm.unitPricePercentageIncrease
+            );
+            newUnitPrice = item.unitPrice * (1 + percentageIncrease / 100);
+          } else if (bulkEditForm.unitPrice) {
+            newUnitPrice = parseFloat(bulkEditForm.unitPrice);
+          }
+
+          // Calculate new minimum price based on percentage increase or absolute value
+          let newMinimumPrice = item.minimumPrice;
+          if (bulkEditForm.minimumPricePercentageIncrease) {
+            const percentageIncrease = parseFloat(
+              bulkEditForm.minimumPricePercentageIncrease
+            );
+            newMinimumPrice =
+              item.minimumPrice * (1 + percentageIncrease / 100);
+          } else if (bulkEditForm.minimumPrice) {
+            newMinimumPrice = parseFloat(bulkEditForm.minimumPrice);
+          }
+
           const updatedItem = {
             ...item,
             ...(bulkEditForm.containerSize && {
               containerSize: bulkEditForm.containerSize,
             }),
             ...(bulkEditForm.uom && { uom: bulkEditForm.uom }),
-            ...(bulkEditForm.unitPrice && {
-              unitPrice: parseFloat(bulkEditForm.unitPrice),
-            }),
-            ...(bulkEditForm.minimumPrice && {
-              minimumPrice: parseFloat(bulkEditForm.minimumPrice),
-            }),
+            ...(bulkEditForm.unitPrice ||
+            bulkEditForm.unitPricePercentageIncrease
+              ? {
+                  unitPrice: newUnitPrice,
+                }
+              : {}),
+            ...(bulkEditForm.minimumPrice ||
+            bulkEditForm.minimumPricePercentageIncrease
+              ? {
+                  minimumPrice: newMinimumPrice,
+                }
+              : {}),
             ...(bulkEditForm.effectiveDate && {
               effectiveDate: bulkEditForm.effectiveDate,
             }),
@@ -754,6 +896,32 @@ export default function AllCustomerPricingPage() {
             }),
           };
 
+          // Also update the header if effective or expiration dates are changed
+          if (bulkEditForm.effectiveDate || bulkEditForm.expirationDate) {
+            const header = allPricingData.priceHeaders.find(
+              (h) => h.priceHeaderId === item.priceHeaderId
+            );
+            if (header) {
+              const updatedHeader = {
+                ...header,
+                ...(bulkEditForm.effectiveDate && {
+                  effectiveDate: bulkEditForm.effectiveDate,
+                }),
+                ...(bulkEditForm.expirationDate && {
+                  expirationDate: bulkEditForm.expirationDate,
+                }),
+              };
+
+              // Update the header in the data
+              setAllPricingData((prev) => ({
+                ...prev,
+                priceHeaders: prev.priceHeaders.map((h) =>
+                  h.priceHeaderId === item.priceHeaderId ? updatedHeader : h
+                ),
+              }));
+            }
+          }
+
           // Track modified rows and columns for highlighting
           setModifiedRows((prev) => new Set([...prev, item.priceItemId]));
 
@@ -761,16 +929,20 @@ export default function AllCustomerPricingPage() {
           const modifiedFields = new Set<string>();
           if (bulkEditForm.containerSize) modifiedFields.add("containerSize");
           if (bulkEditForm.uom) modifiedFields.add("uom");
-          if (bulkEditForm.unitPrice) modifiedFields.add("unitPrice");
-          if (bulkEditForm.minimumPrice) modifiedFields.add("minimumPrice");
+          if (
+            bulkEditForm.unitPrice ||
+            bulkEditForm.unitPricePercentageIncrease
+          )
+            modifiedFields.add("unitPrice");
+          if (
+            bulkEditForm.minimumPrice ||
+            bulkEditForm.minimumPricePercentageIncrease
+          )
+            modifiedFields.add("minimumPrice");
           if (bulkEditForm.effectiveDate) modifiedFields.add("effectiveDate");
           if (bulkEditForm.expirationDate) modifiedFields.add("expirationDate");
 
           if (modifiedFields.size > 0) {
-            console.log(
-              `Bulk edit - Row ${item.priceItemId} modified fields:`,
-              Array.from(modifiedFields)
-            );
             setModifiedColumns((prev) => {
               const newMap = new Map(prev);
               newMap.set(item.priceItemId, modifiedFields);
@@ -789,10 +961,14 @@ export default function AllCustomerPricingPage() {
       containerSize: "",
       uom: "",
       unitPrice: "",
+      unitPricePercentageIncrease: "",
       minimumPrice: "",
+      minimumPricePercentageIncrease: "",
       effectiveDate: "",
       expirationDate: "",
     });
+    setUnitPriceEditMode("absolute");
+    setMinimumPriceEditMode("absolute");
     setApplyChangesDialogOpen(false);
     setSelectedRows([] as any);
     toast.success(`Updated ${selectedIds.length} price item(s) successfully`);
@@ -803,10 +979,14 @@ export default function AllCustomerPricingPage() {
       containerSize: "",
       uom: "",
       unitPrice: "",
+      unitPricePercentageIncrease: "",
       minimumPrice: "",
+      minimumPricePercentageIncrease: "",
       effectiveDate: "",
       expirationDate: "",
     });
+    setUnitPriceEditMode("absolute");
+    setMinimumPriceEditMode("absolute");
     setApplyChangesDialogOpen(false);
   };
 
@@ -830,6 +1010,8 @@ export default function AllCustomerPricingPage() {
     setModifiedColumns(new Map());
     setCurrentPriceChangeConfig(null);
     setExitEditModeConfirmOpen(false);
+    // Reset the modified rows filter when exiting edit mode
+    setFilters((prev) => ({ ...prev, showModifiedOnly: false }));
     toast.info("Exited edit mode");
   };
 
@@ -1070,6 +1252,10 @@ export default function AllCustomerPricingPage() {
             ? `${params.value} (Inactive)`
             : params.value;
 
+        // Check if this cell has modified fields
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("customerName");
+
         return (
           <div
             style={{
@@ -1078,7 +1264,14 @@ export default function AllCustomerPricingPage() {
               lineHeight: "1.2",
             }}
           >
-            <div style={{ fontWeight: "500" }}>{displayName}</div>
+            <div
+              style={{
+                fontWeight: isModified ? "bold" : "500",
+                color: isModified ? "#1c1b1f" : "inherit",
+              }}
+            >
+              {displayName}
+            </div>
             <div style={{ fontSize: "0.8em", color: "#666" }}>
               ID: {customerId}
             </div>
@@ -1093,6 +1286,22 @@ export default function AllCustomerPricingPage() {
       flex: 0,
       minWidth: 80,
       editable: true,
+      renderCell: (params: any) => {
+        // Check if this cell has modified fields
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("productName");
+
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
     },
     {
       field: "profileId",
@@ -1101,6 +1310,22 @@ export default function AllCustomerPricingPage() {
       flex: 0.5,
       minWidth: 100,
       editable: true,
+      renderCell: (params: any) => {
+        // Check if this cell has modified fields
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("profileId");
+
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
     },
     {
       field: "generatorId",
@@ -1109,6 +1334,22 @@ export default function AllCustomerPricingPage() {
       flex: 0.5,
       minWidth: 100,
       editable: true,
+      renderCell: (params: any) => {
+        // Check if this cell has modified fields
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("generatorId");
+
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
     },
     {
       field: "projectName",
@@ -1117,6 +1358,22 @@ export default function AllCustomerPricingPage() {
       flex: 1,
       minWidth: 120,
       editable: true,
+      renderCell: (params: any) => {
+        // Check if this cell has modified fields
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("projectName");
+
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
     },
     {
       field: "facilityName",
@@ -1130,6 +1387,22 @@ export default function AllCustomerPricingPage() {
         value,
         label: value,
       })),
+      renderCell: (params: any) => {
+        // Check if this cell has modified fields
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("facilityName");
+
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
     },
     {
       field: "containerSize",
@@ -1143,6 +1416,22 @@ export default function AllCustomerPricingPage() {
         value,
         label: value,
       })),
+      renderCell: (params: any) => {
+        // Check if this cell has modified fields
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("containerSize");
+
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
     },
     {
       field: "unitPrice",
@@ -1156,12 +1445,36 @@ export default function AllCustomerPricingPage() {
         const effectiveDate = params.row.effectiveDate;
         const expirationDate = params.row.expirationDate;
 
+        // Check if this cell has modified fields
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isPriceModified = modifiedFields?.has("unitPrice");
+        const isEffectiveDateModified = modifiedFields?.has("effectiveDate");
+        const isExpirationDateModified = modifiedFields?.has("expirationDate");
+
         return (
           <div style={{ lineHeight: "1.2" }}>
-            <div style={{ fontWeight: "500" }}>{price}</div>
+            <div
+              style={{
+                fontWeight: isPriceModified ? "bold" : "500",
+                color: isPriceModified ? "#1c1b1f" : "inherit",
+              }}
+            >
+              {price}
+            </div>
             {effectiveDate && expirationDate && (
               <div
-                style={{ fontSize: "0.75em", color: "#888", marginTop: "2px" }}
+                style={{
+                  fontSize: "0.75em",
+                  marginTop: "2px",
+                  fontWeight:
+                    isEffectiveDateModified || isExpirationDateModified
+                      ? "bold"
+                      : "normal",
+                  color:
+                    isEffectiveDateModified || isExpirationDateModified
+                      ? "#1c1b1f"
+                      : "#888",
+                }}
               >
                 {formatDate(effectiveDate)} - {formatDate(expirationDate)}
               </div>
@@ -1179,6 +1492,22 @@ export default function AllCustomerPricingPage() {
       editable: true,
       type: "singleSelect",
       valueOptions: ["Each", "Gallon", "Pound", "Container", "Ton"],
+      renderCell: (params: any) => {
+        // Check if this cell has modified fields
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("uom");
+
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
     },
     {
       field: "minimumPrice",
@@ -1187,9 +1516,33 @@ export default function AllCustomerPricingPage() {
       flex: 0,
       minWidth: 100,
       editable: isEditMode,
-      renderCell: (params: any) => formatCurrency(params.value),
+      renderCell: (params: any) => {
+        const price = formatCurrency(params.value);
+
+        // Check if this cell has modified fields
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isPriceModified = modifiedFields?.has("minimumPrice");
+
+        return (
+          <div
+            style={{
+              fontWeight: isPriceModified ? "bold" : "normal",
+              color: isPriceModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {price}
+          </div>
+        );
+      },
     },
   ];
+
+  const toggleModifiedRowsFilter = () => {
+    setFilters((prev) => ({
+      ...prev,
+      showModifiedOnly: !prev.showModifiedOnly,
+    }));
+  };
 
   const clearFilters = () => {
     setFilters({
@@ -1206,6 +1559,7 @@ export default function AllCustomerPricingPage() {
       generator: "",
       facility: "",
       containerSize: "all",
+      showModifiedOnly: false,
     });
   };
 
@@ -1551,40 +1905,73 @@ export default function AllCustomerPricingPage() {
                 >
                   More Filters
                 </SecondaryButton>
+
+                {/* Modified Button - Only show in edit mode */}
+                {isEditMode && (
+                  <SecondaryButton
+                    onClick={toggleModifiedRowsFilter}
+                    className={`${
+                      filters.showModifiedOnly
+                        ? "bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200"
+                        : ""
+                    }`}
+                  >
+                    Modified (
+                    {(newRows ? newRows.size : 0) +
+                      (modifiedRows ? modifiedRows.size : 0)}
+                    )
+                  </SecondaryButton>
+                )}
               </div>
 
               {/* Active Filters Chips */}
-              {Object.entries(filters).some(
-                ([key, value]) =>
+              {Object.entries(filters).some(([key, value]) => {
+                // For showModifiedOnly, only show if it's true AND we're in edit mode
+                if (key === "showModifiedOnly") {
+                  return value === true && isEditMode;
+                }
+                // For other filters, show if they have a value
+                return (
                   ["all", "", undefined, null].indexOf(value as any) === -1
-              ) && (
+                );
+              }) && (
                 <div className="mb-4">
                   <div className="flex flex-wrap gap-2 items-center p-3 rounded-md bg-[rgba(101,178,48,0.08)] border border-[rgba(101,178,48,0.2)]">
                     {Object.entries(filters)
-                      .filter(
-                        ([key, value]) =>
+                      .filter(([key, value]) => {
+                        // For showModifiedOnly, only show if it's true AND we're in edit mode
+                        if (key === "showModifiedOnly") {
+                          return value === true && isEditMode;
+                        }
+                        // For other filters, show if they have a value
+                        return (
                           ["all", "", undefined, null].indexOf(value as any) ===
                           -1
-                      )
+                        );
+                      })
                       .map(([key, value]) => (
                         <span
                           key={key}
                           className="inline-flex items-center bg-white text-[#1c1b1f] rounded px-2 py-1 text-xs font-medium shadow-sm"
                         >
-                          {key
-                            .replace(/([A-Z])/g, " $1")
-                            .replace(/^./, (str) => str.toUpperCase())}
-                          : {value}
+                          {key === "showModifiedOnly"
+                            ? "Show Modified Only"
+                            : key
+                                .replace(/([A-Z])/g, " $1")
+                                .replace(/^./, (str) => str.toUpperCase())}
+                          {key !== "showModifiedOnly" && `: ${value}`}
                           <IconButton
                             size="small"
                             onClick={() =>
                               setFilters((f) => ({
                                 ...f,
                                 [key]:
-                                  key === "status" ||
-                                  key === "uom" ||
-                                  key === "region" ||
-                                  key === "customer"
+                                  key === "showModifiedOnly"
+                                    ? false
+                                    : key === "status" ||
+                                      key === "uom" ||
+                                      key === "region" ||
+                                      key === "customer"
                                     ? "all"
                                     : "",
                               }))
@@ -1769,6 +2156,7 @@ export default function AllCustomerPricingPage() {
                 ) : (
                   <div style={{ width: "100%", height: "600px" }}>
                     <DataGrid
+                      key={`datagrid-${modifiedRows.size}-${modifiedColumns.size}`}
                       rows={rows || []}
                       columns={columns || []}
                       getRowId={(row) => row.id}
@@ -1790,24 +2178,6 @@ export default function AllCustomerPricingPage() {
                         }
                         return "";
                       }}
-                      getCellClassName={(params) => {
-                        // Only show modified cells in bold when in edit mode
-                        if (isEditMode) {
-                          const modifiedFields = modifiedColumns.get(
-                            params.row.id
-                          );
-                          if (
-                            modifiedFields &&
-                            modifiedFields.has(params.field)
-                          ) {
-                            console.log(
-                              `Applying modified-cell class to row ${params.row.id}, field ${params.field}`
-                            );
-                            return "modified-cell";
-                          }
-                        }
-                        return "";
-                      }}
                       sx={{
                         "& .new-entry-row": {
                           backgroundColor: "#f0f9ff",
@@ -1824,16 +2194,7 @@ export default function AllCustomerPricingPage() {
                             backgroundColor: "#fefce8",
                           },
                         },
-                        "& .modified-cell": {
-                          fontWeight: "bold !important",
-                          color: "#1c1b1f !important",
-                        },
-                        "& .modified-cell .MuiDataGrid-cellContent": {
-                          fontWeight: "bold !important",
-                        },
-                        "& .modified-cell .MuiDataGrid-cellContent *": {
-                          fontWeight: "bold !important",
-                        },
+
                         "& .MuiDataGrid-cell": {
                           fontSize: "0.875rem",
                           padding: "12px 16px",
@@ -2872,6 +3233,7 @@ export default function AllCustomerPricingPage() {
               Update the following fields for all selected rows. Leave fields
               empty to keep existing values.
             </Typography>
+
             <div className="grid grid-cols-2 gap-4">
               {/* Container Size */}
               <FormControl variant="outlined" size="small" fullWidth>
@@ -2919,41 +3281,176 @@ export default function AllCustomerPricingPage() {
                 </Select>
               </FormControl>
 
-              {/* Unit Price */}
-              <TextField
-                label="Unit Price"
-                type="number"
-                value={bulkEditForm.unitPrice}
-                onChange={(e) =>
-                  setBulkEditForm((prev) => ({
-                    ...prev,
-                    unitPrice: e.target.value,
-                  }))
-                }
-                variant="outlined"
-                size="small"
-                fullWidth
-                placeholder="Keep existing"
-                inputProps={{ min: 0, step: 0.01 }}
-              />
+              {/* Unit Price with Inline Toggle */}
+              <div className="relative">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium text-gray-700">
+                    Unit Price
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUnitPriceEditMode("absolute");
+                        setBulkEditForm((prev) => ({
+                          ...prev,
+                          unitPricePercentageIncrease: "",
+                        }));
+                      }}
+                      className={`px-2 py-1 text-xs rounded-l border transition-colors ${
+                        unitPriceEditMode === "absolute"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      $
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUnitPriceEditMode("percentage");
+                        setBulkEditForm((prev) => ({ ...prev, unitPrice: "" }));
+                      }}
+                      className={`px-2 py-1 text-xs rounded-r border-l-0 border transition-colors ${
+                        unitPriceEditMode === "percentage"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      %
+                    </button>
+                  </div>
+                </div>
+                {unitPriceEditMode === "absolute" ? (
+                  <TextField
+                    type="number"
+                    value={bulkEditForm.unitPrice}
+                    onChange={(e) => {
+                      setBulkEditForm((prev) => ({
+                        ...prev,
+                        unitPrice: e.target.value,
+                      }));
+                    }}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    placeholder="Enter new unit price"
+                    inputProps={{ min: 0, step: 0.01 }}
+                    helperText="Set absolute unit price"
+                  />
+                ) : (
+                  <TextField
+                    type="number"
+                    value={bulkEditForm.unitPricePercentageIncrease}
+                    onChange={(e) => {
+                      setBulkEditForm((prev) => ({
+                        ...prev,
+                        unitPricePercentageIncrease: e.target.value,
+                      }));
+                    }}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    placeholder="e.g., 5 for 5% increase"
+                    inputProps={{ min: 0, step: 0.1 }}
+                    helperText={
+                      bulkEditForm.unitPricePercentageIncrease
+                        ? getUnitPricePreview(
+                            bulkEditForm.unitPricePercentageIncrease,
+                            selectedRows
+                          )
+                        : "Enter percentage to increase existing price"
+                    }
+                  />
+                )}
+              </div>
 
-              {/* Minimum Price */}
-              <TextField
-                label="Minimum Price"
-                type="number"
-                value={bulkEditForm.minimumPrice}
-                onChange={(e) =>
-                  setBulkEditForm((prev) => ({
-                    ...prev,
-                    minimumPrice: e.target.value,
-                  }))
-                }
-                variant="outlined"
-                size="small"
-                fullWidth
-                placeholder="Keep existing"
-                inputProps={{ min: 0, step: 0.01 }}
-              />
+              {/* Minimum Price with Inline Toggle */}
+              <div className="relative">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium text-gray-700">
+                    Minimum Price
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMinimumPriceEditMode("absolute");
+                        setBulkEditForm((prev) => ({
+                          ...prev,
+                          minimumPricePercentageIncrease: "",
+                        }));
+                      }}
+                      className={`px-2 py-1 text-xs rounded-l border transition-colors ${
+                        minimumPriceEditMode === "absolute"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      $
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMinimumPriceEditMode("percentage");
+                        setBulkEditForm((prev) => ({
+                          ...prev,
+                          minimumPrice: "",
+                        }));
+                      }}
+                      className={`px-2 py-1 text-xs rounded-r border-l-0 border transition-colors ${
+                        minimumPriceEditMode === "percentage"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      %
+                    </button>
+                  </div>
+                </div>
+                {minimumPriceEditMode === "absolute" ? (
+                  <TextField
+                    type="number"
+                    value={bulkEditForm.minimumPrice}
+                    onChange={(e) => {
+                      setBulkEditForm((prev) => ({
+                        ...prev,
+                        minimumPrice: e.target.value,
+                      }));
+                    }}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    placeholder="Enter new minimum price"
+                    inputProps={{ min: 0, step: 0.01 }}
+                    helperText="Set absolute minimum price"
+                  />
+                ) : (
+                  <TextField
+                    type="number"
+                    value={bulkEditForm.minimumPricePercentageIncrease}
+                    onChange={(e) => {
+                      setBulkEditForm((prev) => ({
+                        ...prev,
+                        minimumPricePercentageIncrease: e.target.value,
+                      }));
+                    }}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    placeholder="e.g., 5 for 5% increase"
+                    inputProps={{ min: 0, step: 0.1 }}
+                    helperText={
+                      bulkEditForm.minimumPricePercentageIncrease
+                        ? getMinimumPricePreview(
+                            bulkEditForm.minimumPricePercentageIncrease,
+                            selectedRows
+                          )
+                        : "Enter percentage to increase existing minimum price"
+                    }
+                  />
+                )}
+              </div>
 
               {/* Effective Date */}
               <TextField

@@ -49,12 +49,13 @@ interface PriceChangeRequest {
   requestId: string;
   subject: string;
   description: string;
-  requestType:
+  requestType: (
     | "New Customer"
     | "New Item Pricing"
     | "Price Increase"
     | "Price Decrease"
-    | "Expire Pricing";
+    | "Expire Pricing"
+  )[];
   customerId?: string;
   customerName?: string;
   assignedTo: string;
@@ -77,12 +78,13 @@ interface EditModeState {
   isEditing: boolean;
   subject: string;
   description: string;
-  requestType:
+  requestType: (
     | "New Customer"
     | "New Item Pricing"
     | "Price Increase"
     | "Price Decrease"
-    | "Expire Pricing";
+    | "Expire Pricing"
+  )[];
   customerId: string;
   customerName: string;
   assignedTo: string;
@@ -120,7 +122,7 @@ class PriceChangeRequestService {
         subject: "Annual Rate Increase for Acme Corporation",
         description:
           "Implement 5% annual rate increase across all services for Acme Corporation effective March 1, 2024. This increase aligns with our annual pricing review and market conditions. The increase will apply to all current service contracts and new contracts signed after the effective date. Customer has been notified of the pending increase and has provided preliminary approval.",
-        requestType: "Price Increase",
+        requestType: ["Price Increase"],
         customerId: "CUST-001",
         customerName: "Acme Corporation",
         assignedTo: "Sarah Johnson",
@@ -214,7 +216,7 @@ class PriceChangeRequestService {
         subject: "Utah State Contract Pricing Update",
         description:
           "Update pricing structure for all Utah state contracts to reflect new regulatory requirements and competitive market positioning. This affects 15 different state agencies and requires coordination with the Utah Department of Environmental Quality. The changes include new compliance fees and updated service rates.",
-        requestType: "Price Increase",
+        requestType: ["Price Increase"],
         assignedTo: "David Brown",
         status: "In Progress",
         submittedBy: "Mike Wilson",
@@ -272,7 +274,7 @@ class PriceChangeRequestService {
         subject: "Global Fuel Surcharge Adjustment",
         description:
           "Implement new fuel surcharge calculation methodology across all customers to better reflect current fuel costs and market volatility. This will replace the current flat-rate surcharge with a dynamic calculation based on current diesel fuel prices and will be updated monthly.",
-        requestType: "Price Increase",
+        requestType: ["Price Increase"],
         assignedTo: "Michael Chen",
         status: "Activated",
         submittedBy: "Lisa Davis",
@@ -406,7 +408,7 @@ export default function PriceChangeRequestDetailsPage() {
     isEditing: false,
     subject: "",
     description: "",
-    requestType: "New Customer",
+    requestType: ["New Customer"],
     customerId: "",
     customerName: "",
     assignedTo: "",
@@ -686,23 +688,23 @@ export default function PriceChangeRequestDetailsPage() {
     const typeConfig = {
       "New Customer": {
         label: "New Customer",
-        className: "text-[#1976d2]",
-        bgColor: "bg-[rgba(25,118,210,0.1)]",
+        className: "text-[#63666a]",
+        bgColor: "bg-[rgba(99,102,106,0.1)]",
       },
       "New Item Pricing": {
         label: "New Item",
-        className: "text-[#2e7d32]",
-        bgColor: "bg-[rgba(46,125,50,0.1)]",
+        className: "text-[#63666a]",
+        bgColor: "bg-[rgba(99,102,106,0.1)]",
       },
       "Price Increase": {
         label: "Increase",
-        className: "text-[#d32f2f]",
-        bgColor: "bg-[rgba(211,47,47,0.1)]",
+        className: "text-[#63666a]",
+        bgColor: "bg-[rgba(99,102,106,0.1)]",
       },
       "Price Decrease": {
         label: "Decrease",
-        className: "text-[#ed6c02]",
-        bgColor: "bg-[rgba(237,108,2,0.1)]",
+        className: "text-[#63666a]",
+        bgColor: "bg-[rgba(99,102,106,0.1)]",
       },
       "Expire Pricing": {
         label: "Expire",
@@ -1153,17 +1155,22 @@ export default function PriceChangeRequestDetailsPage() {
                                   Request Type *
                                 </InputLabel>
                                 <Select
+                                  multiple
                                   labelId="edit-request-type-label"
                                   value={editMode.requestType}
                                   onChange={(e) =>
                                     setEditMode((prev) => ({
                                       ...prev,
-                                      requestType: e.target.value as
+                                      requestType: (typeof e.target.value ===
+                                      "string"
+                                        ? [e.target.value]
+                                        : e.target.value) as (
                                         | "New Customer"
                                         | "New Item Pricing"
                                         | "Price Increase"
                                         | "Price Decrease"
-                                        | "Expire Pricing",
+                                        | "Expire Pricing"
+                                      )[],
                                     }))
                                   }
                                   label="Request Type *"
@@ -1335,11 +1342,15 @@ export default function PriceChangeRequestDetailsPage() {
                                 Request Type
                               </label>
                               <div className="mt-1">
-                                {getRequestTypeBadge(request.requestType)}
+                                {request.requestType.map((type, index) => (
+                                  <div key={index} className="mb-1">
+                                    {getRequestTypeBadge(type)}
+                                  </div>
+                                ))}
                               </div>
                             </div>
                             {(request.customerName ||
-                              request.requestType === "New Customer") && (
+                              request.requestType.includes("New Customer")) && (
                               <div>
                                 <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
                                   Customer
@@ -1497,7 +1508,7 @@ export default function PriceChangeRequestDetailsPage() {
                             },
                             {
                               field: "type",
-                              headerName: "Type",
+                              headerName: "Request Type",
                               flex: 0.5,
                               renderCell: (params) => (
                                 <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#49454f]">

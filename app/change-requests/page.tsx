@@ -49,6 +49,7 @@ interface PriceChangeRequest {
   status: "New" | "In Progress" | "Activated" | "Declined" | "Withdrawn";
   submittedBy: string;
   submittedDate: string;
+  finalizedDate?: string;
   attachments: string[];
   notes?: string;
 }
@@ -122,6 +123,7 @@ class PriceChangeRequestService {
         status: "Activated",
         submittedBy: "Lisa Davis",
         submittedDate: "2024-01-25",
+        finalizedDate: "2024-01-28",
         attachments: ["fuel_analysis.xlsx", "approval_document.pdf"],
       },
       {
@@ -176,6 +178,7 @@ class PriceChangeRequestService {
         status: "Activated",
         submittedBy: "Maria Garcia",
         submittedDate: "2024-02-10",
+        finalizedDate: "2024-02-15",
         attachments: ["emergency_service_agreement.pdf"],
         notes: "Successfully implemented on 2/15/2024",
       },
@@ -479,19 +482,19 @@ export default function PriceChangeRequestsPage() {
     const typeConfig = {
       "New Customer": {
         label: "New Customer",
-        className: "bg-blue-50 text-blue-700 border border-blue-200",
+        className: "bg-gray-50 text-gray-700 border border-gray-200",
       },
       "New Item Pricing": {
         label: "New Item",
-        className: "bg-green-50 text-green-700 border border-green-200",
+        className: "bg-gray-50 text-gray-700 border border-gray-200",
       },
       "Price Increase": {
         label: "Increase",
-        className: "bg-red-50 text-red-700 border border-red-200",
+        className: "bg-gray-50 text-gray-700 border border-gray-200",
       },
       "Price Decrease": {
         label: "Decrease",
-        className: "bg-orange-50 text-orange-700 border border-orange-200",
+        className: "bg-gray-50 text-gray-700 border border-gray-200",
       },
       "Expire Pricing": {
         label: "Expire",
@@ -555,7 +558,7 @@ export default function PriceChangeRequestsPage() {
     },
     {
       field: "requestType",
-      headerName: "Type",
+      headerName: "Request Type",
       width: 120,
       flex: 0,
       renderCell: (params) => getRequestTypeBadge(params.value),
@@ -624,6 +627,27 @@ export default function PriceChangeRequestsPage() {
           {formatDate(params.value)}
         </span>
       ),
+    },
+    {
+      field: "finalizedDate",
+      headerName: "Finalized Date",
+      width: 140,
+      flex: 0,
+      renderCell: (params) => {
+        if (params.row.status === "Activated" && params.value) {
+          return (
+            <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#1c1b1f]">
+              {formatDate(params.value)}
+            </span>
+          );
+        } else {
+          return (
+            <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#bdbdbd] italic">
+              —
+            </span>
+          );
+        }
+      },
     },
     {
       field: "attachments",

@@ -37,18 +37,16 @@ interface PriceChangeRequest {
   requestId: string;
   subject: string;
   description: string;
-  requestType: "Customer" | "Multiple Customers" | "General/Global";
+  requestType:
+    | "New Customer"
+    | "New Item Pricing"
+    | "Price Increase"
+    | "Price Decrease"
+    | "Expire Pricing";
   customerId?: string;
   customerName?: string;
   assignedTo: string;
-  status:
-    | "Draft"
-    | "Submitted"
-    | "In Review"
-    | "Approved"
-    | "In Progress"
-    | "Completed"
-    | "Rejected";
+  status: "New" | "In Progress" | "Activated" | "Declined" | "Withdrawn";
   submittedBy: string;
   submittedDate: string;
   attachments: string[];
@@ -69,7 +67,12 @@ interface CreateRequestModalState {
   isOpen: boolean;
   subject: string;
   description: string;
-  requestType: "Customer" | "Multiple Customers" | "General/Global";
+  requestType:
+    | "New Customer"
+    | "New Item Pricing"
+    | "Price Increase"
+    | "Price Decrease"
+    | "Expire Pricing";
   customerId: string;
   assignedTo: string;
   attachments: File[];
@@ -87,11 +90,11 @@ class PriceChangeRequestService {
         subject: "Annual Rate Increase for Acme Corporation",
         description:
           "Implement 5% annual rate increase across all services for Acme Corporation effective March 1, 2024. This increase aligns with our annual pricing review and market conditions.",
-        requestType: "Customer",
+        requestType: "Price Increase",
         customerId: "CUST-001",
         customerName: "Acme Corporation",
         assignedTo: "Sarah Johnson",
-        status: "In Progress",
+        status: "New",
         submittedBy: "John Smith",
         submittedDate: "2024-01-15",
         attachments: ["rate_increase_proposal.pdf", "customer_approval.pdf"],
@@ -102,9 +105,9 @@ class PriceChangeRequestService {
         subject: "Utah State Contract Pricing Update",
         description:
           "Update pricing structure for all Utah state contracts to reflect new regulatory requirements and competitive market positioning.",
-        requestType: "Multiple Customers",
+        requestType: "Price Increase",
         assignedTo: "David Brown",
-        status: "In Review",
+        status: "In Progress",
         submittedBy: "Mike Wilson",
         submittedDate: "2024-01-20",
         attachments: ["utah_contracts.xlsx", "regulatory_changes.pdf"],
@@ -114,9 +117,9 @@ class PriceChangeRequestService {
         subject: "Global Fuel Surcharge Adjustment",
         description:
           "Implement new fuel surcharge calculation methodology across all customers to better reflect current fuel costs and market volatility.",
-        requestType: "General/Global",
+        requestType: "Price Increase",
         assignedTo: "Michael Chen",
-        status: "Approved",
+        status: "Activated",
         submittedBy: "Lisa Davis",
         submittedDate: "2024-01-25",
         attachments: ["fuel_analysis.xlsx", "approval_document.pdf"],
@@ -126,11 +129,11 @@ class PriceChangeRequestService {
         subject: "Tech Solutions Inc - New Service Pricing",
         description:
           "Create pricing for new hazardous waste disposal service for Tech Solutions Inc. This is a new service offering that requires custom pricing structure.",
-        requestType: "Customer",
+        requestType: "New Item Pricing",
         customerId: "CUST-002",
         customerName: "Tech Solutions Inc",
         assignedTo: "Sarah Johnson",
-        status: "Submitted",
+        status: "New",
         submittedBy: "Robert Taylor",
         submittedDate: "2024-01-30",
         attachments: ["service_specifications.pdf", "pricing_proposal.docx"],
@@ -140,11 +143,11 @@ class PriceChangeRequestService {
         subject: "Environmental Services LLC - Volume Discount",
         description:
           "Implement tiered volume discount structure for Environmental Services LLC based on their increased waste volume projections.",
-        requestType: "Customer",
+        requestType: "Price Decrease",
         customerId: "CUST-005",
         customerName: "Environmental Services LLC",
         assignedTo: "Emily Rodriguez",
-        status: "Draft",
+        status: "Withdrawn",
         submittedBy: "Jennifer Adams",
         submittedDate: "2024-02-01",
         attachments: ["volume_analysis.xlsx"],
@@ -154,9 +157,9 @@ class PriceChangeRequestService {
         subject: "Industry-Wide Compliance Fee Update",
         description:
           "Update compliance fees across all customers to reflect new EPA regulations and increased compliance costs.",
-        requestType: "General/Global",
+        requestType: "Price Increase",
         assignedTo: "Alex Thompson",
-        status: "In Review",
+        status: "Declined",
         submittedBy: "Tom Wilson",
         submittedDate: "2024-02-05",
         attachments: ["epa_regulations.pdf", "cost_analysis.xlsx"],
@@ -166,11 +169,11 @@ class PriceChangeRequestService {
         subject: "Waste Management Corp - Emergency Service Pricing",
         description:
           "Establish emergency response service pricing for Waste Management Corp for after-hours and weekend emergency cleanups.",
-        requestType: "Customer",
+        requestType: "New Item Pricing",
         customerId: "CUST-006",
         customerName: "Waste Management Corp",
         assignedTo: "David Brown",
-        status: "Completed",
+        status: "Activated",
         submittedBy: "Maria Garcia",
         submittedDate: "2024-02-10",
         attachments: ["emergency_service_agreement.pdf"],
@@ -181,11 +184,11 @@ class PriceChangeRequestService {
         subject: "Clean Energy Solutions - Renewable Energy Credit Pricing",
         description:
           "Develop pricing structure for renewable energy credit trading services for Clean Energy Solutions.",
-        requestType: "Customer",
+        requestType: "New Item Pricing",
         customerId: "CUST-007",
         customerName: "Clean Energy Solutions",
         assignedTo: "Michael Chen",
-        status: "Submitted",
+        status: "New",
         submittedBy: "Alex Thompson",
         submittedDate: "2024-02-12",
         attachments: [
@@ -208,7 +211,7 @@ class PriceChangeRequestService {
         Math.floor(Math.random() * 1000)
       ).padStart(3, "0")}`,
       submittedDate: new Date().toISOString().split("T")[0],
-      status: "Draft",
+      status: "New",
     };
 
     console.log("Created new price change request:", newRequest);
@@ -257,7 +260,7 @@ export default function PriceChangeRequestsPage() {
     isOpen: false,
     subject: "",
     description: "",
-    requestType: "Customer",
+    requestType: "New Customer",
     customerId: "",
     assignedTo: "",
     attachments: [],
@@ -339,7 +342,7 @@ export default function PriceChangeRequestsPage() {
       isOpen: true,
       subject: "",
       description: "",
-      requestType: "Customer",
+      requestType: "New Customer",
       customerId: "",
       assignedTo: "",
       attachments: [],
@@ -352,8 +355,8 @@ export default function PriceChangeRequestsPage() {
       return;
     }
 
-    if (createModal.requestType === "Customer" && !createModal.customerId) {
-      toast.error("Please select a customer for customer-specific requests");
+    if (createModal.requestType === "New Customer" && !createModal.customerId) {
+      toast.error("Please select a customer for new customer requests");
       return;
     }
 
@@ -382,7 +385,7 @@ export default function PriceChangeRequestsPage() {
         isOpen: false,
         subject: "",
         description: "",
-        requestType: "Customer",
+        requestType: "New Customer",
         customerId: "",
         assignedTo: "",
         attachments: [],
@@ -398,7 +401,7 @@ export default function PriceChangeRequestsPage() {
       isOpen: false,
       subject: "",
       description: "",
-      requestType: "Customer",
+      requestType: "New Customer",
       customerId: "",
       assignedTo: "",
       attachments: [],
@@ -436,39 +439,31 @@ export default function PriceChangeRequestsPage() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      Draft: {
-        label: "Draft",
-        className: "bg-[rgba(158,158,158,0.1)] text-[#616161]",
-      },
-      Submitted: {
-        label: "Submitted",
-        className: "bg-[rgba(25,118,210,0.1)] text-[#1976d2]",
-      },
-      "In Review": {
-        label: "In Review",
-        className: "bg-[rgba(255,152,0,0.1)] text-[#f57c00]",
-      },
-      Approved: {
-        label: "Approved",
-        className: "bg-[rgba(76,175,80,0.1)] text-[#2e7d32]",
+      New: {
+        label: "New",
+        className: "bg-blue-50 text-blue-700 border border-blue-200",
       },
       "In Progress": {
         label: "In Progress",
-        className: "bg-[rgba(255,111,0,0.1)] text-[#ef6c00]",
+        className: "bg-orange-50 text-orange-700 border border-orange-200",
       },
-      Completed: {
-        label: "Completed",
-        className: "bg-[#65b230] text-white",
+      Activated: {
+        label: "Activated",
+        className: "bg-green-600 text-white border border-green-600",
       },
-      Rejected: {
-        label: "Rejected",
-        className: "bg-[rgba(244,67,54,0.1)] text-[#d32f2f]",
+      Declined: {
+        label: "Declined",
+        className: "bg-red-50 text-red-700 border border-red-200",
+      },
+      Withdrawn: {
+        label: "Withdrawn",
+        className: "bg-gray-50 text-gray-600 border border-gray-200",
       },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || {
       label: status,
-      className: "bg-[rgba(158,158,158,0.1)] text-[#616161]",
+      className: "bg-gray-50 text-gray-600 border border-gray-200",
     };
 
     return (
@@ -482,23 +477,31 @@ export default function PriceChangeRequestsPage() {
 
   const getRequestTypeBadge = (type: string) => {
     const typeConfig = {
-      Customer: {
-        label: "Customer",
-        className: "bg-[rgba(25,118,210,0.1)] text-[#1976d2]",
+      "New Customer": {
+        label: "New Customer",
+        className: "bg-blue-50 text-blue-700 border border-blue-200",
       },
-      "Multiple Customers": {
-        label: "Multiple",
-        className: "bg-[rgba(156,39,176,0.1)] text-[#7b1fa2]",
+      "New Item Pricing": {
+        label: "New Item",
+        className: "bg-green-50 text-green-700 border border-green-200",
       },
-      "General/Global": {
-        label: "Global",
-        className: "bg-[rgba(255,152,0,0.1)] text-[#f57c00]",
+      "Price Increase": {
+        label: "Increase",
+        className: "bg-red-50 text-red-700 border border-red-200",
+      },
+      "Price Decrease": {
+        label: "Decrease",
+        className: "bg-orange-50 text-orange-700 border border-orange-200",
+      },
+      "Expire Pricing": {
+        label: "Expire",
+        className: "bg-gray-50 text-gray-700 border border-gray-200",
       },
     };
 
     const config = typeConfig[type as keyof typeof typeConfig] || {
       label: type,
-      className: "bg-[rgba(158,158,158,0.1)] text-[#616161]",
+      className: "bg-gray-50 text-gray-600 border border-gray-200",
     };
 
     return (
@@ -577,8 +580,8 @@ export default function PriceChangeRequestsPage() {
         } else {
           return (
             <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#bdbdbd] italic">
-              {params.row.requestType === "Multiple Customers"
-                ? "Multiple"
+              {params.row.requestType === "New Customer"
+                ? "New Customer"
                 : "Global"}
             </span>
           );
@@ -754,11 +757,13 @@ export default function PriceChangeRequestsPage() {
                     style={{ fontVariationSettings: "'wdth' 100" }}
                   >
                     <MenuItem value="all">All</MenuItem>
-                    <MenuItem value="Customer">Customer</MenuItem>
-                    <MenuItem value="Multiple Customers">
-                      Multiple Customers
+                    <MenuItem value="New Customer">New Customer</MenuItem>
+                    <MenuItem value="New Item Pricing">
+                      New Item Pricing
                     </MenuItem>
-                    <MenuItem value="General/Global">General/Global</MenuItem>
+                    <MenuItem value="Price Increase">Price Increase</MenuItem>
+                    <MenuItem value="Price Decrease">Price Decrease</MenuItem>
+                    <MenuItem value="Expire Pricing">Expire Pricing</MenuItem>
                   </Select>
                 </FormControl>
               </div>
@@ -780,13 +785,11 @@ export default function PriceChangeRequestsPage() {
                     style={{ fontVariationSettings: "'wdth' 100" }}
                   >
                     <MenuItem value="all">All</MenuItem>
-                    <MenuItem value="Draft">Draft</MenuItem>
-                    <MenuItem value="Submitted">Submitted</MenuItem>
-                    <MenuItem value="In Review">In Review</MenuItem>
-                    <MenuItem value="Approved">Approved</MenuItem>
+                    <MenuItem value="New">New</MenuItem>
                     <MenuItem value="In Progress">In Progress</MenuItem>
-                    <MenuItem value="Completed">Completed</MenuItem>
-                    <MenuItem value="Rejected">Rejected</MenuItem>
+                    <MenuItem value="Activated">Activated</MenuItem>
+                    <MenuItem value="Declined">Declined</MenuItem>
+                    <MenuItem value="Withdrawn">Withdrawn</MenuItem>
                   </Select>
                 </FormControl>
               </div>
@@ -1104,28 +1107,33 @@ export default function PriceChangeRequestsPage() {
                     value={createModal.requestType}
                     onChange={(e) => {
                       const value = e.target.value as
-                        | "Customer"
-                        | "Multiple Customers"
-                        | "General/Global";
+                        | "New Customer"
+                        | "New Item Pricing"
+                        | "Price Increase"
+                        | "Price Decrease"
+                        | "Expire Pricing";
                       setCreateModal((prev) => ({
                         ...prev,
                         requestType: value,
-                        customerId: value !== "Customer" ? "" : prev.customerId,
+                        customerId:
+                          value !== "New Customer" ? "" : prev.customerId,
                       }));
                     }}
                     label="Request Type *"
                     style={{ fontVariationSettings: "'wdth' 100" }}
                   >
-                    <MenuItem value="Customer">Customer</MenuItem>
-                    <MenuItem value="Multiple Customers">
-                      Multiple Customers
+                    <MenuItem value="New Customer">New Customer</MenuItem>
+                    <MenuItem value="New Item Pricing">
+                      New Item Pricing
                     </MenuItem>
-                    <MenuItem value="General/Global">General/Global</MenuItem>
+                    <MenuItem value="Price Increase">Price Increase</MenuItem>
+                    <MenuItem value="Price Decrease">Price Decrease</MenuItem>
+                    <MenuItem value="Expire Pricing">Expire Pricing</MenuItem>
                   </Select>
                 </FormControl>
 
-                {/* Customer (only show if Request Type is Customer) */}
-                {createModal.requestType === "Customer" && (
+                {/* Customer (only show if Request Type is New Customer) */}
+                {createModal.requestType === "New Customer" && (
                   <FormControl variant="outlined" fullWidth>
                     <InputLabel id="create-customer-label">
                       Customer *

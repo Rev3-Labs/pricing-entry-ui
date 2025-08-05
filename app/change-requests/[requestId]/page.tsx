@@ -13,7 +13,14 @@ import {
   DialogContent,
   DialogActions,
   Button as MuiButton,
+  ButtonGroup,
+  ClickAwayListener,
+  Grow,
+  Paper,
+  Popper,
+  MenuList,
 } from "@mui/material";
+import { DataGrid, GridColDef } from "@mui/x-data-grid";
 
 import {
   ArrowLeft,
@@ -32,6 +39,7 @@ import {
   Upload,
   X,
   MessageSquare,
+  ChevronDown,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
@@ -41,18 +49,16 @@ interface PriceChangeRequest {
   requestId: string;
   subject: string;
   description: string;
-  requestType: "Customer" | "Multiple Customers" | "General/Global";
+  requestType:
+    | "New Customer"
+    | "New Item Pricing"
+    | "Price Increase"
+    | "Price Decrease"
+    | "Expire Pricing";
   customerId?: string;
   customerName?: string;
   assignedTo: string;
-  status:
-    | "Draft"
-    | "Submitted"
-    | "In Review"
-    | "Approved"
-    | "In Progress"
-    | "Completed"
-    | "Rejected";
+  status: "New" | "In Progress" | "Activated" | "Declined" | "Withdrawn";
   submittedBy: string;
   submittedDate: string;
   attachments: string[];
@@ -71,18 +77,16 @@ interface EditModeState {
   isEditing: boolean;
   subject: string;
   description: string;
-  requestType: "Customer" | "Multiple Customers" | "General/Global";
+  requestType:
+    | "New Customer"
+    | "New Item Pricing"
+    | "Price Increase"
+    | "Price Decrease"
+    | "Expire Pricing";
   customerId: string;
   customerName: string;
   assignedTo: string;
-  status:
-    | "Draft"
-    | "Submitted"
-    | "In Review"
-    | "Approved"
-    | "In Progress"
-    | "Completed"
-    | "Rejected";
+  status: "New" | "In Progress" | "Activated" | "Declined" | "Withdrawn";
 }
 
 interface Note {
@@ -116,7 +120,7 @@ class PriceChangeRequestService {
         subject: "Annual Rate Increase for Acme Corporation",
         description:
           "Implement 5% annual rate increase across all services for Acme Corporation effective March 1, 2024. This increase aligns with our annual pricing review and market conditions. The increase will apply to all current service contracts and new contracts signed after the effective date. Customer has been notified of the pending increase and has provided preliminary approval.",
-        requestType: "Customer",
+        requestType: "Price Increase",
         customerId: "CUST-001",
         customerName: "Acme Corporation",
         assignedTo: "Sarah Johnson",
@@ -210,9 +214,9 @@ class PriceChangeRequestService {
         subject: "Utah State Contract Pricing Update",
         description:
           "Update pricing structure for all Utah state contracts to reflect new regulatory requirements and competitive market positioning. This affects 15 different state agencies and requires coordination with the Utah Department of Environmental Quality. The changes include new compliance fees and updated service rates.",
-        requestType: "Multiple Customers",
+        requestType: "Price Increase",
         assignedTo: "David Brown",
-        status: "In Review",
+        status: "In Progress",
         submittedBy: "Mike Wilson",
         submittedDate: "2024-01-20",
         attachments: [
@@ -268,9 +272,9 @@ class PriceChangeRequestService {
         subject: "Global Fuel Surcharge Adjustment",
         description:
           "Implement new fuel surcharge calculation methodology across all customers to better reflect current fuel costs and market volatility. This will replace the current flat-rate surcharge with a dynamic calculation based on current diesel fuel prices and will be updated monthly.",
-        requestType: "General/Global",
+        requestType: "Price Increase",
         assignedTo: "Michael Chen",
-        status: "Approved",
+        status: "Activated",
         submittedBy: "Lisa Davis",
         submittedDate: "2024-01-25",
         attachments: [
@@ -402,17 +406,19 @@ export default function PriceChangeRequestDetailsPage() {
     isEditing: false,
     subject: "",
     description: "",
-    requestType: "Customer",
+    requestType: "New Customer",
     customerId: "",
     customerName: "",
     assignedTo: "",
-    status: "Draft",
+    status: "New",
   });
   const [newNote, setNewNote] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [isUpdatingRequest, setIsUpdatingRequest] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const statusMenuAnchorRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadRequest = async () => {
@@ -464,6 +470,31 @@ export default function PriceChangeRequestDetailsPage() {
         notes: "",
       });
     }
+  };
+
+  const handleStatusMenuToggle = () => {
+    setStatusMenuOpen((prevOpen) => !prevOpen);
+  };
+
+  const handleStatusMenuClose = (event: Event) => {
+    if (
+      statusMenuAnchorRef.current &&
+      statusMenuAnchorRef.current.contains(event.target as HTMLElement)
+    ) {
+      return;
+    }
+    setStatusMenuOpen(false);
+  };
+
+  const handleStatusOptionClick = (newStatus: string) => {
+    if (request && newStatus !== request.status) {
+      setStatusUpdateModal({
+        isOpen: true,
+        newStatus: newStatus,
+        notes: "",
+      });
+    }
+    setStatusMenuOpen(false);
   };
 
   const handleStatusUpdate = async () => {
@@ -569,12 +600,8 @@ export default function PriceChangeRequestDetailsPage() {
         subject: editMode.subject,
         description: editMode.description,
         requestType: editMode.requestType,
-        customerId:
-          editMode.requestType === "Customer" ? editMode.customerId : undefined,
-        customerName:
-          editMode.requestType === "Customer"
-            ? editMode.customerName
-            : undefined,
+        customerId: editMode.customerId || undefined,
+        customerName: editMode.customerName || undefined,
         assignedTo: editMode.assignedTo,
       };
 
@@ -602,29 +629,11 @@ export default function PriceChangeRequestDetailsPage() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      Draft: {
-        label: "Draft",
-        className: "text-[#63666a]",
-        bgColor: "bg-[rgba(99,102,106,0.1)]",
-        icon: Clock,
-      },
-      Submitted: {
-        label: "Submitted",
+      New: {
+        label: "New",
         className: "text-[#1976d2]",
         bgColor: "bg-[rgba(25,118,210,0.1)]",
-        icon: Send,
-      },
-      "In Review": {
-        label: "In Review",
-        className: "text-[#ed6c02]",
-        bgColor: "bg-[rgba(237,108,2,0.1)]",
-        icon: AlertCircle,
-      },
-      Approved: {
-        label: "Approved",
-        className: "text-[#2e7d32]",
-        bgColor: "bg-[rgba(46,125,50,0.1)]",
-        icon: CheckCircle,
+        icon: Clock,
       },
       "In Progress": {
         label: "In Progress",
@@ -632,17 +641,23 @@ export default function PriceChangeRequestDetailsPage() {
         bgColor: "bg-[rgba(237,108,2,0.1)]",
         icon: Clock,
       },
-      Completed: {
-        label: "Completed",
+      Activated: {
+        label: "Activated",
         className: "text-[#2e7d32]",
         bgColor: "bg-[rgba(46,125,50,0.1)]",
         icon: CheckCircle,
       },
-      Rejected: {
-        label: "Rejected",
+      Declined: {
+        label: "Declined",
         className: "text-[#d32f2f]",
         bgColor: "bg-[rgba(211,47,47,0.1)]",
         icon: XCircle,
+      },
+      Withdrawn: {
+        label: "Withdrawn",
+        className: "text-[#63666a]",
+        bgColor: "bg-[rgba(99,102,106,0.1)]",
+        icon: AlertCircle,
       },
     };
 
@@ -669,20 +684,30 @@ export default function PriceChangeRequestDetailsPage() {
 
   const getRequestTypeBadge = (type: string) => {
     const typeConfig = {
-      Customer: {
-        label: "Customer",
+      "New Customer": {
+        label: "New Customer",
         className: "text-[#1976d2]",
         bgColor: "bg-[rgba(25,118,210,0.1)]",
       },
-      "Multiple Customers": {
-        label: "Multiple",
-        className: "text-[#7b1fa2]",
-        bgColor: "bg-[rgba(123,31,162,0.1)]",
+      "New Item Pricing": {
+        label: "New Item",
+        className: "text-[#2e7d32]",
+        bgColor: "bg-[rgba(46,125,50,0.1)]",
       },
-      "General/Global": {
-        label: "Global",
+      "Price Increase": {
+        label: "Increase",
+        className: "text-[#d32f2f]",
+        bgColor: "bg-[rgba(211,47,47,0.1)]",
+      },
+      "Price Decrease": {
+        label: "Decrease",
         className: "text-[#ed6c02]",
         bgColor: "bg-[rgba(237,108,2,0.1)]",
+      },
+      "Expire Pricing": {
+        label: "Expire",
+        className: "text-[#63666a]",
+        bgColor: "bg-[rgba(99,102,106,0.1)]",
       },
     };
 
@@ -822,7 +847,7 @@ export default function PriceChangeRequestDetailsPage() {
                   </div>
 
                   {/* Metadata Rows */}
-                  <div className="flex gap-8">
+                  <div className="flex gap-8 items-center">
                     <div className="flex gap-2 place-items-center">
                       <User className="h-4 w-4 text-[#63666a]" />
 
@@ -841,6 +866,159 @@ export default function PriceChangeRequestDetailsPage() {
                           {formatDateShort(request.submittedDate)}
                         </span>
                       </div>
+                    </div>
+
+                    {/* Status Split Button */}
+                    <div className="flex-shrink-0">
+                      <ButtonGroup
+                        variant="contained"
+                        ref={statusMenuAnchorRef}
+                        aria-label="split button"
+                        style={{
+                          backgroundColor: (() => {
+                            switch (request.status) {
+                              case "New":
+                                return "#1976d2";
+                              case "In Progress":
+                                return "#ed6c02";
+                              case "Activated":
+                                return "#2e7d32";
+                              case "Declined":
+                                return "#d32f2f";
+                              case "Withdrawn":
+                                return "#63666a";
+                              default:
+                                return "#65b230";
+                            }
+                          })(),
+                          borderRadius: "100px",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <MuiButton
+                          onClick={handleStatusClick}
+                          style={{
+                            backgroundColor: (() => {
+                              switch (request.status) {
+                                case "New":
+                                  return "#1976d2";
+                                case "In Progress":
+                                  return "#ed6c02";
+                                case "Activated":
+                                  return "#2e7d32";
+                                case "Declined":
+                                  return "#d32f2f";
+                                case "Withdrawn":
+                                  return "#63666a";
+                                default:
+                                  return "#65b230";
+                              }
+                            })(),
+                            color: "white",
+                            fontFamily: "Roboto, sans-serif",
+                            fontWeight: 500,
+                            fontSize: "14px",
+                            lineHeight: "21px",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.1px",
+                            border: "none",
+                            padding: "8px 16px",
+                            minWidth: "120px",
+                          }}
+                        >
+                          <span className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-white">
+                            {request.status}
+                          </span>
+                        </MuiButton>
+                        <MuiButton
+                          size="small"
+                          onClick={handleStatusMenuToggle}
+                          aria-controls={
+                            statusMenuOpen ? "split-button-menu" : undefined
+                          }
+                          aria-expanded={statusMenuOpen ? "true" : undefined}
+                          aria-label="select status"
+                          aria-haspopup="menu"
+                          style={{
+                            backgroundColor: (() => {
+                              switch (request.status) {
+                                case "New":
+                                  return "#1976d2";
+                                case "In Progress":
+                                  return "#ed6c02";
+                                case "Activated":
+                                  return "#2e7d32";
+                                case "Declined":
+                                  return "#d32f2f";
+                                case "Withdrawn":
+                                  return "#63666a";
+                                default:
+                                  return "#65b230";
+                              }
+                            })(),
+                            color: "white",
+                            border: "none",
+                            padding: "8px 8px",
+                            minWidth: "32px",
+                          }}
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </MuiButton>
+                      </ButtonGroup>
+                      <Popper
+                        sx={{
+                          zIndex: 1,
+                        }}
+                        open={statusMenuOpen}
+                        anchorEl={statusMenuAnchorRef.current}
+                        role={undefined}
+                        transition
+                        disablePortal
+                      >
+                        {({ TransitionProps, placement }) => (
+                          <Grow
+                            {...TransitionProps}
+                            style={{
+                              transformOrigin:
+                                placement === "bottom"
+                                  ? "center top"
+                                  : "center bottom",
+                            }}
+                          >
+                            <Paper>
+                              <ClickAwayListener
+                                onClickAway={handleStatusMenuClose}
+                              >
+                                <MenuList id="split-button-menu" autoFocusItem>
+                                  {[
+                                    "New",
+                                    "In Progress",
+                                    "Activated",
+                                    "Declined",
+                                    "Withdrawn",
+                                  ].map((status) => (
+                                    <MenuItem
+                                      key={status}
+                                      onClick={() =>
+                                        handleStatusOptionClick(status)
+                                      }
+                                      selected={status === request.status}
+                                      style={{
+                                        fontFamily: "Roboto, sans-serif",
+                                        fontWeight: 400,
+                                        fontSize: "14px",
+                                        lineHeight: "21px",
+                                      }}
+                                    >
+                                      {getStatusBadge(status)}
+                                    </MenuItem>
+                                  ))}
+                                </MenuList>
+                              </ClickAwayListener>
+                            </Paper>
+                          </Grow>
+                        )}
+                      </Popper>
                     </div>
                   </div>
                 </div>
@@ -919,8 +1097,7 @@ export default function PriceChangeRequestDetailsPage() {
                                 !editMode.subject.trim() ||
                                 !editMode.description.trim() ||
                                 !editMode.assignedTo.trim() ||
-                                (editMode.requestType === "Customer" &&
-                                  !editMode.customerId.trim())
+                                false
                               }
                               variant="contained"
                               style={{
@@ -982,9 +1159,11 @@ export default function PriceChangeRequestDetailsPage() {
                                     setEditMode((prev) => ({
                                       ...prev,
                                       requestType: e.target.value as
-                                        | "Customer"
-                                        | "Multiple Customers"
-                                        | "General/Global",
+                                        | "New Customer"
+                                        | "New Item Pricing"
+                                        | "Price Increase"
+                                        | "Price Decrease"
+                                        | "Expire Pricing",
                                     }))
                                   }
                                   label="Request Type *"
@@ -992,59 +1171,88 @@ export default function PriceChangeRequestDetailsPage() {
                                     fontVariationSettings: "'wdth' 100",
                                   }}
                                 >
-                                  <MenuItem value="Customer">Customer</MenuItem>
-                                  <MenuItem value="Multiple Customers">
-                                    Multiple Customers
+                                  <MenuItem value="New Customer">
+                                    New Customer
                                   </MenuItem>
-                                  <MenuItem value="General/Global">
-                                    General/Global
+                                  <MenuItem value="New Item Pricing">
+                                    New Item Pricing
+                                  </MenuItem>
+                                  <MenuItem value="Price Increase">
+                                    Price Increase
+                                  </MenuItem>
+                                  <MenuItem value="Price Decrease">
+                                    Price Decrease
+                                  </MenuItem>
+                                  <MenuItem value="Expire Pricing">
+                                    Expire Pricing
                                   </MenuItem>
                                 </Select>
                               </FormControl>
                             </div>
 
-                            {editMode.requestType === "Customer" && (
-                              <div>
-                                <FormControl variant="outlined" fullWidth>
-                                  <InputLabel id="edit-customer-label">
-                                    Customer *
-                                  </InputLabel>
-                                  <Select
-                                    labelId="edit-customer-label"
-                                    value={editMode.customerId}
-                                    onChange={(e) => {
-                                      const value = e.target.value as string;
-                                      setEditMode((prev) => ({
-                                        ...prev,
-                                        customerId: value,
-                                        customerName:
-                                          value === "CUST-001"
-                                            ? "Acme Corporation"
-                                            : value === "CUST-002"
-                                            ? "Tech Solutions Inc"
-                                            : value === "CUST-003"
-                                            ? "Utah State Agencies"
-                                            : "",
-                                      }));
-                                    }}
-                                    label="Customer *"
-                                    style={{
-                                      fontVariationSettings: "'wdth' 100",
-                                    }}
-                                  >
-                                    <MenuItem value="CUST-001">
-                                      Acme Corporation
-                                    </MenuItem>
-                                    <MenuItem value="CUST-002">
-                                      Tech Solutions Inc
-                                    </MenuItem>
-                                    <MenuItem value="CUST-003">
-                                      Utah State Agencies (Inactive)
-                                    </MenuItem>
-                                  </Select>
-                                </FormControl>
-                              </div>
-                            )}
+                            <div>
+                              <FormControl variant="outlined" fullWidth>
+                                <InputLabel id="edit-customer-label">
+                                  Customer
+                                </InputLabel>
+                                <Select
+                                  labelId="edit-customer-label"
+                                  value={editMode.customerId}
+                                  onChange={(e) => {
+                                    const value = e.target.value as string;
+                                    setEditMode((prev) => ({
+                                      ...prev,
+                                      customerId: value,
+                                      customerName:
+                                        value === "CUST-001"
+                                          ? "Acme Corporation"
+                                          : value === "CUST-002"
+                                          ? "Tech Solutions Inc"
+                                          : value === "CUST-003"
+                                          ? "Utah State Agencies"
+                                          : value === "CUST-004"
+                                          ? "Industrial Cleanup Ltd"
+                                          : value === "CUST-005"
+                                          ? "Environmental Services LLC"
+                                          : value === "CUST-006"
+                                          ? "Waste Management Corp"
+                                          : value === "CUST-007"
+                                          ? "Clean Energy Solutions"
+                                          : "",
+                                    }));
+                                  }}
+                                  label="Customer"
+                                  style={{
+                                    fontVariationSettings: "'wdth' 100",
+                                  }}
+                                >
+                                  <MenuItem value="">
+                                    <em>No customer (Global request)</em>
+                                  </MenuItem>
+                                  <MenuItem value="CUST-001">
+                                    Acme Corporation
+                                  </MenuItem>
+                                  <MenuItem value="CUST-002">
+                                    Tech Solutions Inc
+                                  </MenuItem>
+                                  <MenuItem value="CUST-003">
+                                    Utah State Agencies (Inactive)
+                                  </MenuItem>
+                                  <MenuItem value="CUST-004">
+                                    Industrial Cleanup Ltd
+                                  </MenuItem>
+                                  <MenuItem value="CUST-005">
+                                    Environmental Services LLC
+                                  </MenuItem>
+                                  <MenuItem value="CUST-006">
+                                    Waste Management Corp (Inactive)
+                                  </MenuItem>
+                                  <MenuItem value="CUST-007">
+                                    Clean Energy Solutions
+                                  </MenuItem>
+                                </Select>
+                              </FormControl>
+                            </div>
 
                             <div>
                               <FormControl variant="outlined" fullWidth>
@@ -1130,7 +1338,8 @@ export default function PriceChangeRequestDetailsPage() {
                                 {getRequestTypeBadge(request.requestType)}
                               </div>
                             </div>
-                            {request.customerName && (
+                            {(request.customerName ||
+                              request.requestType === "New Customer") && (
                               <div>
                                 <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
                                   Customer
@@ -1193,10 +1402,35 @@ export default function PriceChangeRequestDetailsPage() {
                     </div>
                     <div className="p-6">
                       {/* Upload Section */}
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                        <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600 mb-2">
-                          Upload additional documents to this request
+                      <div
+                        className="border-2 border-dashed rounded-lg p-8 text-center"
+                        style={{
+                          backgroundColor: "rgba(101, 178, 48, 0.05)",
+                          borderColor: "#65b230",
+                        }}
+                      >
+                        <Upload className="h-8 w-8 text-[#65b230] mx-auto mb-4" />
+                        <p
+                          className="text-base font-medium text-[#1c1b1f] mb-2"
+                          style={{
+                            fontFamily: "Roboto, sans-serif",
+                            fontWeight: 500,
+                            fontSize: "16px",
+                            lineHeight: "24px",
+                          }}
+                        >
+                          Drop your file(s) here or click to browse
+                        </p>
+                        <p
+                          className="text-sm text-[#49454f] mb-4"
+                          style={{
+                            fontFamily: "Roboto, sans-serif",
+                            fontWeight: 400,
+                            fontSize: "14px",
+                            lineHeight: "20px",
+                          }}
+                        >
+                          Supported formats: .pdf, .xlsx, .xls, .csv
                         </p>
                         <input
                           type="file"
@@ -1204,14 +1438,16 @@ export default function PriceChangeRequestDetailsPage() {
                           disabled={isUploadingDocument}
                           className="hidden"
                           id="document-upload"
+                          accept=".pdf,.xlsx,.xls,.csv"
                         />
                         <MuiButton
                           component="label"
                           htmlFor="document-upload"
                           variant="contained"
                           disabled={isUploadingDocument}
+                          startIcon={<Upload className="h-4 w-4" />}
                           style={{
-                            backgroundColor: "#1976d2",
+                            backgroundColor: "#65b230",
                             color: "white",
                             fontFamily: "Roboto, sans-serif",
                             fontWeight: 500,
@@ -1220,63 +1456,136 @@ export default function PriceChangeRequestDetailsPage() {
                             textTransform: "uppercase",
                             letterSpacing: "0.1px",
                             borderRadius: "100px",
+                            padding: "8px 16px",
+                            minWidth: "140px",
                           }}
                         >
-                          {isUploadingDocument ? "Uploading..." : "Choose File"}
+                          {isUploadingDocument
+                            ? "Uploading..."
+                            : "Select Document"}
                         </MuiButton>
                       </div>
 
-                      {/* Documents List */}
-                      {request.documents && request.documents.length > 0 ? (
-                        <div className="space-y-2">
-                          {request.documents.map((document) => (
-                            <div
-                              key={document.id}
-                              className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-                            >
-                              <div className="flex items-center space-x-3">
-                                <FileText className="h-5 w-5 text-gray-500" />
-                                <div className="flex-1">
-                                  <div className="flex items-center space-x-2">
-                                    <span className="font-medium text-gray-900">
-                                      {document.name}
-                                    </span>
-                                    {document.type === "attachment" && (
-                                      <span className="inline-flex items-center bg-[rgba(158,158,158,0.1)] text-[#616161] rounded-full px-2 py-1 text-xs font-['Roboto:Medium',_sans-serif] font-medium">
-                                        Original
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-sm text-gray-500">
-                                    {document.size} • {document.uploadedBy} •{" "}
-                                    {formatDateShort(document.uploadedAt)}
-                                  </div>
+                      {/* Documents Data Grid */}
+                      <div style={{ width: "100%", marginTop: "20px" }}>
+                        <DataGrid
+                          rows={
+                            request.documents?.map((doc, index) => ({
+                              id: doc.id,
+                              name: doc.name,
+                              type:
+                                doc.type === "attachment"
+                                  ? "Original"
+                                  : "Uploaded",
+                              uploadDate: formatDateShort(doc.uploadedAt),
+                              actions: doc.id,
+                            })) || []
+                          }
+                          columns={[
+                            {
+                              field: "name",
+                              headerName: "Document Name",
+                              flex: 1,
+                              renderCell: (params) => (
+                                <div className="flex items-center">
+                                  <FileText className="h-4 w-4 text-[#65b230] mr-2" />
+                                  <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#1c1b1f] truncate">
+                                    {params.value}
+                                  </span>
                                 </div>
+                              ),
+                            },
+                            {
+                              field: "type",
+                              headerName: "Type",
+                              flex: 0.5,
+                              renderCell: (params) => (
+                                <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#49454f]">
+                                  {params.value}
+                                </span>
+                              ),
+                            },
+                            {
+                              field: "uploadDate",
+                              headerName: "Upload Date",
+                              flex: 0.5,
+                              renderCell: (params) => (
+                                <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#49454f]">
+                                  {params.value}
+                                </span>
+                              ),
+                            },
+                            {
+                              field: "actions",
+                              headerName: "Actions",
+                              flex: 0.5,
+                              sortable: false,
+                              renderCell: (params) => (
+                                <div className="flex items-center space-x-2">
+                                  <MuiButton
+                                    variant="text"
+                                    size="small"
+                                    style={{
+                                      color: "#49454f",
+                                      minWidth: "auto",
+                                      padding: "4px",
+                                    }}
+                                  >
+                                    <Download className="h-4 w-4" />
+                                  </MuiButton>
+                                  <MuiButton
+                                    variant="text"
+                                    size="small"
+                                    style={{
+                                      color: "#49454f",
+                                      minWidth: "auto",
+                                      padding: "4px",
+                                    }}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </MuiButton>
+                                </div>
+                              ),
+                            },
+                          ]}
+                          getRowId={(row) => row.id}
+                          autoHeight={true}
+                          density="standard"
+                          sx={{
+                            "& .MuiDataGrid-cell": {
+                              fontSize: "0.875rem",
+                              padding: "12px 16px",
+                              display: "flex",
+                              alignItems: "center",
+                            },
+                            "& .MuiDataGrid-columnHeader": {
+                              fontSize: "0.875rem",
+                              padding: "12px 16px",
+                              backgroundColor: "#E0E0E0",
+                              borderBottom: "2px solid #65B230 !important",
+                            },
+                            "& .MuiDataGrid-columnHeaders": {
+                              borderBottom: "2px solid #65B230 !important",
+                            },
+                            "& .MuiDataGrid-row:hover": {
+                              backgroundColor: "#f5f5f5",
+                            },
+                            border: "1px solid #b9b9b9",
+                            borderRadius: "4px",
+                          }}
+                          disableRowSelectionOnClick={true}
+                          disableColumnMenu={true}
+                          slots={{
+                            noRowsOverlay: () => (
+                              <div className="flex items-center justify-center h-32">
+                                <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#bdbdbd] italic">
+                                  No records to display.
+                                </span>
                               </div>
-                              <MuiButton
-                                variant="outlined"
-                                size="small"
-                                style={{
-                                  borderColor: "#b9b9b9",
-                                  color: "#1c1b1f",
-                                  fontFamily: "Roboto, sans-serif",
-                                  fontWeight: 500,
-                                  fontSize: "14px",
-                                  lineHeight: "21px",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.1px",
-                                }}
-                              >
-                                <Download className="h-4 w-4" />
-                              </MuiButton>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-gray-500 italic text-center py-4">
-                          No documents available
-                        </p>
-                      )}
+                            ),
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1407,18 +1716,59 @@ export default function PriceChangeRequestDetailsPage() {
         onClose={() =>
           setStatusUpdateModal((prev) => ({ ...prev, isOpen: false }))
         }
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          style: {
+            borderRadius: "8px",
+            boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.15)",
+          },
+        }}
       >
-        <DialogTitle>Update Request Status</DialogTitle>
-        <DialogContent>
-          <p className="text-sm text-gray-600 mb-4">
+        <DialogTitle
+          style={{
+            fontFamily: "Roboto, sans-serif",
+            fontWeight: 600,
+            fontSize: "18px",
+            lineHeight: "24px",
+            color: "#1c1b1f",
+            padding: "24px 24px 8px 24px",
+            borderBottom: "1px solid #e0e0e0",
+          }}
+        >
+          Update Request Status
+        </DialogTitle>
+        <DialogContent style={{ padding: "24px" }}>
+          <p
+            style={{
+              fontFamily: "Roboto, sans-serif",
+              fontWeight: 400,
+              fontSize: "14px",
+              lineHeight: "20px",
+              color: "#666666",
+              marginBottom: "24px",
+            }}
+          >
             Update the status of this price change request and add any relevant
             notes.
           </p>
 
-          <div className="space-y-4">
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+          >
             <div>
               <FormControl variant="outlined" fullWidth>
-                <InputLabel id="status-update-label">New Status</InputLabel>
+                <InputLabel
+                  id="status-update-label"
+                  style={{
+                    fontFamily: "Roboto, sans-serif",
+                    fontWeight: 400,
+                    fontSize: "14px",
+                    lineHeight: "20px",
+                  }}
+                >
+                  New Status
+                </InputLabel>
                 <Select
                   labelId="status-update-label"
                   value={statusUpdateModal.newStatus}
@@ -1429,15 +1779,19 @@ export default function PriceChangeRequestDetailsPage() {
                     }))
                   }
                   label="New Status"
-                  style={{ fontVariationSettings: "'wdth' 100" }}
+                  style={{
+                    fontVariationSettings: "'wdth' 100",
+                    fontFamily: "Roboto, sans-serif",
+                    fontWeight: 400,
+                    fontSize: "14px",
+                    lineHeight: "20px",
+                  }}
                 >
-                  <MenuItem value="Draft">Draft</MenuItem>
-                  <MenuItem value="Submitted">Submitted</MenuItem>
-                  <MenuItem value="In Review">In Review</MenuItem>
-                  <MenuItem value="Approved">Approved</MenuItem>
+                  <MenuItem value="New">New</MenuItem>
                   <MenuItem value="In Progress">In Progress</MenuItem>
-                  <MenuItem value="Completed">Completed</MenuItem>
-                  <MenuItem value="Rejected">Rejected</MenuItem>
+                  <MenuItem value="Activated">Activated</MenuItem>
+                  <MenuItem value="Declined">Declined</MenuItem>
+                  <MenuItem value="Withdrawn">Withdrawn</MenuItem>
                 </Select>
               </FormControl>
             </div>
@@ -1460,13 +1814,31 @@ export default function PriceChangeRequestDetailsPage() {
                 InputProps={{
                   style: {
                     fontVariationSettings: "'wdth' 100",
+                    fontFamily: "Roboto, sans-serif",
+                    fontWeight: 400,
+                    fontSize: "14px",
+                    lineHeight: "20px",
+                  },
+                }}
+                InputLabelProps={{
+                  style: {
+                    fontFamily: "Roboto, sans-serif",
+                    fontWeight: 400,
+                    fontSize: "14px",
+                    lineHeight: "20px",
                   },
                 }}
               />
             </div>
           </div>
         </DialogContent>
-        <DialogActions>
+        <DialogActions
+          style={{
+            padding: "16px 24px 24px 24px",
+            gap: "12px",
+            justifyContent: "flex-end",
+          }}
+        >
           <MuiButton
             onClick={() =>
               setStatusUpdateModal({
@@ -1475,15 +1847,19 @@ export default function PriceChangeRequestDetailsPage() {
                 notes: "",
               })
             }
+            variant="outlined"
             style={{
-              borderColor: "#b9b9b9",
-              color: "#1c1b1f",
+              borderColor: "#65b230",
+              color: "#65b230",
               fontFamily: "Roboto, sans-serif",
               fontWeight: 500,
               fontSize: "14px",
               lineHeight: "21px",
               textTransform: "uppercase",
               letterSpacing: "0.1px",
+              borderRadius: "100px",
+              padding: "8px 16px",
+              minWidth: "80px",
             }}
           >
             Cancel
@@ -1501,6 +1877,9 @@ export default function PriceChangeRequestDetailsPage() {
               lineHeight: "21px",
               textTransform: "uppercase",
               letterSpacing: "0.1px",
+              borderRadius: "100px",
+              padding: "8px 16px",
+              minWidth: "120px",
             }}
           >
             {isUpdatingStatus ? "Updating..." : "Update Status"}

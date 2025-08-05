@@ -992,13 +992,7 @@ export default function PriceChangeRequestDetailsPage() {
                                 onClickAway={handleStatusMenuClose}
                               >
                                 <MenuList id="split-button-menu" autoFocusItem>
-                                  {[
-                                    "New",
-                                    "In Progress",
-                                    "Activated",
-                                    "Declined",
-                                    "Withdrawn",
-                                  ].map((status) => (
+                                  {["Declined", "Withdrawn"].map((status) => (
                                     <MenuItem
                                       key={status}
                                       onClick={() =>
@@ -1798,9 +1792,6 @@ export default function PriceChangeRequestDetailsPage() {
                     lineHeight: "20px",
                   }}
                 >
-                  <MenuItem value="New">New</MenuItem>
-                  <MenuItem value="In Progress">In Progress</MenuItem>
-                  <MenuItem value="Activated">Activated</MenuItem>
                   <MenuItem value="Declined">Declined</MenuItem>
                   <MenuItem value="Withdrawn">Withdrawn</MenuItem>
                 </Select>

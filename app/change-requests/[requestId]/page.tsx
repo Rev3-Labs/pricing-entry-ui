@@ -126,7 +126,7 @@ class PriceChangeRequestService {
         customerId: "CUST-001",
         customerName: "Acme Corporation",
         assignedTo: "Sarah Johnson",
-        status: "In Progress",
+        status: "New",
         submittedBy: "John Smith",
         submittedDate: "2024-01-15",
         attachments: [

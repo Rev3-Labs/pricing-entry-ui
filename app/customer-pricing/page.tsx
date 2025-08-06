@@ -24,6 +24,13 @@ import {
   FormLabel,
   Divider,
   IconButton,
+  Button as MuiButton,
+  ButtonGroup,
+  ClickAwayListener,
+  Grow,
+  Paper,
+  Popper,
+  MenuList,
 } from "@mui/material";
 import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
 import { DataGrid, GridColDef, GridRowSelectionModel } from "@mui/x-data-grid";
@@ -51,6 +58,8 @@ import {
   Check,
   PenSquare,
   RotateCcw,
+  ChevronDown,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -187,6 +196,13 @@ export default function AllCustomerPricingPage() {
   useEffect(() => {
     setFilters((prev) => ({ ...prev, showModifiedOnly: false }));
   }, []);
+
+  // State for split button menu
+  const [submitMenuOpen, setSubmitMenuOpen] = useState(false);
+  const submitMenuAnchorRef = React.useRef<HTMLDivElement>(null);
+
+  // State for delete confirmation dialog
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // State for row editing
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
@@ -1043,6 +1059,86 @@ export default function AllCustomerPricingPage() {
     setSubmitPriceChangeConfirmOpen(false);
   };
 
+  // Split button handlers
+  const handleSubmitMenuToggle = () => {
+    setSubmitMenuOpen((prevOpen) => !prevOpen);
+  };
+
+  const handleSubmitMenuClose = (event: Event) => {
+    if (
+      submitMenuAnchorRef.current &&
+      submitMenuAnchorRef.current.contains(event.target as HTMLElement)
+    ) {
+      return;
+    }
+    setSubmitMenuOpen(false);
+  };
+
+  const handleSubmitOptionClick = (action: "submit" | "draft") => {
+    if (action === "submit") {
+      handleSubmitPriceChange();
+    } else if (action === "draft") {
+      handleSaveAsDraft();
+    }
+    setSubmitMenuOpen(false);
+  };
+
+  const handleSaveAsDraft = () => {
+    const totalChanges =
+      (newRows ? newRows.size : 0) + (modifiedRows ? modifiedRows.size : 0);
+
+    // TODO: Implement actual draft saving logic here
+    // This would typically involve:
+    // 1. Saving changes to a draft state
+    // 2. Sending data to backend API for draft storage
+    // 3. Handling success/error responses
+
+    toast.success(
+      `Successfully saved draft with ${totalChanges} modified entries`
+    );
+
+    // Note: Don't reset edit mode for drafts - user can continue editing
+    setSubmitPriceChangeConfirmOpen(false);
+  };
+
+  // Delete handlers
+  const handleDeleteSelected = () => {
+    const selectedIds = getSelectedRowIds();
+    if (selectedIds.length === 0) {
+      toast.error("No rows selected for deletion");
+      return;
+    }
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    const selectedIds = getSelectedRowIds();
+
+    // TODO: Implement actual deletion logic here
+    // This would typically involve:
+    // 1. Validating deletion permissions
+    // 2. Sending delete requests to backend API
+    // 3. Handling success/error responses
+
+    // For now, we'll just remove the items from the local state
+    setAllPricingData((prev) => ({
+      ...prev,
+      priceItems: prev.priceItems.filter(
+        (item) => !selectedIds.includes(item.priceItemId)
+      ),
+    }));
+
+    // Clear selections and close dialog
+    setSelectedRows([]);
+    setDeleteConfirmOpen(false);
+
+    toast.success(`Successfully deleted ${selectedIds.length} item(s)`);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmOpen(false);
+  };
+
   // Sample price change requests data (using same data as change-requests route)
   const priceChangeRequests = [
     {
@@ -1705,19 +1801,163 @@ export default function AllCustomerPricingPage() {
                     <SecondaryButton onClick={handleExitEditMode} icon={X}>
                       Exit Edit Mode
                     </SecondaryButton>
-                    <PrimaryButton
-                      disabled={
-                        (!newRows || newRows.size === 0) &&
-                        (!modifiedRows || modifiedRows.size === 0)
-                      }
-                      onClick={handleSubmitPriceChange}
-                      icon={Check}
-                    >
-                      Submit Price Change (
-                      {(newRows ? newRows.size : 0) +
-                        (modifiedRows ? modifiedRows.size : 0)}
-                      )
-                    </PrimaryButton>
+                    {/* Submit Price Change Split Button */}
+                    <div className="flex-shrink-0">
+                      <ButtonGroup
+                        variant="contained"
+                        ref={submitMenuAnchorRef}
+                        aria-label="split button"
+                        style={{
+                          backgroundColor:
+                            (!newRows || newRows.size === 0) &&
+                            (!modifiedRows || modifiedRows.size === 0)
+                              ? "#e0e0e0"
+                              : "#65b230",
+                          borderRadius: "100px",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <MuiButton
+                          disabled={
+                            (!newRows || newRows.size === 0) &&
+                            (!modifiedRows || modifiedRows.size === 0)
+                          }
+                          onClick={() => handleSubmitOptionClick("submit")}
+                          style={{
+                            backgroundColor:
+                              (!newRows || newRows.size === 0) &&
+                              (!modifiedRows || modifiedRows.size === 0)
+                                ? "#e0e0e0"
+                                : "#65b230",
+                            color:
+                              (!newRows || newRows.size === 0) &&
+                              (!modifiedRows || modifiedRows.size === 0)
+                                ? "#9e9e9e"
+                                : "white",
+                            fontFamily: "Roboto, sans-serif",
+                            fontWeight: 500,
+                            fontSize: "14px",
+                            lineHeight: "21px",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.1px",
+                            border: "none",
+                            padding: "8px 16px",
+                            minWidth: "auto",
+                            cursor:
+                              (!newRows || newRows.size === 0) &&
+                              (!modifiedRows || modifiedRows.size === 0)
+                                ? "not-allowed"
+                                : "pointer",
+                          }}
+                        >
+                          <Check
+                            className="w-4 h-4 mr-2"
+                            style={{
+                              color:
+                                (!newRows || newRows.size === 0) &&
+                                (!modifiedRows || modifiedRows.size === 0)
+                                  ? "#9e9e9e"
+                                  : "white",
+                            }}
+                          />
+                          <span>
+                            Submit Price Change (
+                            {(newRows ? newRows.size : 0) +
+                              (modifiedRows ? modifiedRows.size : 0)}
+                            )
+                          </span>
+                        </MuiButton>
+                        <MuiButton
+                          size="small"
+                          disabled={
+                            (!newRows || newRows.size === 0) &&
+                            (!modifiedRows || modifiedRows.size === 0)
+                          }
+                          onClick={handleSubmitMenuToggle}
+                          aria-controls={
+                            submitMenuOpen ? "split-button-menu" : undefined
+                          }
+                          aria-expanded={submitMenuOpen ? "true" : undefined}
+                          aria-label="select submit action"
+                          aria-haspopup="menu"
+                          style={{
+                            backgroundColor:
+                              (!newRows || newRows.size === 0) &&
+                              (!modifiedRows || modifiedRows.size === 0)
+                                ? "#e0e0e0"
+                                : "#65b230",
+                            color:
+                              (!newRows || newRows.size === 0) &&
+                              (!modifiedRows || modifiedRows.size === 0)
+                                ? "#9e9e9e"
+                                : "white",
+                            border: "none",
+                            padding: "8px 8px",
+                            minWidth: "32px",
+                            cursor:
+                              (!newRows || newRows.size === 0) &&
+                              (!modifiedRows || modifiedRows.size === 0)
+                                ? "not-allowed"
+                                : "pointer",
+                          }}
+                        >
+                          <ChevronDown
+                            className="h-4 w-4"
+                            style={{
+                              color:
+                                (!newRows || newRows.size === 0) &&
+                                (!modifiedRows || modifiedRows.size === 0)
+                                  ? "#9e9e9e"
+                                  : "white",
+                            }}
+                          />
+                        </MuiButton>
+                      </ButtonGroup>
+                      <Popper
+                        sx={{
+                          zIndex: 1,
+                        }}
+                        open={submitMenuOpen}
+                        anchorEl={submitMenuAnchorRef.current}
+                        role={undefined}
+                        transition
+                        disablePortal
+                      >
+                        {({ TransitionProps, placement }) => (
+                          <Grow
+                            {...TransitionProps}
+                            style={{
+                              transformOrigin:
+                                placement === "bottom"
+                                  ? "center top"
+                                  : "center bottom",
+                            }}
+                          >
+                            <Paper>
+                              <ClickAwayListener
+                                onClickAway={handleSubmitMenuClose}
+                              >
+                                <MenuList id="split-button-menu" autoFocusItem>
+                                  <MenuItem
+                                    onClick={() =>
+                                      handleSubmitOptionClick("draft")
+                                    }
+                                    style={{
+                                      fontFamily: "Roboto, sans-serif",
+                                      fontWeight: 400,
+                                      fontSize: "14px",
+                                      lineHeight: "21px",
+                                    }}
+                                  >
+                                    Save as Draft
+                                  </MenuItem>
+                                </MenuList>
+                              </ClickAwayListener>
+                            </Paper>
+                          </Grow>
+                        )}
+                      </Popper>
+                    </div>
                   </>
                 )}
                 {!isEditMode && (
@@ -2068,6 +2308,27 @@ export default function AllCustomerPricingPage() {
                         size="small"
                       >
                         Edit ({getSelectedRowIds().length})
+                      </SecondaryButton>
+                      <SecondaryButton
+                        onClick={handleDeleteSelected}
+                        disabled={getSelectedRowIds().length === 0}
+                        icon={Trash2}
+                        size="small"
+                        sx={{
+                          borderColor: "#d32f2f",
+                          color: "#d32f2f",
+                          "&:hover": {
+                            borderColor: "#b71c1c",
+                            color: "#b71c1c",
+                            backgroundColor: "rgba(211, 47, 47, 0.04)",
+                          },
+                          "&:disabled": {
+                            borderColor: "#e0e0e0",
+                            color: "#9e9e9e",
+                          },
+                        }}
+                      >
+                        Delete ({getSelectedRowIds().length})
                       </SecondaryButton>
                     </div>
                   </div>
@@ -3616,6 +3877,56 @@ export default function AllCustomerPricingPage() {
             </SecondaryButton>
             <PrimaryButton onClick={submitPriceChange}>
               Submit Price Change
+            </PrimaryButton>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog
+          open={deleteConfirmOpen}
+          onClose={handleDeleteCancel}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle
+            sx={{
+              fontFamily: "Roboto:Medium, sans-serif",
+              fontWeight: 500,
+              fontSize: "22px",
+              lineHeight: "28px",
+              color: "#1c1b1f",
+            }}
+          >
+            Delete Selected Items
+          </DialogTitle>
+          <DialogContent sx={{ p: 3 }}>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              You are about to delete the following items:
+            </Typography>
+            <div className="flex items-center space-x-2 mb-3">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              <span className="text-sm font-medium">
+                {getSelectedRowIds().length} item
+                {getSelectedRowIds().length === 1 ? "" : "s"} selected for
+                deletion
+              </span>
+            </div>
+            <Typography variant="body2" sx={{ color: "#666" }}>
+              This action cannot be undone. Are you sure you want to proceed?
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, gap: 2 }}>
+            <SecondaryButton onClick={handleDeleteCancel}>
+              Cancel
+            </SecondaryButton>
+            <PrimaryButton
+              onClick={handleDeleteConfirm}
+              sx={{
+                backgroundColor: "#d32f2f",
+                "&:hover": { backgroundColor: "#b71c1c" },
+              }}
+            >
+              Delete Items
             </PrimaryButton>
           </DialogActions>
         </Dialog>

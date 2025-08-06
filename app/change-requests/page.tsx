@@ -651,7 +651,7 @@ export default function PriceChangeRequestsPage() {
     },
     {
       field: "attachments",
-      headerName: "Attachments",
+      headerName: "Documents",
       width: 120,
       flex: 0,
       renderCell: (params) => {

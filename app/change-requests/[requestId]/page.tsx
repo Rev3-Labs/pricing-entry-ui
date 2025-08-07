@@ -215,6 +215,8 @@ class PriceChangeRequestService {
         description:
           "Update pricing structure for all Utah state contracts to reflect new regulatory requirements and competitive market positioning. This affects 15 different state agencies and requires coordination with the Utah Department of Environmental Quality. The changes include new compliance fees and updated service rates.",
         requestType: "Price Increase",
+        customerId: "CUST-003",
+        customerName: "Utah State Agencies",
         assignedTo: "David Brown",
         status: "In Progress",
         submittedBy: "Mike Wilson",
@@ -273,6 +275,8 @@ class PriceChangeRequestService {
         description:
           "Implement new fuel surcharge calculation methodology across all customers to better reflect current fuel costs and market volatility. This will replace the current flat-rate surcharge with a dynamic calculation based on current diesel fuel prices and will be updated monthly.",
         requestType: "Price Increase",
+        customerId: "CUST-007",
+        customerName: "Clean Energy Solutions",
         assignedTo: "Michael Chen",
         status: "Activated",
         submittedBy: "Lisa Davis",
@@ -868,151 +872,33 @@ export default function PriceChangeRequestDetailsPage() {
                       </div>
                     </div>
 
-                    {/* Status Split Button */}
+                    {/* Execute Price Change Button */}
                     <div className="flex-shrink-0">
-                      <ButtonGroup
+                      <MuiButton
+                        onClick={() =>
+                          router.push(
+                            `/customer-pricing/${request.customerId}?executeRequestId=${request.requestId}`
+                          )
+                        }
                         variant="contained"
-                        ref={statusMenuAnchorRef}
-                        aria-label="split button"
+                        className="flex items-center gap-2"
                         style={{
-                          backgroundColor: (() => {
-                            switch (request.status) {
-                              case "New":
-                                return "#1976d2";
-                              case "In Progress":
-                                return "#ed6c02";
-                              case "Activated":
-                                return "#2e7d32";
-                              case "Declined":
-                                return "#d32f2f";
-                              case "Withdrawn":
-                                return "#63666a";
-                              default:
-                                return "#65b230";
-                            }
-                          })(),
+                          backgroundColor: "#65b230",
+                          color: "white",
+                          fontFamily: "Roboto, sans-serif",
+                          fontWeight: 500,
+                          fontSize: "14px",
+                          lineHeight: "21px",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.1px",
                           borderRadius: "100px",
-                          overflow: "hidden",
+                          height: "36px",
+                          padding: "8px 12px",
                         }}
                       >
-                        <MuiButton
-                          onClick={handleStatusClick}
-                          style={{
-                            backgroundColor: (() => {
-                              switch (request.status) {
-                                case "New":
-                                  return "#1976d2";
-                                case "In Progress":
-                                  return "#ed6c02";
-                                case "Activated":
-                                  return "#2e7d32";
-                                case "Declined":
-                                  return "#d32f2f";
-                                case "Withdrawn":
-                                  return "#63666a";
-                                default:
-                                  return "#65b230";
-                              }
-                            })(),
-                            color: "white",
-                            fontFamily: "Roboto, sans-serif",
-                            fontWeight: 500,
-                            fontSize: "14px",
-                            lineHeight: "21px",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.1px",
-                            border: "none",
-                            padding: "8px 16px",
-                            minWidth: "120px",
-                          }}
-                        >
-                          <span className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-white">
-                            {request.status}
-                          </span>
-                        </MuiButton>
-                        <MuiButton
-                          size="small"
-                          onClick={handleStatusMenuToggle}
-                          aria-controls={
-                            statusMenuOpen ? "split-button-menu" : undefined
-                          }
-                          aria-expanded={statusMenuOpen ? "true" : undefined}
-                          aria-label="select status"
-                          aria-haspopup="menu"
-                          style={{
-                            backgroundColor: (() => {
-                              switch (request.status) {
-                                case "New":
-                                  return "#1976d2";
-                                case "In Progress":
-                                  return "#ed6c02";
-                                case "Activated":
-                                  return "#2e7d32";
-                                case "Declined":
-                                  return "#d32f2f";
-                                case "Withdrawn":
-                                  return "#63666a";
-                                default:
-                                  return "#65b230";
-                              }
-                            })(),
-                            color: "white",
-                            border: "none",
-                            padding: "8px 8px",
-                            minWidth: "32px",
-                          }}
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </MuiButton>
-                      </ButtonGroup>
-                      <Popper
-                        sx={{
-                          zIndex: 1,
-                        }}
-                        open={statusMenuOpen}
-                        anchorEl={statusMenuAnchorRef.current}
-                        role={undefined}
-                        transition
-                        disablePortal
-                      >
-                        {({ TransitionProps, placement }) => (
-                          <Grow
-                            {...TransitionProps}
-                            style={{
-                              transformOrigin:
-                                placement === "bottom"
-                                  ? "center top"
-                                  : "center bottom",
-                            }}
-                          >
-                            <Paper>
-                              <ClickAwayListener
-                                onClickAway={handleStatusMenuClose}
-                              >
-                                <MenuList id="split-button-menu" autoFocusItem>
-                                  {["Declined", "Withdrawn"].map((status) => (
-                                    <MenuItem
-                                      key={status}
-                                      onClick={() =>
-                                        handleStatusOptionClick(status)
-                                      }
-                                      selected={status === request.status}
-                                      style={{
-                                        fontFamily: "Roboto, sans-serif",
-                                        fontWeight: 400,
-                                        fontSize: "14px",
-                                        lineHeight: "21px",
-                                      }}
-                                    >
-                                      {getStatusBadge(status)}
-                                    </MenuItem>
-                                  ))}
-                                </MenuList>
-                              </ClickAwayListener>
-                            </Paper>
-                          </Grow>
-                        )}
-                      </Popper>
+                        <CheckCircle className="w-4 h-4 text-white" />
+                        <span>Execute Price Change</span>
+                      </MuiButton>
                     </div>
                   </div>
                 </div>
@@ -1032,32 +918,254 @@ export default function PriceChangeRequestDetailsPage() {
                           Request Details
                         </h3>
                         {!editMode.isEditing ? (
-                          <MuiButton
-                            onClick={() =>
-                              setEditMode((prev) => ({
-                                ...prev,
-                                isEditing: true,
-                              }))
-                            }
-                            variant="contained"
-                            className="flex items-center gap-2"
-                            style={{
-                              backgroundColor: "#65b230",
-                              color: "white",
-                              fontFamily: "Roboto, sans-serif",
-                              fontWeight: 500,
-                              fontSize: "14px",
-                              lineHeight: "21px",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.1px",
-                              borderRadius: "100px",
-                              height: "36px",
-                              padding: "8px 12px",
-                            }}
-                          >
-                            <Edit className="w-4 h-4 text-white" />
-                            <span>Edit</span>
-                          </MuiButton>
+                          <div className="flex space-x-2">
+                            <MuiButton
+                              onClick={() =>
+                                setEditMode((prev) => ({
+                                  ...prev,
+                                  isEditing: true,
+                                }))
+                              }
+                              variant="outlined"
+                              className="flex items-center gap-2"
+                              style={{
+                                backgroundColor: "white",
+                                color: "#1c1b1f",
+                                borderColor: "#b9b9b9",
+                                fontFamily: "Roboto, sans-serif",
+                                fontWeight: 500,
+                                fontSize: "14px",
+                                lineHeight: "21px",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.1px",
+                                borderRadius: "100px",
+                                height: "36px",
+                                padding: "8px 12px",
+                              }}
+                            >
+                              <Edit className="w-4 h-4 text-[#1c1b1f]" />
+                              <span>Edit</span>
+                            </MuiButton>
+                            <ButtonGroup
+                              variant="contained"
+                              ref={statusMenuAnchorRef}
+                              aria-label="split button"
+                              style={{
+                                backgroundColor: (() => {
+                                  switch (request.status) {
+                                    case "New":
+                                      return "#eff6ff"; // bg-blue-50
+                                    case "In Progress":
+                                      return "#fff7ed"; // bg-orange-50
+                                    case "Activated":
+                                      return "#16a34a"; // bg-green-600
+                                    case "Declined":
+                                      return "#fef2f2"; // bg-red-50
+                                    case "Withdrawn":
+                                      return "#f9fafb"; // bg-gray-50
+                                    default:
+                                      return "#f9fafb"; // bg-gray-50
+                                  }
+                                })(),
+                                borderRadius: "100px",
+                                overflow: "hidden",
+                                border: `1px solid ${(() => {
+                                  switch (request.status) {
+                                    case "New":
+                                      return "#bfdbfe"; // border-blue-200
+                                    case "In Progress":
+                                      return "#fed7aa"; // border-orange-200
+                                    case "Activated":
+                                      return "#16a34a"; // border-green-600
+                                    case "Declined":
+                                      return "#fecaca"; // border-red-200
+                                    case "Withdrawn":
+                                      return "#e5e7eb"; // border-gray-200
+                                    default:
+                                      return "#e5e7eb"; // border-gray-200
+                                  }
+                                })()}`,
+                              }}
+                            >
+                              <MuiButton
+                                onClick={handleStatusClick}
+                                style={{
+                                  backgroundColor: (() => {
+                                    switch (request.status) {
+                                      case "New":
+                                        return "#eff6ff"; // bg-blue-50
+                                      case "In Progress":
+                                        return "#fff7ed"; // bg-orange-50
+                                      case "Activated":
+                                        return "#16a34a"; // bg-green-600
+                                      case "Declined":
+                                        return "#fef2f2"; // bg-red-50
+                                      case "Withdrawn":
+                                        return "#f9fafb"; // bg-gray-50
+                                      default:
+                                        return "#f9fafb"; // bg-gray-50
+                                    }
+                                  })(),
+                                  color: (() => {
+                                    switch (request.status) {
+                                      case "New":
+                                        return "#1d4ed8"; // text-blue-700
+                                      case "In Progress":
+                                        return "#c2410c"; // text-orange-700
+                                      case "Activated":
+                                        return "#ffffff"; // text-white
+                                      case "Declined":
+                                        return "#b91c1c"; // text-red-700
+                                      case "Withdrawn":
+                                        return "#4b5563"; // text-gray-600
+                                      default:
+                                        return "#4b5563"; // text-gray-600
+                                    }
+                                  })(),
+                                  fontFamily: "Roboto, sans-serif",
+                                  fontWeight: 500,
+                                  fontSize: "14px",
+                                  lineHeight: "21px",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.1px",
+                                  border: "none",
+                                  borderRight: `1px solid ${(() => {
+                                    switch (request.status) {
+                                      case "New":
+                                        return "#bfdbfe"; // border-blue-200
+                                      case "In Progress":
+                                        return "#fed7aa"; // border-orange-200
+                                      case "Activated":
+                                        return "#16a34a"; // border-green-600
+                                      case "Declined":
+                                        return "#fecaca"; // border-red-200
+                                      case "Withdrawn":
+                                        return "#e5e7eb"; // border-gray-200
+                                      default:
+                                        return "#e5e7eb"; // border-gray-200
+                                    }
+                                  })()}`,
+                                  padding: "8px 16px",
+                                  minWidth: "120px",
+                                  borderRadius: "100px 0 0 100px",
+                                }}
+                              >
+                                <span className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px]">
+                                  {request.status}
+                                </span>
+                              </MuiButton>
+                              <MuiButton
+                                size="small"
+                                onClick={handleStatusMenuToggle}
+                                aria-controls={
+                                  statusMenuOpen
+                                    ? "split-button-menu"
+                                    : undefined
+                                }
+                                aria-expanded={
+                                  statusMenuOpen ? "true" : undefined
+                                }
+                                aria-label="select status"
+                                aria-haspopup="menu"
+                                style={{
+                                  backgroundColor: (() => {
+                                    switch (request.status) {
+                                      case "New":
+                                        return "#eff6ff"; // bg-blue-50
+                                      case "In Progress":
+                                        return "#fff7ed"; // bg-orange-50
+                                      case "Activated":
+                                        return "#16a34a"; // bg-green-600
+                                      case "Declined":
+                                        return "#fef2f2"; // bg-red-50
+                                      case "Withdrawn":
+                                        return "#f9fafb"; // bg-gray-50
+                                      default:
+                                        return "#f9fafb"; // bg-gray-50
+                                    }
+                                  })(),
+                                  color: (() => {
+                                    switch (request.status) {
+                                      case "New":
+                                        return "#1d4ed8"; // text-blue-700
+                                      case "In Progress":
+                                        return "#c2410c"; // text-orange-700
+                                      case "Activated":
+                                        return "#ffffff"; // text-white
+                                      case "Declined":
+                                        return "#b91c1c"; // text-red-700
+                                      case "Withdrawn":
+                                        return "#4b5563"; // text-gray-600
+                                      default:
+                                        return "#4b5563"; // text-gray-600
+                                    }
+                                  })(),
+                                  border: "none",
+                                  padding: "8px 8px",
+                                  minWidth: "32px",
+                                  borderRadius: "0 100px 100px 0",
+                                }}
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </MuiButton>
+                            </ButtonGroup>
+                            <Popper
+                              sx={{
+                                zIndex: 1,
+                              }}
+                              open={statusMenuOpen}
+                              anchorEl={statusMenuAnchorRef.current}
+                              role={undefined}
+                              transition
+                              disablePortal
+                            >
+                              {({ TransitionProps, placement }) => (
+                                <Grow
+                                  {...TransitionProps}
+                                  style={{
+                                    transformOrigin:
+                                      placement === "bottom"
+                                        ? "center top"
+                                        : "center bottom",
+                                  }}
+                                >
+                                  <Paper>
+                                    <ClickAwayListener
+                                      onClickAway={handleStatusMenuClose}
+                                    >
+                                      <MenuList
+                                        id="split-button-menu"
+                                        autoFocusItem
+                                      >
+                                        {["Declined", "Withdrawn"].map(
+                                          (status) => (
+                                            <MenuItem
+                                              key={status}
+                                              onClick={() =>
+                                                handleStatusOptionClick(status)
+                                              }
+                                              selected={
+                                                status === request.status
+                                              }
+                                              style={{
+                                                fontFamily:
+                                                  "Roboto, sans-serif",
+                                                fontWeight: 400,
+                                                fontSize: "14px",
+                                                lineHeight: "21px",
+                                              }}
+                                            >
+                                              {getStatusBadge(status)}
+                                            </MenuItem>
+                                          )
+                                        )}
+                                      </MenuList>
+                                    </ClickAwayListener>
+                                  </Paper>
+                                </Grow>
+                              )}
+                            </Popper>
+                          </div>
                         ) : (
                           <div className="flex space-x-2">
                             <MuiButton
@@ -1220,9 +1328,6 @@ export default function PriceChangeRequestDetailsPage() {
                                     fontVariationSettings: "'wdth' 100",
                                   }}
                                 >
-                                  <MenuItem value="">
-                                    <em>No customer (Global request)</em>
-                                  </MenuItem>
                                   <MenuItem value="CUST-001">
                                     Acme Corporation
                                   </MenuItem>
@@ -1332,13 +1437,12 @@ export default function PriceChangeRequestDetailsPage() {
                                 {getRequestTypeBadge(request.requestType)}
                               </div>
                             </div>
-                            {(request.customerName ||
-                              request.requestType === "New Customer") && (
-                              <div>
-                                <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
-                                  Customer
-                                </label>
-                                <div className="mt-1">
+                            <div>
+                              <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
+                                Customer
+                              </label>
+                              <div className="mt-1">
+                                {request.customerName ? (
                                   <div className="flex items-center space-x-2">
                                     <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
                                       {request.customerName}
@@ -1349,9 +1453,13 @@ export default function PriceChangeRequestDetailsPage() {
                                       </span>
                                     </div>
                                   </div>
-                                </div>
+                                ) : (
+                                  <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#63666a] italic">
+                                    No customer (Global request)
+                                  </span>
+                                )}
                               </div>
-                            )}
+                            </div>
                             <div>
                               <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
                                 Assigned To

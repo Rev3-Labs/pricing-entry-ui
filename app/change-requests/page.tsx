@@ -107,6 +107,8 @@ class PriceChangeRequestService {
         description:
           "Update pricing structure for all Utah state contracts to reflect new regulatory requirements and competitive market positioning.",
         requestType: "Price Increase",
+        customerId: "CUST-003",
+        customerName: "Green Energy Co",
         assignedTo: "David Brown",
         status: "In Progress",
         submittedBy: "Mike Wilson",
@@ -115,10 +117,12 @@ class PriceChangeRequestService {
       },
       {
         requestId: "PCR-2024-003",
-        subject: "Global Fuel Surcharge Adjustment",
+        subject: "Industrial Cleanup Ltd - Fuel Surcharge Adjustment",
         description:
-          "Implement new fuel surcharge calculation methodology across all customers to better reflect current fuel costs and market volatility.",
+          "Implement new fuel surcharge calculation methodology for Industrial Cleanup Ltd to better reflect current fuel costs and market volatility.",
         requestType: "Price Increase",
+        customerId: "CUST-004",
+        customerName: "Industrial Cleanup Ltd",
         assignedTo: "Michael Chen",
         status: "Activated",
         submittedBy: "Lisa Davis",
@@ -156,10 +160,12 @@ class PriceChangeRequestService {
       },
       {
         requestId: "PCR-2024-006",
-        subject: "Industry-Wide Compliance Fee Update",
+        subject: "Clean Energy Solutions - Compliance Fee Update",
         description:
-          "Update compliance fees across all customers to reflect new EPA regulations and increased compliance costs.",
+          "Update compliance fees for Clean Energy Solutions to reflect new EPA regulations and increased compliance costs.",
         requestType: "Price Increase",
+        customerId: "CUST-007",
+        customerName: "Clean Energy Solutions",
         assignedTo: "Alex Thompson",
         status: "Declined",
         submittedBy: "Tom Wilson",
@@ -355,11 +361,6 @@ export default function PriceChangeRequestsPage() {
   const handleCreateSubmit = async () => {
     if (!createModal.subject.trim() || !createModal.assignedTo) {
       toast.error("Please fill in all required fields");
-      return;
-    }
-
-    if (createModal.requestType === "New Customer" && !createModal.customerId) {
-      toast.error("Please select a customer for new customer requests");
       return;
     }
 
@@ -583,9 +584,7 @@ export default function PriceChangeRequestsPage() {
         } else {
           return (
             <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#bdbdbd] italic">
-              {params.row.requestType === "New Customer"
-                ? "New Customer"
-                : "Global"}
+              No customer assigned
             </span>
           );
         }
@@ -1139,8 +1138,6 @@ export default function PriceChangeRequestsPage() {
                       setCreateModal((prev) => ({
                         ...prev,
                         requestType: value,
-                        customerId:
-                          value !== "New Customer" ? "" : prev.customerId,
                       }));
                     }}
                     label="Request Type *"
@@ -1156,34 +1153,29 @@ export default function PriceChangeRequestsPage() {
                   </Select>
                 </FormControl>
 
-                {/* Customer (only show if Request Type is New Customer) */}
-                {createModal.requestType === "New Customer" && (
-                  <FormControl variant="outlined" fullWidth>
-                    <InputLabel id="create-customer-label">
-                      Customer *
-                    </InputLabel>
-                    <Select
-                      labelId="create-customer-label"
-                      value={createModal.customerId}
-                      onChange={(e) =>
-                        setCreateModal((prev) => ({
-                          ...prev,
-                          customerId: e.target.value as string,
-                        }))
-                      }
-                      label="Customer *"
-                      style={{ fontVariationSettings: "'wdth' 100" }}
-                    >
-                      <MenuItem value="">Select customer</MenuItem>
-                      {CUSTOMERS.map((customer) => (
-                        <MenuItem key={customer.id} value={customer.id}>
-                          {customer.name}
-                          {customer.status === "inactive" && " (Inactive)"}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                )}
+                {/* Customer */}
+                <FormControl variant="outlined" fullWidth>
+                  <InputLabel id="create-customer-label">Customer</InputLabel>
+                  <Select
+                    labelId="create-customer-label"
+                    value={createModal.customerId}
+                    onChange={(e) =>
+                      setCreateModal((prev) => ({
+                        ...prev,
+                        customerId: e.target.value as string,
+                      }))
+                    }
+                    label="Customer"
+                    style={{ fontVariationSettings: "'wdth' 100" }}
+                  >
+                    {CUSTOMERS.map((customer) => (
+                      <MenuItem key={customer.id} value={customer.id}>
+                        {customer.name}
+                        {customer.status === "inactive" && " (Inactive)"}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
 
                 {/* Assigned To */}
                 <FormControl variant="outlined" fullWidth>

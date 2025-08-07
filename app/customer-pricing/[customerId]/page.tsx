@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
   TextField,
   Select,
@@ -35,6 +35,7 @@ import {
 import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
 import { DataGrid, GridColDef, GridRowSelectionModel } from "@mui/x-data-grid";
 import {
+  AlertCircle,
   ArrowLeft,
   Building2,
   DollarSign,
@@ -60,6 +61,8 @@ import {
   RotateCcw,
   ChevronDown,
   Trash2,
+  Edit,
+  Square,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -106,12 +109,21 @@ interface AllPricingData {
 
 export default function AllCustomerPricingPage() {
   const router = useRouter();
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const customerId = params.customerId as string;
+
+  // Check if user came from execute price change button
+  const executeRequestId = searchParams.get("executeRequestId");
   const [allPricingData, setAllPricingData] = useState<AllPricingData>({
     customers: [],
     priceHeaders: [],
     priceItems: [],
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [currentCustomer, setCurrentCustomer] = useState<CustomerInfo | null>(
+    null
+  );
   const [filters, setFilters] = useState<FilterState>({
     customer: "all",
     customerName: "",
@@ -203,17 +215,92 @@ export default function AllCustomerPricingPage() {
 
   // State for delete confirmation dialog
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteValidationErrorOpen, setDeleteValidationErrorOpen] =
+    useState(false);
+  const [validationErrorDetails, setValidationErrorDetails] = useState<{
+    count: number;
+    rows: string[];
+  }>({ count: 0, rows: [] });
 
   // State for row editing
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [newRowId, setNewRowId] = useState<string | null>(null);
+  const [newEntryData, setNewEntryData] = useState<Record<string, any>>({});
+  const [showNewEntryForm, setShowNewEntryForm] = useState(false);
+  const [showEditEntryForm, setShowEditEntryForm] = useState(false);
+  const [editingEntryData, setEditingEntryData] = useState<Record<string, any>>(
+    {}
+  );
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [showPriceHeaderModal, setShowPriceHeaderModal] = useState(false);
+  const [priceHeaderData, setPriceHeaderData] = useState<Record<string, any>>(
+    {}
+  );
+  const [selectedPriceHeaderId, setSelectedPriceHeaderId] = useState<
+    string | null
+  >(null);
+  const [availablePriceHeaders, setAvailablePriceHeaders] = useState<
+    Array<{
+      id: string;
+      name: string;
+      type: "customer" | "project";
+      projectName?: string;
+    }>
+  >([]);
+  const [priceHeaderLoading, setPriceHeaderLoading] = useState(false);
 
   // State to store the current price change configuration
   const [currentPriceChangeConfig, setCurrentPriceChangeConfig] = useState<{
     selectedRequests: string[];
-    templateType: "standard" | "custom";
-    customHeaderFields?: any;
+    excelUploadMode: "upload" | "manual" | null;
+    excelFile?: string | null;
   } | null>(null);
+
+  // State for Excel upload functionality
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [excelUploadMode, setExcelUploadMode] = useState<
+    "upload" | "manual" | null
+  >(null);
+
+  // Enhanced session state for complete workflow persistence
+  const [sessionState, setSessionState] = useState<{
+    isEditMode: boolean;
+    selectedPriceChangeRequests: string[];
+    priceChangeRequestFilter: string;
+    assignedToFilter: string;
+    excelUploadMode: "upload" | "manual" | null;
+    excelFile: string | null;
+    newRows: Set<string>;
+    modifiedRows: Set<string>;
+    modifiedColumns: Map<string, Set<string>>;
+    currentPriceChangeConfig: {
+      selectedRequests: string[];
+      excelUploadMode: "upload" | "manual" | null;
+      excelFile?: string | null;
+    } | null;
+  }>({
+    isEditMode: false,
+    selectedPriceChangeRequests: [],
+    priceChangeRequestFilter: "",
+    assignedToFilter: "",
+    excelUploadMode: null,
+    excelFile: null,
+    newRows: new Set(),
+    modifiedRows: new Set(),
+    modifiedColumns: new Map(),
+    currentPriceChangeConfig: null,
+  });
+
+  // State for tracking changes
+  const [forceRerender, setForceRerender] = useState(0);
+
+  // Auto-open price change modal if user came from execute price change button
+  useEffect(() => {
+    if (executeRequestId && !isLoading) {
+      setSelectedPriceChangeRequests([executeRequestId]);
+      setPriceChangeDialogOpen(true);
+    }
+  }, [executeRequestId, isLoading]);
 
   // Helper function to calculate unit price preview for percentage increase
   const getUnitPricePreview = (
@@ -289,6 +376,12 @@ export default function AllCustomerPricingPage() {
     return [...new Set(containerSizes)].sort();
   };
 
+  const hasUnsavedChanges = () => {
+    return (
+      (newRows && newRows.size > 0) || (modifiedRows && modifiedRows.size > 0)
+    );
+  };
+
   // Custom header fields state
   const [customHeaderFields, setCustomHeaderFields] = useState({
     eei: "Regular",
@@ -305,7 +398,7 @@ export default function AllCustomerPricingPage() {
 
   // Load all pricing data
   useEffect(() => {
-    // Force clear localStorage to ensure fresh data
+    // Force clear localStorage to ensure fresh data with new generator names
     localStorage.removeItem("sampleCustomers");
     localStorage.removeItem("samplePriceHeaders");
     localStorage.removeItem("samplePriceItems");
@@ -339,6 +432,24 @@ export default function AllCustomerPricingPage() {
           priceHeaders: sampleData.priceHeaders,
           priceItems: sampleData.priceItems,
         });
+
+        // If a customer ID is provided in the route, look up the customer
+        if (customerId) {
+          const normalizedCustomerId = customerId.replace("-", "");
+          let foundCustomer = sampleData.customers.find(
+            (c: CustomerInfo) => c.customerId === customerId
+          );
+
+          if (!foundCustomer) {
+            foundCustomer = sampleData.customers.find(
+              (c: CustomerInfo) => c.customerId === normalizedCustomerId
+            );
+          }
+
+          if (foundCustomer) {
+            setCurrentCustomer(foundCustomer);
+          }
+        }
       } catch (error) {
         console.error("Failed to load pricing data:", error);
         toast.error("Failed to load pricing data");
@@ -348,7 +459,7 @@ export default function AllCustomerPricingPage() {
     };
 
     loadAllPricingData();
-  }, []);
+  }, [customerId]);
 
   // Filter price items based on current filters
   const filteredPriceItems = useMemo(() => {
@@ -362,7 +473,10 @@ export default function AllCustomerPricingPage() {
       return [];
     }
 
-    return allPricingData.priceItems.filter((item) => {
+    // Use only the main price items
+    const allItems = [...allPricingData.priceItems];
+
+    return allItems.filter((item) => {
       // Get the associated customer and header for this item
       const header = allPricingData.priceHeaders.find(
         (h) => h.priceHeaderId === item.priceHeaderId
@@ -371,16 +485,11 @@ export default function AllCustomerPricingPage() {
         (c) => c.customerId === header?.customerId
       );
 
-      const matchesCustomer =
-        filters.customer === "all" ||
-        (customer && customer.customerId === filters.customer);
-
-      const matchesCustomerName =
-        !filters.customerName ||
-        (customer &&
-          customer.customerName
-            .toLowerCase()
-            .includes(filters.customerName.toLowerCase()));
+      // If a customer ID is provided in the route, automatically filter by that customer
+      const matchesCustomer = currentCustomer
+        ? customer && customer.customerId === currentCustomer.customerId
+        : filters.customer === "all" ||
+          (customer && customer.customerId === filters.customer);
 
       const matchesContractNumber =
         !filters.contractNumber ||
@@ -472,7 +581,6 @@ export default function AllCustomerPricingPage() {
 
       return (
         matchesCustomer &&
-        matchesCustomerName &&
         matchesContractNumber &&
         matchesProfileId &&
         matchesProductName &&
@@ -513,6 +621,10 @@ export default function AllCustomerPricingPage() {
         (c) => c.customerId === header?.customerId
       );
 
+      // Check if this is a new or modified item
+      const isNewItem = newRows && newRows.has(item.priceItemId);
+      const isModifiedItem = modifiedRows && modifiedRows.has(item.priceItemId);
+
       // Force numeric values and ensure they are not zero unless actually zero
       const unitPrice = parseFloat(String(item.unitPrice)) || 0;
       const minimumPrice = parseFloat(String(item.minimumPrice)) || 0;
@@ -526,47 +638,38 @@ export default function AllCustomerPricingPage() {
         generatorId: item.generatorId,
         contractId: item.contractId,
         projectName: item.projectName,
+        region: item.region || "",
         facilityName: item.facilityName,
+        description: item.productName || "", // Using productName as description for now
         containerSize: item.containerSize,
         uom: item.uom,
         unitPrice: unitPrice,
         minimumPrice: minimumPrice,
-        effectiveDate: header?.effectiveDate || "",
-        expirationDate: header?.expirationDate || "",
+        effectiveDate: item.effectiveDate || "",
+        expirationDate: item.expirationDate || "",
+        entryDate: header?.createdAt || "",
+        enteredBy: header?.createdByUser?.toString() || "",
         header: header,
+        isNew: isNewItem,
+        isModified: isModifiedItem,
       };
     });
 
-    // Add new entry row at the top if in add mode
-    if (newRowId) {
-      const newEntryRow = {
-        id: newRowId,
-        customerId: "",
-        customerName: "",
-        productName: "",
-        profileId: "",
-        generatorId: "",
-        contractId: "",
-        projectName: "",
-        facilityName: "",
-        containerSize: "",
-        uom: "",
-        unitPrice: "",
-        minimumPrice: "",
-        effectiveDate: "",
-        expirationDate: "",
-        header: null,
-        isNewEntry: true,
-      };
-      return [newEntryRow, ...baseRows];
-    }
+    // No longer adding new entry row to DataGrid - using form dialog instead
 
+    console.log("Rows computed:", {
+      baseRows,
+      filteredItemsCount: filteredPriceItems.length,
+      newRowId,
+      forceRerender,
+    });
     return baseRows;
   }, [
     filteredPriceItems,
     allPricingData.priceHeaders,
     allPricingData.customers,
     newRowId,
+    forceRerender,
   ]);
 
   const handleBack = () => {
@@ -586,18 +689,12 @@ export default function AllCustomerPricingPage() {
   };
 
   const handlePriceChangeRequestSelect = (requestId: string) => {
-    setSelectedPriceChangeRequests((prev) => {
-      if (prev.includes(requestId)) {
-        return prev.filter((id) => id !== requestId);
-      } else {
-        return [...prev, requestId];
-      }
-    });
+    setSelectedPriceChangeRequests([requestId]);
   };
 
   const handleCreatePriceChange = () => {
     if (selectedPriceChangeRequests.length === 0) {
-      toast.error("Please select at least one price change request");
+      toast.error("Please select a price change request");
       return;
     }
 
@@ -618,20 +715,21 @@ export default function AllCustomerPricingPage() {
     // Save the current price change configuration
     setCurrentPriceChangeConfig({
       selectedRequests: [...selectedPriceChangeRequests],
-      templateType,
-      customHeaderFields:
-        templateType === "custom" ? { ...customHeaderFields } : undefined,
+      excelUploadMode,
+      excelFile: excelFile ? excelFile.name : null,
     });
 
     // TODO: Implement the actual price change creation logic with the configuration
     console.log("Creating price changes with:", {
       selectedRequests: selectedPriceChangeRequests,
-      templateType,
-      customHeaderFields: templateType === "custom" ? customHeaderFields : null,
+      excelUploadMode,
+      excelFile: excelFile ? excelFile.name : null,
     });
 
+    const modeText =
+      excelUploadMode === "upload" ? "Excel upload" : "manual entry";
     toast.success(
-      `Creating price changes for ${selectedPriceChangeRequests.length} request(s) with ${templateType} template. Edit mode is now enabled.`
+      `Creating price changes for the selected request with ${modeText}. Edit mode is now enabled.`
     );
 
     // Enable edit mode
@@ -642,19 +740,8 @@ export default function AllCustomerPricingPage() {
     setSelectedPriceChangeRequests([]);
     setPriceChangeRequestFilter("");
     setAssignedToFilter("");
-    setTemplateType("standard");
-    setCustomHeaderFields({
-      eei: "Regular",
-      fuelSurcharge: "Standard Monthly",
-      invoiceMinimum: 350,
-      containerConversion: "Standard Conversion 1",
-      itemMinimums: "Standard Tables",
-      economicAdjustmentFee: 3,
-      eManifestFee: 25,
-      hubFee: true,
-      regionalPricing: true,
-      zoneTransportation: true,
-    });
+    setExcelFile(null);
+    setExcelUploadMode(null);
   };
 
   const handleCancelPriceChangeConfig = () => {
@@ -662,20 +749,28 @@ export default function AllCustomerPricingPage() {
     setSelectedPriceChangeRequests([]);
     setPriceChangeRequestFilter("");
     setAssignedToFilter("");
-    setTemplateType("standard");
     setCurrentPriceChangeConfig(null); // Clear the price change configuration
-    setCustomHeaderFields({
-      eei: "Regular",
-      fuelSurcharge: "Standard Monthly",
-      invoiceMinimum: 350,
-      containerConversion: "Standard Conversion 1",
-      itemMinimums: "Standard Tables",
-      economicAdjustmentFee: 3,
-      eManifestFee: 25,
-      hubFee: true,
-      regionalPricing: true,
-      zoneTransportation: true,
-    });
+    // Reset Excel upload state
+    setExcelFile(null);
+    setExcelUploadMode(null);
+  };
+
+  const handleExcelFileUpload = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (
+        file.type ===
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        file.type === "application/vnd.ms-excel"
+      ) {
+        setExcelFile(file);
+        toast.success("Excel file uploaded successfully");
+      } else {
+        toast.error("Please upload a valid Excel file (.xlsx or .xls)");
+      }
+    }
   };
 
   const handleBackToPriceChangeSelection = () => {
@@ -685,100 +780,649 @@ export default function AllCustomerPricingPage() {
 
   // New handler functions for edit mode
   const handleAddNewEntry = () => {
-    const newId = `new-${Date.now()}`;
-    setNewRowId(newId);
-    setEditingRowId(newId);
+    setShowNewEntryForm(true);
+    // Initialize new entry data with empty values
+    setNewEntryData({
+      productName: "",
+      unitPrice: "",
+      minimumPrice: "",
+      effectiveDate: "",
+      expirationDate: "",
+      projectName: "",
+      profileId: "",
+      generatorId: "",
+      contractId: "",
+      facilityName: "",
+      containerSize: "",
+      uom: "",
+      region: "North",
+    });
   };
 
   const handleSaveNewEntry = () => {
-    // This will be handled by processRowUpdate
-    setEditingRowId(null);
-    setNewRowId(null);
+    console.log("=== SAVE NEW ENTRY TRIGGERED ===");
+    console.log("New entry data to save:", newEntryData);
+
+    // Use the tracked new entry data instead of trying to find it in rows
+    if (!newEntryData || Object.keys(newEntryData).length === 0) {
+      console.error("No new entry data found");
+      toast.error("No new entry to save");
+      return;
+    }
+
+    // Convert and validate the entered data
+    const convertValue = (value: any, fieldName: string): any => {
+      if (value === null || value === undefined || value === "") {
+        return "";
+      }
+
+      // Handle numeric fields
+      if (fieldName === "unitPrice" || fieldName === "minimumPrice") {
+        const numValue = parseFloat(String(value));
+        return isNaN(numValue) ? 0 : numValue;
+      }
+
+      // Handle date fields
+      if (fieldName === "effectiveDate" || fieldName === "expirationDate") {
+        if (value instanceof Date) {
+          return value.toISOString().split("T")[0];
+        }
+        if (typeof value === "string" && value.trim()) {
+          return value.trim();
+        }
+        return "";
+      }
+
+      // Handle string fields
+      return String(value).trim();
+    };
+
+    const convertedData = {
+      productName: convertValue(newEntryData.productName, "productName"),
+      unitPrice: convertValue(newEntryData.unitPrice, "unitPrice"),
+      minimumPrice: convertValue(newEntryData.minimumPrice, "minimumPrice"),
+      effectiveDate: convertValue(newEntryData.effectiveDate, "effectiveDate"),
+      expirationDate: convertValue(
+        newEntryData.expirationDate,
+        "expirationDate"
+      ),
+      projectName: convertValue(newEntryData.projectName, "projectName"),
+      profileId: convertValue(newEntryData.profileId, "profileId"),
+      generatorId: convertValue(newEntryData.generatorId, "generatorId"),
+      contractId: convertValue(newEntryData.contractId, "contractId"),
+      facilityName: convertValue(newEntryData.facilityName, "facilityName"),
+      containerSize: convertValue(newEntryData.containerSize, "containerSize"),
+      uom: convertValue(newEntryData.uom, "uom"),
+    };
+
+    console.log("Converted data:", convertedData);
+
+    // Check if user has actually entered any data
+    const hasEnteredData = Object.values(convertedData).some(
+      (value) => value !== "" && value !== 0
+    );
+
+    if (!hasEnteredData) {
+      console.log("No data entered");
+      toast.error("Please enter some data before saving");
+      return;
+    }
+
+    // Validate required fields
+    if (!convertedData.productName) {
+      toast.error("Product name is required");
+      return;
+    }
+    if (!convertedData.unitPrice || convertedData.unitPrice <= 0) {
+      toast.error("Valid unit price is required");
+      return;
+    }
+
+    // Create a new price item from the entered data
+    const newPriceItem: PriceItem = {
+      priceItemId: newRowId || `new-${Date.now()}`,
+      priceHeaderId: allPricingData.priceHeaders[0]?.priceHeaderId || "",
+      productName: convertedData.productName,
+      region: newEntryData.region || "North",
+      unitPrice: convertedData.unitPrice,
+      minimumPrice: convertedData.minimumPrice,
+      effectiveDate:
+        convertedData.effectiveDate || new Date().toISOString().split("T")[0],
+      expirationDate:
+        convertedData.expirationDate ||
+        new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0],
+      status: "new",
+      uom: convertedData.uom,
+      containerSize: convertedData.containerSize,
+      facilityName: convertedData.facilityName,
+      projectName: convertedData.projectName,
+      profileId: convertedData.profileId,
+      generatorId: convertedData.generatorId,
+      contractId: convertedData.contractId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    console.log("Created new price item:", newPriceItem);
+
+    // Add the new item to the main data
+    setAllPricingData((prev) => {
+      const updated = {
+        ...prev,
+        priceItems: [newPriceItem, ...prev.priceItems], // Add at the top
+      };
+      console.log("Added new price item to data:", newPriceItem);
+      console.log("Updated price items count:", updated.priceItems.length);
+      return updated;
+    });
+
+    // Add to newRows set to track it
+    setNewRows((prev) => new Set([...prev, newPriceItem.priceItemId]));
+
+    // Reset editing state
+    setShowNewEntryForm(false);
+    setNewEntryData({});
+
+    toast.success("New entry added successfully");
+  };
+
+  const handleSaveEditEntry = () => {
+    console.log("=== SAVE EDIT ENTRY TRIGGERED ===");
+    console.log("Edit entry data to save:", editingEntryData);
+
+    if (!editingEntryId) {
+      console.error("No editing entry ID found");
+      toast.error("No entry to save");
+      return;
+    }
+
+    // Convert and validate the entered data
+    const convertValue = (value: any, fieldName: string): any => {
+      if (value === null || value === undefined || value === "") {
+        return "";
+      }
+
+      // Handle numeric fields
+      if (fieldName === "unitPrice" || fieldName === "minimumPrice") {
+        const numValue = parseFloat(String(value));
+        return isNaN(numValue) ? 0 : numValue;
+      }
+
+      // Handle date fields
+      if (fieldName === "effectiveDate" || fieldName === "expirationDate") {
+        if (value instanceof Date) {
+          return value.toISOString().split("T")[0];
+        }
+        if (typeof value === "string" && value.trim()) {
+          return value.trim();
+        }
+        return "";
+      }
+
+      // Handle string fields
+      return String(value).trim();
+    };
+
+    const convertedData = {
+      productName: convertValue(editingEntryData.productName, "productName"),
+      unitPrice: convertValue(editingEntryData.unitPrice, "unitPrice"),
+      minimumPrice: convertValue(editingEntryData.minimumPrice, "minimumPrice"),
+      effectiveDate: convertValue(
+        editingEntryData.effectiveDate,
+        "effectiveDate"
+      ),
+      expirationDate: convertValue(
+        editingEntryData.expirationDate,
+        "expirationDate"
+      ),
+      projectName: convertValue(editingEntryData.projectName, "projectName"),
+      profileId: convertValue(editingEntryData.profileId, "profileId"),
+      generatorId: convertValue(editingEntryData.generatorId, "generatorId"),
+      contractId: convertValue(editingEntryData.contractId, "contractId"),
+      facilityName: convertValue(editingEntryData.facilityName, "facilityName"),
+      containerSize: convertValue(
+        editingEntryData.containerSize,
+        "containerSize"
+      ),
+      uom: convertValue(editingEntryData.uom, "uom"),
+    };
+
+    console.log("Converted data:", convertedData);
+
+    // Validate required fields
+    if (!convertedData.productName) {
+      toast.error("Product name is required");
+      return;
+    }
+    if (!convertedData.unitPrice || convertedData.unitPrice <= 0) {
+      toast.error("Valid unit price is required");
+      return;
+    }
+
+    // Update the price item in the main data
+    setAllPricingData((prev) => ({
+      ...prev,
+      priceItems: prev.priceItems.map((item) => {
+        if (item.priceItemId === editingEntryId) {
+          const updatedItem = {
+            ...item,
+            productName: convertedData.productName,
+            containerSize: convertedData.containerSize,
+            facilityName: convertedData.facilityName,
+            projectName: convertedData.projectName,
+            profileId: convertedData.profileId,
+            generatorId: convertedData.generatorId,
+            unitPrice: convertedData.unitPrice,
+            minimumPrice: convertedData.minimumPrice,
+            uom: convertedData.uom,
+            effectiveDate: convertedData.effectiveDate,
+            expirationDate: convertedData.expirationDate,
+            updatedAt: new Date().toISOString(),
+          };
+          console.log("Updated price item:", updatedItem);
+          return updatedItem;
+        }
+        return item;
+      }),
+    }));
+
+    // Track modified rows and columns for highlighting
+    setModifiedRows((prev) => new Set([...prev, editingEntryId]));
+
+    // Track which specific columns were modified
+    const modifiedFields = new Set<string>();
+    Object.keys(convertedData).forEach((field) => {
+      if ((convertedData as any)[field] !== "") {
+        modifiedFields.add(field);
+      }
+    });
+
+    if (modifiedFields.size > 0) {
+      setModifiedColumns((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(editingEntryId, modifiedFields);
+        return newMap;
+      });
+    }
+
+    // Reset editing state
+    setShowEditEntryForm(false);
+    setEditingEntryData({});
+    setEditingEntryId(null);
+
+    toast.success("Entry updated successfully");
+  };
+
+  const handleCancelEditEntry = () => {
+    setShowEditEntryForm(false);
+    setEditingEntryData({});
+    setEditingEntryId(null);
+  };
+
+  const handleOpenPriceHeaderModal = () => {
+    // Find all price headers for the current customer
+    const customerPriceHeaders = allPricingData.priceHeaders.filter(
+      (header) => header.customerId === currentCustomer?.customerId
+    );
+
+    // Build the list of available price headers
+    const headers: Array<{
+      id: string;
+      name: string;
+      type: "customer" | "project";
+      projectName?: string;
+    }> = [];
+
+    // Add customer-level header (always first)
+    const customerHeader = customerPriceHeaders.find((header) =>
+      header.headerName.includes("Standard Pricing")
+    );
+    if (customerHeader) {
+      headers.push({
+        id: customerHeader.priceHeaderId,
+        name: "Customer",
+        type: "customer",
+      });
+    } else {
+      // Create a placeholder for customer header if it doesn't exist
+      headers.push({
+        id: "customer-default",
+        name: "Customer",
+        type: "customer",
+      });
+    }
+
+    // Add project-specific headers (headers with project names)
+    const projectHeaders = customerPriceHeaders.filter((header) =>
+      header.headerName.startsWith("Project:")
+    );
+    projectHeaders.forEach((header) => {
+      // Extract project name from header name
+      const projectName = header.headerName.replace("Project: ", "");
+
+      headers.push({
+        id: header.priceHeaderId,
+        name: projectName,
+        type: "project",
+        projectName: projectName,
+      });
+    });
+
+    setAvailablePriceHeaders(headers);
+
+    // Select the first header by default
+    const defaultHeaderId = headers.length > 0 ? headers[0].id : null;
+    setSelectedPriceHeaderId(defaultHeaderId);
+
+    // Load the selected header data
+    if (defaultHeaderId && defaultHeaderId !== "customer-default") {
+      const selectedHeader = customerPriceHeaders.find(
+        (header) => header.priceHeaderId === defaultHeaderId
+      );
+      if (selectedHeader) {
+        setPriceHeaderData({
+          headerName: selectedHeader.headerName || "",
+          effectiveDate: selectedHeader.effectiveDate || "",
+          expirationDate: selectedHeader.expirationDate || "",
+          status: selectedHeader.status || "",
+          createdBy: selectedHeader.createdByUser?.toString() || "",
+          createdAt: selectedHeader.createdAt || "",
+          updatedAt: selectedHeader.updatedAt || "",
+          // Custom header fields from Figma mockup (using default values for now)
+          eei: "Regular",
+          fuelSurcharge: "Standard Monthly",
+          invoiceMinimum: selectedHeader.invoiceMinimum || 350,
+          containerConversion: "Standard Conversion 1",
+          itemMinimums: "Standard Tables",
+          economicAdjustmentFee: 3,
+          eManifestFee: 25,
+          hubFee: true,
+          regionalPricing: true,
+          zoneTransportation: true,
+        });
+      }
+    } else {
+      // Set default values for new customer header
+      setPriceHeaderData({
+        headerName: "",
+        effectiveDate: "",
+        expirationDate: "",
+        status: "",
+        createdBy: "",
+        createdAt: "",
+        updatedAt: "",
+        // Custom header fields from Figma mockup
+        eei: "Regular",
+        fuelSurcharge: "Standard Monthly",
+        invoiceMinimum: 350,
+        containerConversion: "Standard Conversion 1",
+        itemMinimums: "Standard Tables",
+        economicAdjustmentFee: 3,
+        eManifestFee: 25,
+        hubFee: true,
+        regionalPricing: true,
+        zoneTransportation: true,
+      });
+    }
+
+    setShowPriceHeaderModal(true);
+  };
+
+  const handleSavePriceHeader = () => {
+    // TODO: Implement save logic for price header updates
+    console.log("Saving price header data:", priceHeaderData);
+
+    // For now, just close the modal
+    setShowPriceHeaderModal(false);
+    setPriceHeaderData({});
+
+    toast.success("Price header updated successfully");
+  };
+
+  const handleCancelPriceHeader = () => {
+    setShowPriceHeaderModal(false);
+    setPriceHeaderData({});
+  };
+
+  const handlePriceHeaderSelectionChange = (headerId: string) => {
+    setPriceHeaderLoading(true);
+    setSelectedPriceHeaderId(headerId);
+
+    // Simulate loading with a brief delay to show the spinner
+    setTimeout(() => {
+      // Find the selected header
+      const customerPriceHeaders = allPricingData.priceHeaders.filter(
+        (header) => header.customerId === currentCustomer?.customerId
+      );
+
+      if (headerId === "customer-default") {
+        // Set default values for new customer header
+        setPriceHeaderData({
+          headerName: "",
+          effectiveDate: "",
+          expirationDate: "",
+          status: "",
+          createdBy: "",
+          createdAt: "",
+          updatedAt: "",
+          // Custom header fields from Figma mockup
+          eei: "Regular",
+          fuelSurcharge: "Standard Monthly",
+          invoiceMinimum: 350,
+          containerConversion: "Standard Conversion 1",
+          itemMinimums: "Standard Tables",
+          economicAdjustmentFee: 3,
+          eManifestFee: 25,
+          hubFee: true,
+          regionalPricing: true,
+          zoneTransportation: true,
+        });
+      } else {
+        const selectedHeader = customerPriceHeaders.find(
+          (header) => header.priceHeaderId === headerId
+        );
+        if (selectedHeader) {
+          setPriceHeaderData({
+            headerName: selectedHeader.headerName || "",
+            effectiveDate: selectedHeader.effectiveDate || "",
+            expirationDate: selectedHeader.expirationDate || "",
+            status: selectedHeader.status || "",
+            createdBy: selectedHeader.createdByUser?.toString() || "",
+            createdAt: selectedHeader.createdAt || "",
+            updatedAt: selectedHeader.updatedAt || "",
+            // Custom header fields from Figma mockup (using sample data values)
+            eei: selectedHeader.headerName.includes("Project")
+              ? "Custom"
+              : "Regular",
+            fuelSurcharge: selectedHeader.headerName.includes("Project")
+              ? "Custom Rate"
+              : "Standard Monthly",
+            invoiceMinimum: selectedHeader.invoiceMinimum || 350,
+            containerConversion: selectedHeader.headerName.includes("Project")
+              ? "Custom Conversion"
+              : "Standard Conversion 1",
+            itemMinimums: selectedHeader.headerName.includes("Project")
+              ? "Custom Tables"
+              : "Standard Tables",
+            economicAdjustmentFee: selectedHeader.headerName.includes("Project")
+              ? 5
+              : 3,
+            eManifestFee: selectedHeader.headerName.includes("Project")
+              ? 35
+              : 25,
+            hubFee: selectedHeader.headerName.includes("Project"),
+            regionalPricing: selectedHeader.headerName.includes("Project"),
+            zoneTransportation: selectedHeader.headerName.includes("Project"),
+          });
+        }
+      }
+
+      setPriceHeaderLoading(false);
+    }, 500); // 500ms delay to show the spinner
   };
 
   const handleCancelNewEntry = () => {
-    setEditingRowId(null);
-    setNewRowId(null);
+    setShowNewEntryForm(false);
+    setNewEntryData({});
+  };
+
+  // Handle cell edits for new entry row
+  const handleNewEntryCellEdit = (field: string, value: any) => {
+    console.log("New entry cell edit:", field, value);
+    setNewEntryData((prev: Record<string, any>) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  // Handle cell edits for edit entry row
+  const handleEditEntryCellEdit = (field: string, value: any) => {
+    console.log("Edit entry cell edit:", field, value);
+    setEditingEntryData((prev: Record<string, any>) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
   // Process row updates for editing
-  const processRowUpdate = (newRow: any, oldRow: any) => {
+  const processRowUpdate = async (newRow: any, oldRow: any) => {
+    console.log("=== PROCESS ROW UPDATE TRIGGERED ===");
+    console.log("processRowUpdate called:", {
+      newRow: JSON.stringify(newRow, null, 2),
+      oldRow: JSON.stringify(oldRow, null, 2),
+      newRowId,
+      isEditMode,
+    });
+
+    // Helper function to safely convert values to proper types
+    const convertValue = (value: any, fieldName: string): any => {
+      if (value === null || value === undefined || value === "") {
+        return "";
+      }
+
+      // Handle numeric fields
+      if (fieldName === "unitPrice" || fieldName === "minimumPrice") {
+        const numValue = parseFloat(String(value));
+        return isNaN(numValue) ? 0 : numValue;
+      }
+
+      // Handle date fields
+      if (fieldName === "effectiveDate" || fieldName === "expirationDate") {
+        if (value instanceof Date) {
+          return value.toISOString().split("T")[0];
+        }
+        if (typeof value === "string" && value.trim()) {
+          return value.trim();
+        }
+        return "";
+      }
+
+      // Handle string fields
+      return String(value).trim();
+    };
+
     // If this is a new row being added
-    if (newRow.isNewEntry) {
-      // Validate required fields
-      if (
-        !newRow.productName ||
-        !newRow.containerSize ||
-        !newRow.uom ||
-        !newRow.unitPrice ||
-        !newRow.minimumPrice
-      ) {
-        toast.error(
-          "Please fill in all required fields: Product Name, Container Size, UOM, Unit Price, and Minimum Price"
-        );
-        return oldRow;
-      }
+    if (newRow.isNewEntry || oldRow.isNewEntry || newRowId === newRow.id) {
+      console.log("Processing new entry row");
 
-      // Validate numeric fields
-      if (
-        isNaN(parseFloat(newRow.unitPrice)) ||
-        parseFloat(newRow.unitPrice) < 0
-      ) {
-        toast.error("Unit Price must be a valid positive number");
-        return oldRow;
-      }
-
-      if (
-        isNaN(parseFloat(newRow.minimumPrice)) ||
-        parseFloat(newRow.minimumPrice) < 0
-      ) {
-        toast.error("Minimum Price must be a valid positive number");
-        return oldRow;
-      }
-
-      // Create new price item
-      const newPriceItem: PriceItem = {
-        priceItemId: `new-${Date.now()}`,
-        priceHeaderId: allPricingData.priceHeaders[0]?.priceHeaderId || "",
-        productName: newRow.productName,
-        region: "North", // Default region
-        unitPrice: parseFloat(newRow.unitPrice),
-        minimumPrice: parseFloat(newRow.minimumPrice),
-        effectiveDate: new Date().toISOString().split("T")[0],
-        expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split("T")[0],
-        status: "new",
-        uom: newRow.uom,
-        containerSize: newRow.containerSize,
-        facilityName: newRow.facilityName,
-        projectName: newRow.projectName,
-        profileId: newRow.profileId,
-        generatorId: newRow.generatorId,
-        contractId: newRow.contractId,
+      // Convert and validate the entered data
+      const convertedData = {
+        productName: convertValue(newRow.productName, "productName"),
+        unitPrice: convertValue(newRow.unitPrice, "unitPrice"),
+        minimumPrice: convertValue(newRow.minimumPrice, "minimumPrice"),
+        effectiveDate: convertValue(newRow.effectiveDate, "effectiveDate"),
+        expirationDate: convertValue(newRow.expirationDate, "expirationDate"),
+        projectName: convertValue(newRow.projectName, "projectName"),
+        profileId: convertValue(newRow.profileId, "profileId"),
+        generatorId: convertValue(newRow.generatorId, "generatorId"),
+        contractId: convertValue(newRow.contractId, "contractId"),
+        facilityName: convertValue(newRow.facilityName, "facilityName"),
+        containerSize: convertValue(newRow.containerSize, "containerSize"),
+        uom: convertValue(newRow.uom, "uom"),
       };
 
-      // Add to existing data
-      setAllPricingData((prev) => ({
-        ...prev,
-        priceItems: [newPriceItem, ...prev.priceItems], // Add new items at the top
-      }));
+      // Check if user has actually entered any data
+      const hasEnteredData = Object.values(convertedData).some(
+        (value) => value !== "" && value !== 0
+      );
 
-      // Track the new row for highlighting
+      // If no data has been entered, just return the row without saving
+      if (!hasEnteredData) {
+        console.log("No data entered, returning row without saving");
+        return newRow;
+      }
+
+      // Validate required fields only if user has started entering data
+      if (!convertedData.productName) {
+        throw new Error("Product name is required");
+      }
+      if (!convertedData.unitPrice || convertedData.unitPrice <= 0) {
+        throw new Error("Valid unit price is required");
+      }
+
+      // Create a new price item from the entered data
+      const newPriceItem: PriceItem = {
+        priceItemId: newRow.id || `new-${Date.now()}`,
+        priceHeaderId: allPricingData.priceHeaders[0]?.priceHeaderId || "",
+        productName: convertedData.productName,
+        region: newRow.region || "North",
+        unitPrice: convertedData.unitPrice,
+        minimumPrice: convertedData.minimumPrice,
+        effectiveDate:
+          convertedData.effectiveDate || new Date().toISOString().split("T")[0],
+        expirationDate:
+          convertedData.expirationDate ||
+          new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split("T")[0],
+        status: "new",
+        uom: convertedData.uom,
+        containerSize: convertedData.containerSize,
+        facilityName: convertedData.facilityName,
+        projectName: convertedData.projectName,
+        profileId: convertedData.profileId,
+        generatorId: convertedData.generatorId,
+        contractId: convertedData.contractId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Add the new item to the main data
+      setAllPricingData((prev) => {
+        const updated = {
+          ...prev,
+          priceItems: [newPriceItem, ...prev.priceItems], // Add at the top
+        };
+        console.log("Added new price item to data:", newPriceItem);
+        console.log("Updated price items count:", updated.priceItems.length);
+        return updated;
+      });
+
+      // Add to newRows set to track it
       setNewRows((prev) => new Set([...prev, newPriceItem.priceItemId]));
 
       // Reset editing state
       setEditingRowId(null);
       setNewRowId(null);
 
-      toast.success("New price entry added successfully");
-      return newRow;
+      toast.success("New entry added successfully");
+
+      // Return the updated row data
+      return {
+        ...newRow,
+        id: newPriceItem.priceItemId,
+        isNewEntry: false, // Mark as no longer a new entry
+        ...convertedData, // Include the converted data
+      };
     }
 
     // For existing rows, track which columns were modified
     const modifiedFields = new Set<string>();
 
-    // Compare each field to detect changes
+    // Convert all field values to proper types
+    const convertedNewRow = { ...newRow };
     const fieldsToTrack = [
       "customerName",
       "productName",
@@ -795,17 +1439,59 @@ export default function AllCustomerPricingPage() {
     ];
 
     fieldsToTrack.forEach((field) => {
-      if (newRow[field] !== oldRow[field]) {
+      const convertedValue = convertValue(newRow[field], field);
+      convertedNewRow[field] = convertedValue;
+
+      // Compare with old value to detect changes
+      const oldValue = convertValue(oldRow[field], field);
+      if (convertedValue !== oldValue) {
         modifiedFields.add(field);
       }
     });
 
-    // If any fields were modified, track them
+    // Validate critical fields for existing rows
+    if (convertedNewRow.unitPrice < 0) {
+      throw new Error("Unit price cannot be negative");
+    }
+    if (convertedNewRow.minimumPrice < 0) {
+      throw new Error("Minimum price cannot be negative");
+    }
+
+    // If any fields were modified, update the underlying data
     if (modifiedFields.size > 0) {
       console.log(
         `Row ${newRow.id} modified fields:`,
         Array.from(modifiedFields)
       );
+
+      // Update the price item in the main data
+      setAllPricingData((prev) => ({
+        ...prev,
+        priceItems: prev.priceItems.map((item) => {
+          if (item.priceItemId === newRow.id) {
+            const updatedItem = {
+              ...item,
+              productName: convertedNewRow.productName,
+              containerSize: convertedNewRow.containerSize,
+              facilityName: convertedNewRow.facilityName,
+              projectName: convertedNewRow.projectName,
+              profileId: convertedNewRow.profileId,
+              generatorId: convertedNewRow.generatorId,
+              unitPrice: convertedNewRow.unitPrice,
+              minimumPrice: convertedNewRow.minimumPrice,
+              uom: convertedNewRow.uom,
+              effectiveDate: convertedNewRow.effectiveDate,
+              expirationDate: convertedNewRow.expirationDate,
+              updatedAt: new Date().toISOString(),
+            };
+            console.log("Updated price item:", updatedItem);
+            return updatedItem;
+          }
+          return item;
+        }),
+      }));
+
+      // Track modified rows and columns for highlighting
       setModifiedRows((prev) => new Set([...prev, newRow.id]));
       setModifiedColumns((prev) => {
         const newMap = new Map(prev);
@@ -825,10 +1511,10 @@ export default function AllCustomerPricingPage() {
           const updatedHeader = {
             ...header,
             ...(modifiedFields.has("effectiveDate") && {
-              effectiveDate: newRow.effectiveDate,
+              effectiveDate: convertedNewRow.effectiveDate,
             }),
             ...(modifiedFields.has("expirationDate") && {
-              expirationDate: newRow.expirationDate,
+              expirationDate: convertedNewRow.expirationDate,
             }),
           };
 
@@ -841,9 +1527,12 @@ export default function AllCustomerPricingPage() {
           }));
         }
       }
+
+      // Force a re-render to ensure the DataGrid updates
+      setForceRerender((prev) => prev + 1);
     }
 
-    return newRow;
+    return convertedNewRow;
   };
 
   const handleApplyChanges = () => {
@@ -852,6 +1541,44 @@ export default function AllCustomerPricingPage() {
       return;
     }
     setApplyChangesDialogOpen(true);
+  };
+
+  const handleEditSelected = () => {
+    const selectedIds = getSelectedRowIds();
+    if (selectedIds.length === 0) {
+      toast.error("Please select at least one row to edit");
+      return;
+    }
+    if (selectedIds.length > 1) {
+      toast.error("Please select only one row to edit at a time");
+      return;
+    }
+
+    // Find the selected row data
+    const selectedRow = rows.find((row) => row.id === selectedIds[0]);
+    if (!selectedRow) {
+      toast.error("Selected row not found");
+      return;
+    }
+
+    // Set up the edit form with current data
+    setEditingEntryId(selectedRow.id);
+    setEditingEntryData({
+      productName: selectedRow.productName || "",
+      unitPrice: selectedRow.unitPrice || "",
+      minimumPrice: selectedRow.minimumPrice || "",
+      effectiveDate: selectedRow.effectiveDate || "",
+      expirationDate: selectedRow.expirationDate || "",
+      projectName: selectedRow.projectName || "",
+      profileId: selectedRow.profileId || "",
+      generatorId: selectedRow.generatorId || "",
+      contractId: selectedRow.contractId || "",
+      facilityName: selectedRow.facilityName || "",
+      containerSize: selectedRow.containerSize || "",
+      uom: selectedRow.uom || "",
+      region: selectedRow.region || "North",
+    });
+    setShowEditEntryForm(true);
   };
 
   const handleApplyChangesSubmit = () => {
@@ -1087,17 +1814,10 @@ export default function AllCustomerPricingPage() {
     const totalChanges =
       (newRows ? newRows.size : 0) + (modifiedRows ? modifiedRows.size : 0);
 
-    // TODO: Implement actual draft saving logic here
-    // This would typically involve:
-    // 1. Saving changes to a draft state
-    // 2. Sending data to backend API for draft storage
-    // 3. Handling success/error responses
+    // This function just confirms the current state
+    toast.success(`Changes saved with ${totalChanges} modified entries`);
 
-    toast.success(
-      `Successfully saved draft with ${totalChanges} modified entries`
-    );
-
-    // Note: Don't reset edit mode for drafts - user can continue editing
+    // Note: Don't reset edit mode - user can continue editing
     setSubmitPriceChangeConfirmOpen(false);
   };
 
@@ -1108,6 +1828,88 @@ export default function AllCustomerPricingPage() {
       toast.error("No rows selected for deletion");
       return;
     }
+
+    // Check if any selected rows have effective dates less than or equal to today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day for comparison
+
+    console.log("Today's date:", today.toISOString());
+    console.log("Selected IDs:", selectedIds);
+
+    const rowsWithPastEffectiveDates = selectedIds.filter((id) => {
+      const row = allPricingData.priceItems.find(
+        (item) => item.priceItemId === id
+      );
+      if (!row) {
+        console.log(`Row not found for ID: ${id}`);
+        return false;
+      }
+
+      console.log(`Row found:`, row);
+
+      // Check if the row itself has an effective date
+      if (row.effectiveDate) {
+        const effectiveDate = new Date(row.effectiveDate);
+        effectiveDate.setHours(0, 0, 0, 0);
+        console.log(
+          `Row effective date: ${
+            row.effectiveDate
+          } -> ${effectiveDate.toISOString()}`
+        );
+
+        if (effectiveDate <= today) {
+          console.log(
+            `Row has past effective date: ${effectiveDate.toISOString()} <= ${today.toISOString()}`
+          );
+          return true;
+        }
+      }
+
+      // Find the corresponding price header to get the effective date
+      const header = allPricingData.priceHeaders.find(
+        (h) => h.priceHeaderId === row.priceHeaderId
+      );
+      if (!header) {
+        console.log(`Header not found for priceHeaderId: ${row.priceHeaderId}`);
+        return false;
+      }
+
+      if (!header.effectiveDate) {
+        console.log(`Header has no effective date:`, header);
+        return false;
+      }
+
+      const effectiveDate = new Date(header.effectiveDate);
+      effectiveDate.setHours(0, 0, 0, 0); // Set to start of day for comparison
+
+      console.log(
+        `Header effective date: ${
+          header.effectiveDate
+        } -> ${effectiveDate.toISOString()}`
+      );
+
+      if (effectiveDate <= today) {
+        console.log(
+          `Header has past effective date: ${effectiveDate.toISOString()} <= ${today.toISOString()}`
+        );
+        return true;
+      }
+
+      return false;
+    });
+
+    console.log("Rows with past effective dates:", rowsWithPastEffectiveDates);
+
+    if (rowsWithPastEffectiveDates.length > 0) {
+      console.log("Validation failed - showing error dialog");
+      setValidationErrorDetails({
+        count: rowsWithPastEffectiveDates.length,
+        rows: rowsWithPastEffectiveDates,
+      });
+      setDeleteValidationErrorOpen(true);
+      return;
+    }
+
     setDeleteConfirmOpen(true);
   };
 
@@ -1326,115 +2128,17 @@ export default function AllCustomerPricingPage() {
           },
         ]
       : []),
-    {
-      field: "customerName",
-      headerName: "Customer",
-      width: 250,
-      flex: 1,
-      minWidth: 200,
-      editable: true,
-      type: "singleSelect",
-      valueOptions: getUniqueCustomers().map((value) => ({
-        value,
-        label: value,
-      })),
-      renderCell: (params: any) => {
-        const customerId = params.row.customerId;
-        const customer = allPricingData?.customers?.find(
-          (c) => c.customerId === customerId
-        );
-        const displayName =
-          customer?.status === "inactive"
-            ? `${params.value} (Inactive)`
-            : params.value;
 
-        // Check if this cell has modified fields
-        const modifiedFields = modifiedColumns.get(params.row.id);
-        const isModified = modifiedFields?.has("customerName");
-
-        return (
-          <div
-            style={{
-              whiteSpace: "pre-wrap",
-              wordWrap: "break-word",
-              lineHeight: "1.2",
-            }}
-          >
-            <div
-              style={{
-                fontWeight: isModified ? "bold" : "500",
-                color: isModified ? "#1c1b1f" : "inherit",
-              }}
-            >
-              {displayName}
-            </div>
-            <div style={{ fontSize: "0.8em", color: "#666" }}>
-              ID: {customerId}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      field: "productName",
-      headerName: "Product",
-      width: 100,
-      flex: 0,
-      minWidth: 80,
-      editable: true,
-      renderCell: (params: any) => {
-        // Check if this cell has modified fields
-        const modifiedFields = modifiedColumns.get(params.row.id);
-        const isModified = modifiedFields?.has("productName");
-
-        return (
-          <div
-            style={{
-              fontWeight: isModified ? "bold" : "normal",
-              color: isModified ? "#1c1b1f" : "inherit",
-            }}
-          >
-            {params.value}
-          </div>
-        );
-      },
-    },
     {
       field: "profileId",
       headerName: "Profile",
       width: 120,
       flex: 0.5,
       minWidth: 100,
-      editable: true,
+      // editable: true, // Disabled direct editing
       renderCell: (params: any) => {
-        // Check if this cell has modified fields
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isModified = modifiedFields?.has("profileId");
-
-        return (
-          <div
-            style={{
-              fontWeight: isModified ? "bold" : "normal",
-              color: isModified ? "#1c1b1f" : "inherit",
-            }}
-          >
-            {params.value}
-          </div>
-        );
-      },
-    },
-    {
-      field: "generatorId",
-      headerName: "Generator",
-      width: 120,
-      flex: 0.5,
-      minWidth: 100,
-      editable: true,
-      renderCell: (params: any) => {
-        // Check if this cell has modified fields
-        const modifiedFields = modifiedColumns.get(params.row.id);
-        const isModified = modifiedFields?.has("generatorId");
-
         return (
           <div
             style={{
@@ -1453,12 +2157,76 @@ export default function AllCustomerPricingPage() {
       width: 150,
       flex: 1,
       minWidth: 120,
-      editable: true,
+      // editable: true, // Disabled direct editing
       renderCell: (params: any) => {
-        // Check if this cell has modified fields
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isModified = modifiedFields?.has("projectName");
-
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
+    },
+    {
+      field: "generatorId",
+      headerName: "Generator",
+      width: 200,
+      flex: 0.8,
+      minWidth: 180,
+      // editable: true, // Disabled direct editing
+      renderCell: (params: any) => {
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("generatorId");
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
+    },
+    {
+      field: "contractId",
+      headerName: "Contract",
+      width: 120,
+      flex: 0.5,
+      minWidth: 100,
+      // editable: true, // Disabled direct editing
+      renderCell: (params: any) => {
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("contractId");
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
+    },
+    {
+      field: "region",
+      headerName: "Region",
+      width: 100,
+      flex: 0.5,
+      minWidth: 80,
+      // editable: true, // Disabled direct editing
+      renderCell: (params: any) => {
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("region");
         return (
           <div
             style={{
@@ -1477,17 +2245,83 @@ export default function AllCustomerPricingPage() {
       width: 150,
       flex: 1,
       minWidth: 120,
-      editable: true,
+      // editable: true, // Disabled direct editing
       type: "singleSelect",
       valueOptions: getUniqueFacilities().map((value) => ({
         value,
         label: value,
       })),
       renderCell: (params: any) => {
-        // Check if this cell has modified fields
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isModified = modifiedFields?.has("facilityName");
-
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
+    },
+    {
+      field: "productName",
+      headerName: "Item",
+      width: 100,
+      flex: 0,
+      minWidth: 80,
+      // editable: true, // Disabled direct editing
+      renderCell: (params: any) => {
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("productName");
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
+    },
+    {
+      field: "description",
+      headerName: "Description",
+      width: 200,
+      flex: 1,
+      minWidth: 150,
+      // editable: true, // Disabled direct editing
+      renderCell: (params: any) => {
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("description");
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
+    },
+    {
+      field: "uom",
+      headerName: "UOM",
+      width: 100,
+      flex: 0,
+      minWidth: 80,
+      // editable: true, // Disabled direct editing
+      type: "singleSelect",
+      valueOptions: ["Each", "Gallon", "Pound", "Container", "Ton"],
+      renderCell: (params: any) => {
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("uom");
         return (
           <div
             style={{
@@ -1506,17 +2340,15 @@ export default function AllCustomerPricingPage() {
       width: 130,
       flex: 0.8,
       minWidth: 110,
-      editable: true,
+      // editable: true, // Disabled direct editing
       type: "singleSelect",
       valueOptions: getUniqueContainerSizes().map((value) => ({
         value,
         label: value,
       })),
       renderCell: (params: any) => {
-        // Check if this cell has modified fields
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isModified = modifiedFields?.has("containerSize");
-
         return (
           <div
             style={{
@@ -1535,90 +2367,50 @@ export default function AllCustomerPricingPage() {
       width: 120,
       flex: 0,
       minWidth: 100,
-      editable: isEditMode,
+      // editable: isEditMode, // Disabled direct editing
+      type: "number",
+      valueGetter: (params: any) => {
+        return params.value || 0;
+      },
+      valueSetter: (params: any) => {
+        const value = parseFloat(params.value) || 0;
+        return { ...params.row, unitPrice: value };
+      },
       renderCell: (params: any) => {
         const price = formatCurrency(params.value);
-        const effectiveDate = params.row.effectiveDate;
-        const expirationDate = params.row.expirationDate;
-
-        // Check if this cell has modified fields
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isPriceModified = modifiedFields?.has("unitPrice");
-        const isEffectiveDateModified = modifiedFields?.has("effectiveDate");
-        const isExpirationDateModified = modifiedFields?.has("expirationDate");
-
-        return (
-          <div style={{ lineHeight: "1.2" }}>
-            <div
-              style={{
-                fontWeight: isPriceModified ? "bold" : "500",
-                color: isPriceModified ? "#1c1b1f" : "inherit",
-              }}
-            >
-              {price}
-            </div>
-            {effectiveDate && expirationDate && (
-              <div
-                style={{
-                  fontSize: "0.75em",
-                  marginTop: "2px",
-                  fontWeight:
-                    isEffectiveDateModified || isExpirationDateModified
-                      ? "bold"
-                      : "normal",
-                  color:
-                    isEffectiveDateModified || isExpirationDateModified
-                      ? "#1c1b1f"
-                      : "#888",
-                }}
-              >
-                {formatDate(effectiveDate)} - {formatDate(expirationDate)}
-              </div>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      field: "uom",
-      headerName: "UOM",
-      width: 100,
-      flex: 0,
-      minWidth: 80,
-      editable: true,
-      type: "singleSelect",
-      valueOptions: ["Each", "Gallon", "Pound", "Container", "Ton"],
-      renderCell: (params: any) => {
-        // Check if this cell has modified fields
-        const modifiedFields = modifiedColumns.get(params.row.id);
-        const isModified = modifiedFields?.has("uom");
-
         return (
           <div
             style={{
-              fontWeight: isModified ? "bold" : "normal",
-              color: isModified ? "#1c1b1f" : "inherit",
+              fontWeight: isPriceModified ? "bold" : "500",
+              color: isPriceModified ? "#1c1b1f" : "inherit",
             }}
           >
-            {params.value}
+            {price}
           </div>
         );
       },
     },
     {
       field: "minimumPrice",
-      headerName: "Minimum",
+      headerName: "Price Minimum",
       width: 120,
       flex: 0,
       minWidth: 100,
-      editable: isEditMode,
+      // editable: isEditMode, // Disabled direct editing
+      type: "number",
+      valueGetter: (params: any) => {
+        return params.value || 0;
+      },
+      valueSetter: (params: any) => {
+        const value = parseFloat(params.value) || 0;
+        return { ...params.row, minimumPrice: value };
+      },
       renderCell: (params: any) => {
         const price = formatCurrency(params.value);
-
-        // Check if this cell has modified fields
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isPriceModified = modifiedFields?.has("minimumPrice");
-
         return (
           <div
             style={{
@@ -1627,6 +2419,145 @@ export default function AllCustomerPricingPage() {
             }}
           >
             {price}
+          </div>
+        );
+      },
+    },
+    {
+      field: "effectiveDate",
+      headerName: "Effective Date",
+      width: 120,
+      flex: 0,
+      minWidth: 100,
+      // editable: isEditMode, // Disabled direct editing
+      type: "date",
+      valueGetter: (params: any) => {
+        try {
+          const value = params.row?.effectiveDate;
+          return value ? new Date(value) : null;
+        } catch {
+          return null;
+        }
+      },
+      valueSetter: (params: any) => {
+        if (!params || !params.row) {
+          return { id: "temp", effectiveDate: "" };
+        }
+
+        try {
+          const value = params.value;
+          const dateString =
+            value instanceof Date ? value.toISOString().split("T")[0] : "";
+          return { ...params.row, effectiveDate: dateString };
+        } catch {
+          return { ...params.row, effectiveDate: "" };
+        }
+      },
+      renderCell: (params: any) => {
+        // Get the original value from the row data for display
+        const originalValue = params.row.effectiveDate;
+        const date = originalValue ? formatDate(originalValue) : "";
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("effectiveDate");
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {date}
+          </div>
+        );
+      },
+    },
+    {
+      field: "expirationDate",
+      headerName: "Expiry Date",
+      width: 120,
+      flex: 0,
+      minWidth: 100,
+      // editable: isEditMode, // Disabled direct editing
+      type: "date",
+      valueGetter: (params: any) => {
+        try {
+          const value = params.row?.expirationDate;
+          return value ? new Date(value) : null;
+        } catch {
+          return null;
+        }
+      },
+      valueSetter: (params: any) => {
+        if (!params || !params.row) {
+          return { id: "temp", expirationDate: "" };
+        }
+
+        try {
+          const value = params.value;
+          const dateString =
+            value instanceof Date ? value.toISOString().split("T")[0] : "";
+          return { ...params.row, expirationDate: dateString };
+        } catch {
+          return { ...params.row, expirationDate: "" };
+        }
+      },
+      renderCell: (params: any) => {
+        // Get the original value from the row data for display
+        const originalValue = params.row.expirationDate;
+        const date = originalValue ? formatDate(originalValue) : "";
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("expirationDate");
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {date}
+          </div>
+        );
+      },
+    },
+    {
+      field: "entryDate",
+      headerName: "Entry Date",
+      width: 120,
+      flex: 0,
+      minWidth: 100,
+      editable: false,
+      renderCell: (params: any) => {
+        const date = formatDate(params.value);
+        return (
+          <div
+            style={{
+              color: "#666",
+              fontStyle: "italic",
+              fontSize: "0.875rem",
+            }}
+          >
+            {date}
+          </div>
+        );
+      },
+    },
+    {
+      field: "enteredBy",
+      headerName: "Entered By",
+      width: 120,
+      flex: 0,
+      minWidth: 100,
+      editable: false,
+      renderCell: (params: any) => {
+        return (
+          <div
+            style={{
+              color: "#666",
+              fontStyle: "italic",
+              fontSize: "0.875rem",
+            }}
+          >
+            {params.value}
           </div>
         );
       },
@@ -1773,14 +2704,38 @@ export default function AllCustomerPricingPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="font-['Roboto:Medium',_sans-serif] font-medium text-[32px] leading-[40px] text-[#1c1b1f] mb-2">
-                All Customer Pricing
+                {currentCustomer
+                  ? `${currentCustomer.customerName} Pricing`
+                  : "All Customer Pricing"}
               </h1>
 
-              <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#49454f]">
-                View and filter pricing entries across all customers, contracts,
-                profiles, and item numbers
+              <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#49454f] mb-2">
+                {currentCustomer
+                  ? `View and filter pricing entries for ${currentCustomer.customerName}`
+                  : "View and filter pricing entries across all customers, contracts, profiles, and item numbers"}
               </p>
+
+              {/* Active Status Indicator */}
+              {currentCustomer && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-[#65b230] rounded-full"></div>
+                  <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#65b230]">
+                    Active
+                  </span>
+                </div>
+              )}
             </div>
+
+            {/* Price Header Button */}
+            {currentCustomer && (
+              <SecondaryButton
+                onClick={() => handleOpenPriceHeaderModal()}
+                icon={Settings}
+                size="small"
+              >
+                Price Header
+              </SecondaryButton>
+            )}
           </div>
         </div>
 
@@ -1789,11 +2744,24 @@ export default function AllCustomerPricingPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <span className="font-['Roboto:Medium',_sans-serif] font-medium text-[22px] leading-[28px] text-[#1c1b1f]">
-                  Pricing Items
+                  Price Sheet
                 </span>
                 <span className="inline-flex items-center bg-[rgba(158,158,158,0.1)] text-[#49454f] rounded-full px-3 py-1 text-xs font-medium border border-[#b9b9b9]">
                   {filteredPriceItems.length} items
                 </span>
+                {hasUnsavedChanges() && (
+                  <span className="inline-flex items-center bg-[rgba(101,178,48,0.1)] text-[#65b230] rounded-full px-3 py-1 text-xs font-medium border border-[#65b230]">
+                    {(newRows ? newRows.size : 0) +
+                      (modifiedRows ? modifiedRows.size : 0)}{" "}
+                    pending changes
+                  </span>
+                )}
+                {isEditMode && (
+                  <span className="inline-flex items-center bg-[rgba(25,118,210,0.1)] text-[#1976d2] rounded-full px-3 py-1 text-xs font-medium border border-[#1976d2]">
+                    <div className="w-2 h-2 bg-[#1976d2] rounded-full mr-2 animate-pulse"></div>
+                    Edit Mode Active
+                  </span>
+                )}
               </div>
               <div className="flex items-center space-x-2">
                 {isEditMode && (
@@ -1808,32 +2776,21 @@ export default function AllCustomerPricingPage() {
                         ref={submitMenuAnchorRef}
                         aria-label="split button"
                         style={{
-                          backgroundColor:
-                            (!newRows || newRows.size === 0) &&
-                            (!modifiedRows || modifiedRows.size === 0)
-                              ? "#e0e0e0"
-                              : "#65b230",
+                          backgroundColor: hasUnsavedChanges()
+                            ? "#65b230"
+                            : "#e0e0e0",
                           borderRadius: "100px",
                           overflow: "hidden",
                         }}
                       >
                         <MuiButton
-                          disabled={
-                            (!newRows || newRows.size === 0) &&
-                            (!modifiedRows || modifiedRows.size === 0)
-                          }
+                          disabled={!hasUnsavedChanges()}
                           onClick={() => handleSubmitOptionClick("submit")}
                           style={{
-                            backgroundColor:
-                              (!newRows || newRows.size === 0) &&
-                              (!modifiedRows || modifiedRows.size === 0)
-                                ? "#e0e0e0"
-                                : "#65b230",
-                            color:
-                              (!newRows || newRows.size === 0) &&
-                              (!modifiedRows || modifiedRows.size === 0)
-                                ? "#9e9e9e"
-                                : "white",
+                            backgroundColor: hasUnsavedChanges()
+                              ? "#65b230"
+                              : "#e0e0e0",
+                            color: hasUnsavedChanges() ? "white" : "#9e9e9e",
                             fontFamily: "Roboto, sans-serif",
                             fontWeight: 500,
                             fontSize: "14px",
@@ -1843,21 +2800,15 @@ export default function AllCustomerPricingPage() {
                             border: "none",
                             padding: "8px 16px",
                             minWidth: "auto",
-                            cursor:
-                              (!newRows || newRows.size === 0) &&
-                              (!modifiedRows || modifiedRows.size === 0)
-                                ? "not-allowed"
-                                : "pointer",
+                            cursor: hasUnsavedChanges()
+                              ? "pointer"
+                              : "not-allowed",
                           }}
                         >
                           <Check
                             className="w-4 h-4 mr-2"
                             style={{
-                              color:
-                                (!newRows || newRows.size === 0) &&
-                                (!modifiedRows || modifiedRows.size === 0)
-                                  ? "#9e9e9e"
-                                  : "white",
+                              color: hasUnsavedChanges() ? "white" : "#9e9e9e",
                             }}
                           />
                           <span>
@@ -2004,29 +2955,11 @@ export default function AllCustomerPricingPage() {
                   </FormControl>
                 </div> */}
 
-                {/* Customer Name Search */}
+                {/* Item Name Filter */}
                 <div>
                   <TextField
-                    label="Customer Name"
-                    placeholder="Search customer name..."
-                    value={filters.customerName}
-                    onChange={(e) =>
-                      setFilters((f) => ({
-                        ...f,
-                        customerName: e.target.value,
-                      }))
-                    }
-                    variant="outlined"
-                    size="small"
-                    sx={{ width: "200px" }}
-                  />
-                </div>
-
-                {/* Product Name Filter */}
-                <div>
-                  <TextField
-                    label="Product Name"
-                    placeholder="Product name..."
+                    label="Item"
+                    placeholder="Item..."
                     value={filters.productName}
                     onChange={(e) =>
                       setFilters((f) => ({ ...f, productName: e.target.value }))
@@ -2058,8 +2991,8 @@ export default function AllCustomerPricingPage() {
                 {/* Profile ID Filter */}
                 <div>
                   <TextField
-                    label="Profile ID"
-                    placeholder="Profile ID..."
+                    label="Profile"
+                    placeholder="Profile..."
                     value={filters.profileId}
                     onChange={(e) =>
                       setFilters((f) => ({ ...f, profileId: e.target.value }))
@@ -2074,14 +3007,14 @@ export default function AllCustomerPricingPage() {
                 <div>
                   <TextField
                     label="Generator"
-                    placeholder="Generator..."
+                    placeholder="Generator name or state..."
                     value={filters.generator || ""}
                     onChange={(e) =>
                       setFilters((f) => ({ ...f, generator: e.target.value }))
                     }
                     variant="outlined"
                     size="small"
-                    sx={{ width: "150px" }}
+                    sx={{ width: "180px" }}
                   />
                 </div>
 
@@ -2293,16 +3226,18 @@ export default function AllCustomerPricingPage() {
                         )}
                       </div>
 
+                      {/* Add Line Button */}
                       <PrimaryButton
                         onClick={handleAddNewEntry}
-                        disabled={!!newRowId}
+                        disabled={showNewEntryForm}
                         icon={Plus}
                         size="small"
                       >
-                        {newRowId ? "Adding..." : "Add Entry"}
+                        {showNewEntryForm ? "Adding..." : "Add Line"}
                       </PrimaryButton>
+
                       <SecondaryButton
-                        onClick={handleApplyChanges}
+                        onClick={handleEditSelected}
                         disabled={getSelectedRowIds().length === 0}
                         icon={PenSquare}
                         size="small"
@@ -2333,38 +3268,6 @@ export default function AllCustomerPricingPage() {
                     </div>
                   </div>
 
-                  {/* Save/Cancel buttons when editing new entry */}
-                  {newRowId && (
-                    <div className="flex items-center space-x-3 pt-2 border-t border-gray-200">
-                      <PrimaryButton
-                        onClick={handleSaveNewEntry}
-                        size="small"
-                        sx={{
-                          backgroundColor: "#65b230",
-                          "&:hover": {
-                            backgroundColor: "#4a8a1f",
-                          },
-                        }}
-                      >
-                        Save Entry
-                      </PrimaryButton>
-                      <SecondaryButton
-                        onClick={handleCancelNewEntry}
-                        size="small"
-                        sx={{
-                          borderColor: "#b9b9b9",
-                          color: "#49454f",
-                          "&:hover": {
-                            borderColor: "#65b230",
-                            color: "#65b230",
-                          },
-                        }}
-                      >
-                        Cancel
-                      </SecondaryButton>
-                    </div>
-                  )}
-
                   {/* Price Change Configuration - Compact Summary */}
                   {currentPriceChangeConfig && (
                     <div className="mt-3 pt-3 border-t border-gray-200">
@@ -2377,10 +3280,10 @@ export default function AllCustomerPricingPage() {
                             fontWeight: 500,
                           }}
                         >
-                          Price Header Configuration:{" "}
-                          {currentPriceChangeConfig.templateType === "standard"
-                            ? "Standard"
-                            : "Custom"}{" "}
+                          Price Change Configuration:{" "}
+                          {currentPriceChangeConfig.excelUploadMode === "upload"
+                            ? "Excel Upload"
+                            : "Manual Entry"}{" "}
                           • {currentPriceChangeConfig.selectedRequests.length}{" "}
                           change request
                         </Typography>
@@ -2417,32 +3320,35 @@ export default function AllCustomerPricingPage() {
                 ) : (
                   <div style={{ width: "100%", height: "600px" }}>
                     <DataGrid
-                      key={`datagrid-${modifiedRows.size}-${modifiedColumns.size}`}
+                      key={`datagrid-${modifiedRows.size}-${
+                        modifiedColumns.size
+                      }-${newRows.size}-${
+                        newRowId || "no-new"
+                      }-${forceRerender}`}
                       rows={rows || []}
                       columns={columns || []}
                       getRowId={(row) => row.id}
                       density="comfortable"
-                      editMode={isEditMode ? "row" : undefined}
-                      processRowUpdate={
-                        isEditMode ? processRowUpdate : undefined
-                      }
+                      // Disabled direct grid editing - users must use modals
+                      // editMode={isEditMode ? "row" : undefined}
+                      // processRowUpdate={
+                      //   isEditMode ? processRowUpdate : undefined
+                      // }
+                      // onProcessRowUpdateError={(error) => {
+                      //   console.error("Row update error:", error);
+                      //   toast.error("Failed to update row. Please try again.");
+                      // }}
                       getRowClassName={(params) => {
                         // Add special styling for different row types
-                        if (params.row.isNewEntry) {
-                          return "new-entry-row";
-                        }
-                        if (newRows.has(params.row.id)) {
+                        if (params.row.isNew) {
                           return "new-row";
                         }
-                        if (modifiedRows.has(params.row.id)) {
+                        if (params.row.isModified) {
                           return "modified-row";
                         }
                         return "";
                       }}
                       sx={{
-                        "& .new-entry-row": {
-                          backgroundColor: "#f0f9ff",
-                        },
                         "& .new-row": {
                           backgroundColor: "#f0fff4",
                           "&:hover": {
@@ -2486,8 +3392,23 @@ export default function AllCustomerPricingPage() {
                           backgroundColor: "#E0E0E0",
                         },
                       }}
-                      disableRowSelectionOnClick={!isEditMode}
-                      isCellEditable={() => isEditMode}
+                      disableRowSelectionOnClick={true}
+                      // Disabled direct cell editing - users must use modals
+                      // isCellEditable={(params) => {
+                      //   // Only allow editing when in edit mode and not for certain columns
+                      //   if (!isEditMode) return false;
+                      //
+                      //   // Don't allow editing for selection column, entry date, or entered by
+                      //   if (
+                      //     params.field === "selection" ||
+                      //     params.field === "entryDate" ||
+                      //     params.field === "enteredBy"
+                      //   ) {
+                      //     return false;
+                      //   }
+                      //
+                      //   return true;
+                      // }}
                       disableColumnMenu={true}
                     />
                   </div>
@@ -2685,8 +3606,8 @@ export default function AllCustomerPricingPage() {
           <DialogContent sx={{ p: 3 }}>
             <div className="flex items-center justify-between mb-4">
               <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#49454f]">
-                Choose price change request(s) to associate with your new price
-                change action:
+                Choose a price change request to associate with your new price
+                change action. Select one request using the radio buttons:
               </p>
               <div className="flex gap-2"></div>
             </div>
@@ -2858,7 +3779,7 @@ export default function AllCustomerPricingPage() {
                         </Box>
                       </Box>
                       <Box sx={{ ml: 2 }}>
-                        <Checkbox
+                        <Radio
                           checked={selectedPriceChangeRequests.includes(
                             request.id
                           )}
@@ -2927,8 +3848,7 @@ export default function AllCustomerPricingPage() {
                 variant="subtitle2"
                 sx={{ mb: 1, color: "#495057", fontWeight: 600 }}
               >
-                Selected Price Change Requests (
-                {selectedPriceChangeRequests.length})
+                Selected Price Change Request
               </Typography>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                 {selectedPriceChangeRequests.map((requestId) => {
@@ -2951,515 +3871,181 @@ export default function AllCustomerPricingPage() {
               </Box>
             </Box>
 
-            {/* Template Type Selection */}
+            {/* Import Options Toggle */}
             <Box sx={{ mb: 4 }}>
               <Typography
                 variant="h6"
                 sx={{ mb: 2, color: "#1c1b1f", fontWeight: 600 }}
               >
-                Price Header Template
+                Entry Options
               </Typography>
-              <Box sx={{ display: "flex", gap: 2 }}>
-                <Card
-                  sx={{
-                    flex: 1,
-                    cursor: "pointer",
-                    border:
-                      templateType === "standard"
-                        ? "2px solid #65b230"
-                        : "1px solid #e0e0e0",
-                    backgroundColor:
-                      templateType === "standard"
-                        ? "rgba(101,178,48,0.08)"
-                        : "transparent",
-                    "&:hover": {
-                      borderColor: "#65b230",
-                      backgroundColor: "rgba(101,178,48,0.04)",
-                    },
-                    transition: "all 0.2s ease-in-out",
-                  }}
-                  onClick={() => setTemplateType("standard")}
-                >
-                  <CardContent sx={{ p: 3 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                      <Box
-                        sx={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 1,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          backgroundColor:
-                            templateType === "standard"
-                              ? "rgba(101,178,48,0.2)"
-                              : "rgba(101,178,48,0.05)",
-                        }}
-                      >
-                        <Settings
-                          size={20}
-                          color={
-                            templateType === "standard"
-                              ? "#65b230"
-                              : "rgba(101,178,48,0.7)"
-                          }
-                        />
-                      </Box>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography
-                          variant="subtitle1"
-                          sx={{ fontWeight: 600, color: "#1c1b1f" }}
-                        >
-                          Standard Template
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{ color: "#666", fontSize: "0.75rem" }}
-                        >
-                          Use predefined standard settings
-                        </Typography>
-                      </Box>
-                      {templateType === "standard" && (
-                        <Check size={16} color="#65b230" />
-                      )}
-                    </Box>
-                  </CardContent>
-                </Card>
-                <Card
-                  sx={{
-                    flex: 1,
-                    cursor: "pointer",
-                    border:
-                      templateType === "custom"
-                        ? "2px solid #65b230"
-                        : "1px solid #e0e0e0",
-                    backgroundColor:
-                      templateType === "custom"
-                        ? "rgba(101,178,48,0.08)"
-                        : "transparent",
-                    "&:hover": {
-                      borderColor: "#65b230",
-                      backgroundColor: "rgba(101,178,48,0.04)",
-                    },
-                    transition: "all 0.2s ease-in-out",
-                  }}
-                  onClick={() => setTemplateType("custom")}
-                >
-                  <CardContent sx={{ p: 3 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                      <Box
-                        sx={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 1,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          backgroundColor:
-                            templateType === "custom"
-                              ? "rgba(101,178,48,0.2)"
-                              : "rgba(101,178,48,0.05)",
-                        }}
-                      >
-                        <PenSquare
-                          size={20}
-                          color={
-                            templateType === "custom"
-                              ? "#65b230"
-                              : "rgba(101,178,48,0.7)"
-                          }
-                        />
-                      </Box>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography
-                          variant="subtitle1"
-                          sx={{ fontWeight: 600, color: "#1c1b1f" }}
-                        >
-                          Custom Template
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{ color: "#666", fontSize: "0.75rem" }}
-                        >
-                          Customize individual settings
-                        </Typography>
-                      </Box>
-                      {templateType === "custom" && (
-                        <Check size={16} color="#65b230" />
-                      )}
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Box>
-            </Box>
+              <Typography variant="body2" sx={{ mb: 3, color: "#666" }}>
+                Choose how you'd like to proceed with the price change. You can
+                upload an Excel template or start with manual entry.
+              </Typography>
 
-            {/* Standard Template Summary */}
-            {templateType === "standard" && (
-              <Box sx={{ mb: 4 }}>
-                <Card sx={{ bgcolor: "#f9f9f9", border: "1px solid #e0e0e0" }}>
-                  <CardContent sx={{ p: 3 }}>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        mb: 2,
-                      }}
-                    >
-                      <Typography
-                        variant="h6"
-                        sx={{ fontWeight: 600, color: "#1c1b1f" }}
-                      >
-                        Standard Template Settings
-                      </Typography>
-                      <SecondaryButton
-                        onClick={() => setTemplateType("custom")}
-                        icon={Settings}
-                      >
-                        Edit Header
-                      </SecondaryButton>
-                    </Box>
-                    <Box
-                      sx={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 2,
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Typography
-                          sx={{
-                            color: "#666",
-                            fontWeight: 600,
-                            fontSize: "0.875rem",
-                          }}
-                        >
-                          EEI:
-                        </Typography>
-                        <Typography
-                          sx={{ fontWeight: 500, fontSize: "0.875rem" }}
-                        >
-                          15%
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Typography
-                          sx={{
-                            color: "#666",
-                            fontWeight: 600,
-                            fontSize: "0.875rem",
-                          }}
-                        >
-                          Fuel Surcharge:
-                        </Typography>
-                        <Typography
-                          sx={{ fontWeight: 500, fontSize: "0.875rem" }}
-                        >
-                          Standard Monthly
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Typography
-                          sx={{
-                            color: "#666",
-                            fontWeight: 600,
-                            fontSize: "0.875rem",
-                          }}
-                        >
-                          Invoice Minimum:
-                        </Typography>
-                        <Typography
-                          sx={{ fontWeight: 500, fontSize: "0.875rem" }}
-                        >
-                          $350
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Typography
-                          sx={{
-                            color: "#666",
-                            fontWeight: 600,
-                            fontSize: "0.875rem",
-                          }}
-                        >
-                          E-Manifest Fee:
-                        </Typography>
-                        <Typography
-                          sx={{ fontWeight: 500, fontSize: "0.875rem" }}
-                        >
-                          $25
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Typography
-                          sx={{
-                            color: "#666",
-                            fontWeight: 600,
-                            fontSize: "0.875rem",
-                          }}
-                        >
-                          Economic Adjustment:
-                        </Typography>
-                        <Typography
-                          sx={{ fontWeight: 500, fontSize: "0.875rem" }}
-                        >
-                          3%
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </Card>
+              {/* Toggle Buttons */}
+              <Box sx={{ mb: 3 }}>
+                <ButtonGroup variant="outlined" sx={{ width: "100%" }}>
+                  <MuiButton
+                    onClick={() => setExcelUploadMode("upload")}
+                    sx={{
+                      flex: 1,
+                      backgroundColor:
+                        excelUploadMode === "upload"
+                          ? "#65b230"
+                          : "transparent",
+                      color: excelUploadMode === "upload" ? "white" : "#1c1b1f",
+                      borderColor: "#65b230",
+                      "&:hover": {
+                        backgroundColor:
+                          excelUploadMode === "upload"
+                            ? "#5a9e2a"
+                            : "rgba(101,178,48,0.04)",
+                        borderColor: "#65b230",
+                      },
+                      textTransform: "none",
+                      py: 1.5,
+                    }}
+                  >
+                    <Upload size={16} style={{ marginRight: "8px" }} />
+                    Excel Upload
+                  </MuiButton>
+                  <MuiButton
+                    onClick={() => setExcelUploadMode("manual")}
+                    sx={{
+                      flex: 1,
+                      backgroundColor:
+                        excelUploadMode === "manual"
+                          ? "#65b230"
+                          : "transparent",
+                      color: excelUploadMode === "manual" ? "white" : "#1c1b1f",
+                      borderColor: "#65b230",
+                      "&:hover": {
+                        backgroundColor:
+                          excelUploadMode === "manual"
+                            ? "#5a9e2a"
+                            : "rgba(101,178,48,0.04)",
+                        borderColor: "#65b230",
+                      },
+                      textTransform: "none",
+                      py: 1.5,
+                    }}
+                  >
+                    <PenSquare size={16} style={{ marginRight: "8px" }} />
+                    Manual Entry
+                  </MuiButton>
+                </ButtonGroup>
               </Box>
-            )}
 
-            {/* Custom Template Fields */}
-            {templateType === "custom" && (
-              <Box sx={{ mb: 4 }}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    mb: 3,
-                  }}
-                >
+              {/* Excel Upload Section - Always visible when upload mode is selected */}
+              {excelUploadMode === "upload" && (
+                <Box sx={{ mb: 3 }}>
                   <Typography
-                    variant="h6"
-                    sx={{ fontWeight: 600, color: "#1c1b1f" }}
+                    variant="subtitle1"
+                    sx={{ mb: 2, color: "#1c1b1f", fontWeight: 600 }}
                   >
-                    Price Header Settings
+                    Upload Excel Template
                   </Typography>
-                  <SecondaryButton
-                    onClick={() => setTemplateType("standard")}
-                    icon={RotateCcw}
-                  >
-                    Reset to Standard
-                  </SecondaryButton>
-                </Box>
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 3,
-                  }}
-                >
-                  <FormControl variant="outlined" size="small" fullWidth>
-                    <InputLabel>EEI</InputLabel>
-                    <Select
-                      value={customHeaderFields.eei}
-                      onChange={(e) =>
-                        setCustomHeaderFields((prev) => ({
-                          ...prev,
-                          eei: e.target.value,
-                        }))
-                      }
-                      label="EEI"
-                    >
-                      <MenuItem value="Regular">Regular</MenuItem>
-                      <MenuItem value="Custom">Custom</MenuItem>
-                      <MenuItem value="Floating">Floating</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <FormControl variant="outlined" size="small" fullWidth>
-                    <InputLabel>Fuel Surcharge (FSC)</InputLabel>
-                    <Select
-                      value={customHeaderFields.fuelSurcharge}
-                      onChange={(e) =>
-                        setCustomHeaderFields((prev) => ({
-                          ...prev,
-                          fuelSurcharge: e.target.value,
-                        }))
-                      }
-                      label="Fuel Surcharge (FSC)"
-                    >
-                      <MenuItem value="Standard Monthly">
-                        Standard Monthly
-                      </MenuItem>
-                      <MenuItem value="Standard Weekly">
-                        Standard Weekly
-                      </MenuItem>
-                      <MenuItem value="Custom">Custom</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <TextField
-                    label="Invoice Minimum"
-                    type="number"
-                    value={customHeaderFields.invoiceMinimum}
-                    onChange={(e) =>
-                      setCustomHeaderFields((prev) => ({
-                        ...prev,
-                        invoiceMinimum: Number(e.target.value),
-                      }))
-                    }
-                    variant="outlined"
-                    size="small"
-                    fullWidth
-                    placeholder="350"
-                  />
-
-                  <FormControl variant="outlined" size="small" fullWidth>
-                    <InputLabel>Container Conversion</InputLabel>
-                    <Select
-                      value={customHeaderFields.containerConversion}
-                      onChange={(e) =>
-                        setCustomHeaderFields((prev) => ({
-                          ...prev,
-                          containerConversion: e.target.value,
-                        }))
-                      }
-                      label="Container Conversion"
-                    >
-                      <MenuItem value="Standard Conversion 1">
-                        Standard Conversion 1
-                      </MenuItem>
-                      <MenuItem value="Standard Conversion 2">
-                        Standard Conversion 2
-                      </MenuItem>
-                      <MenuItem value="Custom Conversion">
-                        Custom Conversion
-                      </MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <FormControl variant="outlined" size="small" fullWidth>
-                    <InputLabel>Item Minimums</InputLabel>
-                    <Select
-                      value={customHeaderFields.itemMinimums}
-                      onChange={(e) =>
-                        setCustomHeaderFields((prev) => ({
-                          ...prev,
-                          itemMinimums: e.target.value,
-                        }))
-                      }
-                      label="Item Minimums"
-                    >
-                      <MenuItem value="Standard Tables">
-                        Standard Tables
-                      </MenuItem>
-                      <MenuItem value="Custom Tables">Custom Tables</MenuItem>
-                      <MenuItem value="No Minimums">No Minimums</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <TextField
-                    label="Economic Adjustment Fee (EAF) %"
-                    type="number"
-                    value={customHeaderFields.economicAdjustmentFee}
-                    onChange={(e) =>
-                      setCustomHeaderFields((prev) => ({
-                        ...prev,
-                        economicAdjustmentFee: Number(e.target.value),
-                      }))
-                    }
-                    variant="outlined"
-                    size="small"
-                    fullWidth
-                    placeholder="3"
-                  />
-
-                  <TextField
-                    label="E-Manifest Fee"
-                    type="number"
-                    value={customHeaderFields.eManifestFee}
-                    onChange={(e) =>
-                      setCustomHeaderFields((prev) => ({
-                        ...prev,
-                        eManifestFee: Number(e.target.value),
-                      }))
-                    }
-                    variant="outlined"
-                    size="small"
-                    fullWidth
-                    placeholder="25"
-                  />
-
-                  <Box sx={{ gridColumn: "span 2" }}>
-                    <Typography
-                      variant="subtitle2"
-                      sx={{ mb: 2, color: "#666" }}
-                    >
-                      Additional Options
-                    </Typography>
-                    <Box
-                      sx={{ display: "flex", flexDirection: "column", gap: 1 }}
-                    >
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={customHeaderFields.hubFee}
-                            onChange={(e) =>
-                              setCustomHeaderFields((prev) => ({
-                                ...prev,
-                                hubFee: e.target.checked,
-                              }))
-                            }
-                            sx={{ color: "#65b230" }}
-                          />
-                        }
-                        label="Hub Fee"
-                      />
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={customHeaderFields.regionalPricing}
-                            onChange={(e) =>
-                              setCustomHeaderFields((prev) => ({
-                                ...prev,
-                                regionalPricing: e.target.checked,
-                              }))
-                            }
-                            sx={{ color: "#65b230" }}
-                          />
-                        }
-                        label="Regional Pricing"
-                      />
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={customHeaderFields.zoneTransportation}
-                            onChange={(e) =>
-                              setCustomHeaderFields((prev) => ({
-                                ...prev,
-                                zoneTransportation: e.target.checked,
-                              }))
-                            }
-                            sx={{ color: "#65b230" }}
-                          />
-                        }
-                        label="Zone Transportation"
-                      />
-                    </Box>
+                  <Box sx={{ mb: 2 }}>
+                    <input
+                      accept=".xlsx,.xls"
+                      style={{ display: "none" }}
+                      id="excel-file-upload"
+                      type="file"
+                      onChange={handleExcelFileUpload}
+                    />
+                    <label htmlFor="excel-file-upload">
+                      <Card
+                        sx={{
+                          cursor: "pointer",
+                          border: excelFile
+                            ? "2px solid #65b230"
+                            : "2px dashed #e0e0e0",
+                          backgroundColor: excelFile
+                            ? "rgba(101,178,48,0.08)"
+                            : "transparent",
+                          "&:hover": {
+                            borderColor: "#65b230",
+                            backgroundColor: "rgba(101,178,48,0.04)",
+                          },
+                          transition: "all 0.2s ease-in-out",
+                        }}
+                      >
+                        <CardContent sx={{ p: 3, textAlign: "center" }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: 2,
+                              mb: 2,
+                            }}
+                          >
+                            <Upload
+                              size={24}
+                              color={excelFile ? "#65b230" : "#666"}
+                            />
+                            <Typography
+                              variant="h6"
+                              sx={{ color: excelFile ? "#65b230" : "#666" }}
+                            >
+                              {excelFile
+                                ? excelFile.name
+                                : "Click to upload Excel file"}
+                            </Typography>
+                          </Box>
+                          {!excelFile && (
+                            <Typography variant="body2" sx={{ color: "#666" }}>
+                              Supported formats: .xlsx, .xls
+                            </Typography>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </label>
                   </Box>
                 </Box>
-              </Box>
-            )}
+              )}
+
+              {/* Manual Entry Section - Always visible when manual mode is selected */}
+              {excelUploadMode === "manual" && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{ mb: 2, color: "#1c1b1f", fontWeight: 600 }}
+                  >
+                    Manual Entry
+                  </Typography>
+                  <Card
+                    sx={{ bgcolor: "#f8f9fa", border: "1px solid #e9ecef" }}
+                  >
+                    <CardContent sx={{ p: 3 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 2,
+                          mb: 2,
+                        }}
+                      >
+                        <PenSquare size={20} color="#65b230" />
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ color: "#1c1b1f", fontWeight: 600 }}
+                        >
+                          Ready for Manual Entry
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" sx={{ color: "#666" }}>
+                        You can proceed with manual price entry. The pricing
+                        grid will be available for direct editing once you begin
+                        the price change.
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Box>
+              )}
+            </Box>
           </DialogContent>
           <DialogActions sx={{ p: 3, gap: 1 }}>
             <SecondaryButton onClick={handleBackToPriceChangeSelection}>
@@ -3927,6 +4513,814 @@ export default function AllCustomerPricingPage() {
               }}
             >
               Delete Items
+            </PrimaryButton>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Validation Error Dialog */}
+        <Dialog
+          open={deleteValidationErrorOpen}
+          onClose={() => setDeleteValidationErrorOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle
+            sx={{
+              fontFamily: "Roboto:Medium, sans-serif",
+              fontWeight: 500,
+              fontSize: "22px",
+              lineHeight: "28px",
+              color: "#d32f2f",
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+            }}
+          >
+            <AlertCircle className="h-6 w-6 text-[#d32f2f]" />
+            Cannot Delete Selected Items
+          </DialogTitle>
+          <DialogContent sx={{ p: 3 }}>
+            <Typography variant="body1" sx={{ mb: 3, color: "#1c1b1f" }}>
+              You cannot delete {validationErrorDetails.count} selected item
+              {validationErrorDetails.count === 1 ? "" : "s"} because they have
+              effective dates on or before today's date.
+            </Typography>
+
+            <Typography
+              variant="subtitle2"
+              sx={{ mb: 2, color: "#666", fontWeight: 600 }}
+            >
+              Why can't these items be deleted?
+            </Typography>
+
+            <div className="bg-[#fff3e0] border border-[#ffb74d] rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-[#f57c00] mt-0.5 flex-shrink-0" />
+                <div>
+                  <Typography
+                    variant="body2"
+                    sx={{ color: "#e65100", fontWeight: 600, mb: 1 }}
+                  >
+                    Active or Past Effective Dates
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ color: "#666", lineHeight: 1.5 }}
+                  >
+                    Items with effective dates on or before today cannot be
+                    deleted to maintain data integrity and prevent disruption to
+                    active pricing agreements.
+                  </Typography>
+                </div>
+              </div>
+            </div>
+
+            <Typography
+              variant="subtitle2"
+              sx={{ mb: 2, color: "#666", fontWeight: 600 }}
+            >
+              What you can do:
+            </Typography>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-[#65b230] rounded-full"></div>
+                <Typography variant="body2" sx={{ color: "#666" }}>
+                  Only select items with future effective dates for deletion
+                </Typography>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-[#65b230] rounded-full"></div>
+                <Typography variant="body2" sx={{ color: "#666" }}>
+                  Use the "Effective Date" filter to find items with future
+                  dates
+                </Typography>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-[#65b230] rounded-full"></div>
+                <Typography variant="body2" sx={{ color: "#666" }}>
+                  Contact your administrator if you need to modify active
+                  pricing
+                </Typography>
+              </div>
+            </div>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, gap: 2 }}>
+            <PrimaryButton
+              onClick={() => setDeleteValidationErrorOpen(false)}
+              sx={{
+                backgroundColor: "#65b230",
+                "&:hover": { backgroundColor: "#5a9e2a" },
+              }}
+            >
+              I Understand
+            </PrimaryButton>
+          </DialogActions>
+        </Dialog>
+
+        {/* Add New Entry Form Dialog */}
+        <Dialog
+          open={showNewEntryForm}
+          onClose={handleCancelNewEntry}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle
+            sx={{
+              fontFamily: "Roboto:Medium, sans-serif",
+              fontWeight: 500,
+              fontSize: "22px",
+              lineHeight: "28px",
+              color: "#1c1b1f",
+            }}
+          >
+            Add New Price Entry
+          </DialogTitle>
+          <DialogContent sx={{ p: 3, pt: 4 }}>
+            <div className="pt-4 grid grid-cols-2 gap-4">
+              {/* Product Name */}
+              <TextField
+                label="Product Name *"
+                value={newEntryData.productName || ""}
+                onChange={(e) =>
+                  handleEditEntryCellEdit("productName", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                required
+              />
+
+              {/* Unit Price */}
+              <TextField
+                label="Unit Price *"
+                type="number"
+                value={newEntryData.unitPrice || ""}
+                onChange={(e) =>
+                  handleNewEntryCellEdit("unitPrice", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                required
+                inputProps={{ min: 0, step: 0.01 }}
+              />
+
+              {/* Minimum Price */}
+              <TextField
+                label="Minimum Price *"
+                type="number"
+                value={newEntryData.minimumPrice || ""}
+                onChange={(e) =>
+                  handleNewEntryCellEdit("minimumPrice", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                required
+                inputProps={{ min: 0, step: 0.01 }}
+              />
+
+              {/* Container Size */}
+              <FormControl variant="outlined" size="small" fullWidth>
+                <InputLabel>Container Size</InputLabel>
+                <Select
+                  value={newEntryData.containerSize || ""}
+                  onChange={(e) =>
+                    handleNewEntryCellEdit("containerSize", e.target.value)
+                  }
+                  label="Container Size"
+                >
+                  <MenuItem value="">Select Container Size</MenuItem>
+                  <MenuItem value="5G">5G</MenuItem>
+                  <MenuItem value="15G">15G</MenuItem>
+                  <MenuItem value="20G">20G</MenuItem>
+                  <MenuItem value="30G">30G</MenuItem>
+                  <MenuItem value="55G">55G</MenuItem>
+                  <MenuItem value="Tri-Wall">Tri-Wall</MenuItem>
+                  <MenuItem value="275G">275G</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* UOM */}
+              <FormControl variant="outlined" size="small" fullWidth>
+                <InputLabel>UOM</InputLabel>
+                <Select
+                  value={newEntryData.uom || ""}
+                  onChange={(e) =>
+                    handleNewEntryCellEdit("uom", e.target.value)
+                  }
+                  label="UOM"
+                >
+                  <MenuItem value="">Select UOM</MenuItem>
+                  <MenuItem value="Each">Each</MenuItem>
+                  <MenuItem value="Gallon">Gallon</MenuItem>
+                  <MenuItem value="Pound">Pound</MenuItem>
+                  <MenuItem value="Container">Container</MenuItem>
+                  <MenuItem value="Ton">Ton</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* Project Name */}
+              <TextField
+                label="Project Name"
+                value={newEntryData.projectName || ""}
+                onChange={(e) =>
+                  handleNewEntryCellEdit("projectName", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+
+              {/* Profile ID */}
+              <TextField
+                label="Profile ID"
+                value={newEntryData.profileId || ""}
+                onChange={(e) =>
+                  handleNewEntryCellEdit("profileId", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+
+              {/* Generator ID */}
+              <TextField
+                label="Generator ID"
+                value={newEntryData.generatorId || ""}
+                onChange={(e) =>
+                  handleNewEntryCellEdit("generatorId", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+
+              {/* Contract ID */}
+              <TextField
+                label="Contract ID"
+                value={newEntryData.contractId || ""}
+                onChange={(e) =>
+                  handleNewEntryCellEdit("contractId", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+
+              {/* Facility Name */}
+              <TextField
+                label="Facility Name"
+                value={newEntryData.facilityName || ""}
+                onChange={(e) =>
+                  handleNewEntryCellEdit("facilityName", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+
+              {/* Effective Date */}
+              <TextField
+                label="Effective Date"
+                type="date"
+                value={newEntryData.effectiveDate || ""}
+                onChange={(e) =>
+                  handleNewEntryCellEdit("effectiveDate", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+
+              {/* Expiration Date */}
+              <TextField
+                label="Expiration Date"
+                type="date"
+                value={newEntryData.expirationDate || ""}
+                onChange={(e) =>
+                  handleNewEntryCellEdit("expirationDate", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+            </div>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, gap: 2 }}>
+            <SecondaryButton onClick={handleCancelNewEntry}>
+              Cancel
+            </SecondaryButton>
+            <PrimaryButton onClick={handleSaveNewEntry}>Add Line</PrimaryButton>
+          </DialogActions>
+        </Dialog>
+
+        {/* Edit Entry Form Dialog */}
+        <Dialog
+          open={showEditEntryForm}
+          onClose={handleCancelEditEntry}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle
+            sx={{
+              fontFamily: "Roboto:Medium, sans-serif",
+              fontWeight: 500,
+              fontSize: "22px",
+              lineHeight: "28px",
+              color: "#1c1b1f",
+            }}
+          >
+            Edit Price Entry
+          </DialogTitle>
+          <DialogContent sx={{ p: 3 }}>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Product Name */}
+              <TextField
+                label="Product Name *"
+                value={editingEntryData.productName || ""}
+                onChange={(e) =>
+                  handleEditEntryCellEdit("productName", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                required
+              />
+
+              {/* Unit Price */}
+              <TextField
+                label="Unit Price *"
+                type="number"
+                value={editingEntryData.unitPrice || ""}
+                onChange={(e) =>
+                  handleEditEntryCellEdit("unitPrice", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                required
+                inputProps={{ min: 0, step: 0.01 }}
+              />
+
+              {/* Minimum Price */}
+              <TextField
+                label="Minimum Price *"
+                type="number"
+                value={editingEntryData.minimumPrice || ""}
+                onChange={(e) =>
+                  handleEditEntryCellEdit("minimumPrice", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                required
+                inputProps={{ min: 0, step: 0.01 }}
+              />
+
+              {/* Container Size */}
+              <FormControl variant="outlined" size="small" fullWidth>
+                <InputLabel>Container Size</InputLabel>
+                <Select
+                  value={editingEntryData.containerSize || ""}
+                  onChange={(e) =>
+                    handleEditEntryCellEdit("containerSize", e.target.value)
+                  }
+                  label="Container Size"
+                >
+                  <MenuItem value="">Select Container Size</MenuItem>
+                  <MenuItem value="5G">5G</MenuItem>
+                  <MenuItem value="15G">15G</MenuItem>
+                  <MenuItem value="20G">20G</MenuItem>
+                  <MenuItem value="30G">30G</MenuItem>
+                  <MenuItem value="55G">55G</MenuItem>
+                  <MenuItem value="Tri-Wall">Tri-Wall</MenuItem>
+                  <MenuItem value="275G">275G</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* UOM */}
+              <FormControl variant="outlined" size="small" fullWidth>
+                <InputLabel>UOM</InputLabel>
+                <Select
+                  value={editingEntryData.uom || ""}
+                  onChange={(e) =>
+                    handleEditEntryCellEdit("uom", e.target.value)
+                  }
+                  label="UOM"
+                >
+                  <MenuItem value="">Select UOM</MenuItem>
+                  <MenuItem value="Each">Each</MenuItem>
+                  <MenuItem value="Gallon">Gallon</MenuItem>
+                  <MenuItem value="Pound">Pound</MenuItem>
+                  <MenuItem value="Container">Container</MenuItem>
+                  <MenuItem value="Ton">Ton</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* Project Name */}
+              <TextField
+                label="Project Name"
+                value={editingEntryData.projectName || ""}
+                onChange={(e) =>
+                  handleEditEntryCellEdit("projectName", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+
+              {/* Profile ID */}
+              <TextField
+                label="Profile ID"
+                value={editingEntryData.profileId || ""}
+                onChange={(e) =>
+                  handleEditEntryCellEdit("profileId", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+
+              {/* Generator ID */}
+              <TextField
+                label="Generator ID"
+                value={editingEntryData.generatorId || ""}
+                onChange={(e) =>
+                  handleEditEntryCellEdit("generatorId", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+
+              {/* Contract ID */}
+              <TextField
+                label="Contract ID"
+                value={editingEntryData.contractId || ""}
+                onChange={(e) =>
+                  handleEditEntryCellEdit("contractId", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+
+              {/* Facility Name */}
+              <TextField
+                label="Facility Name"
+                value={editingEntryData.facilityName || ""}
+                onChange={(e) =>
+                  handleEditEntryCellEdit("facilityName", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+              />
+
+              {/* Effective Date */}
+              <TextField
+                label="Effective Date"
+                type="date"
+                value={editingEntryData.effectiveDate || ""}
+                onChange={(e) =>
+                  handleEditEntryCellEdit("effectiveDate", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+
+              {/* Expiration Date */}
+              <TextField
+                label="Expiration Date"
+                type="date"
+                value={editingEntryData.expirationDate || ""}
+                onChange={(e) =>
+                  handleEditEntryCellEdit("expirationDate", e.target.value)
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+            </div>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, gap: 2 }}>
+            <SecondaryButton onClick={handleCancelEditEntry}>
+              Cancel
+            </SecondaryButton>
+            <PrimaryButton onClick={handleSaveEditEntry}>
+              Update Entry
+            </PrimaryButton>
+          </DialogActions>
+        </Dialog>
+
+        {/* Price Header Modal */}
+        <Dialog
+          open={showPriceHeaderModal}
+          onClose={handleCancelPriceHeader}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle
+            sx={{
+              fontFamily: "Roboto:Medium, sans-serif",
+              fontWeight: 500,
+              fontSize: "22px",
+              lineHeight: "28px",
+              color: "#1c1b1f",
+            }}
+          >
+            Custom Header Settings
+          </DialogTitle>
+          <DialogContent sx={{ p: 3 }}>
+            {/* Price Header Selection */}
+            <div className="mb-8 p-4 bg-gray-50 rounded-lg">
+              <FormControl variant="outlined" size="small" fullWidth>
+                <InputLabel>Select Price Header</InputLabel>
+                <Select
+                  value={selectedPriceHeaderId || ""}
+                  onChange={(e) =>
+                    handlePriceHeaderSelectionChange(e.target.value)
+                  }
+                  label="Select Price Header"
+                >
+                  {availablePriceHeaders.map((header) => (
+                    <MenuItem key={header.id} value={header.id}>
+                      {header.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </div>
+
+            {/* Main Content with Loading Overlay */}
+            <div className="relative">
+              {/* Loading Spinner Overlay */}
+              {priceHeaderLoading && (
+                <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
+                  <div className="flex flex-col items-center space-y-2">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#65b230]"></div>
+                    <span className="text-sm text-gray-600">
+                      Loading header data...
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-6">
+                {/* EEI */}
+                <FormControl variant="outlined" size="small" fullWidth>
+                  <InputLabel>EEI</InputLabel>
+                  <Select
+                    value={priceHeaderData.eei || "Regular"}
+                    onChange={(e) =>
+                      setPriceHeaderData((prev) => ({
+                        ...prev,
+                        eei: e.target.value,
+                      }))
+                    }
+                    label="EEI"
+                  >
+                    <MenuItem value="Regular">Regular</MenuItem>
+                    <MenuItem value="Custom">Custom</MenuItem>
+                    <MenuItem value="None">None</MenuItem>
+                  </Select>
+                </FormControl>
+
+                {/* Fuel Surcharge (FSC) */}
+                <FormControl variant="outlined" size="small" fullWidth>
+                  <InputLabel>Fuel Surcharge (FSC)</InputLabel>
+                  <Select
+                    value={priceHeaderData.fuelSurcharge || "Standard Monthly"}
+                    onChange={(e) =>
+                      setPriceHeaderData((prev) => ({
+                        ...prev,
+                        fuelSurcharge: e.target.value,
+                      }))
+                    }
+                    label="Fuel Surcharge (FSC)"
+                  >
+                    <MenuItem value="Standard Monthly">
+                      Standard Monthly
+                    </MenuItem>
+                    <MenuItem value="Custom Rate">Custom Rate</MenuItem>
+                    <MenuItem value="None">None</MenuItem>
+                  </Select>
+                </FormControl>
+
+                {/* Invoice Minimum */}
+                <TextField
+                  label="Invoice Minimum"
+                  type="number"
+                  value={priceHeaderData.invoiceMinimum || 350}
+                  onChange={(e) =>
+                    setPriceHeaderData((prev) => ({
+                      ...prev,
+                      invoiceMinimum: parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  inputProps={{ min: 0, step: 1 }}
+                />
+
+                {/* Container Conversion */}
+                <FormControl variant="outlined" size="small" fullWidth>
+                  <InputLabel>Container Conversion</InputLabel>
+                  <Select
+                    value={
+                      priceHeaderData.containerConversion ||
+                      "Standard Conversion 1"
+                    }
+                    onChange={(e) =>
+                      setPriceHeaderData((prev) => ({
+                        ...prev,
+                        containerConversion: e.target.value,
+                      }))
+                    }
+                    label="Container Conversion"
+                  >
+                    <MenuItem value="Standard Conversion 1">
+                      Standard Conversion 1
+                    </MenuItem>
+                    <MenuItem value="Standard Conversion 2">
+                      Standard Conversion 2
+                    </MenuItem>
+                    <MenuItem value="Custom Conversion">
+                      Custom Conversion
+                    </MenuItem>
+                  </Select>
+                </FormControl>
+
+                {/* Item Minimums */}
+                <FormControl variant="outlined" size="small" fullWidth>
+                  <InputLabel>Item Minimums</InputLabel>
+                  <Select
+                    value={priceHeaderData.itemMinimums || "Standard Tables"}
+                    onChange={(e) =>
+                      setPriceHeaderData((prev) => ({
+                        ...prev,
+                        itemMinimums: e.target.value,
+                      }))
+                    }
+                    label="Item Minimums"
+                  >
+                    <MenuItem value="Standard Tables">Standard Tables</MenuItem>
+                    <MenuItem value="Custom Tables">Custom Tables</MenuItem>
+                    <MenuItem value="None">None</MenuItem>
+                  </Select>
+                </FormControl>
+
+                {/* Economic Adjustment Fee (EAF) % */}
+                <TextField
+                  label="Economic Adjustment Fee (EAF) %"
+                  type="number"
+                  value={priceHeaderData.economicAdjustmentFee || 3}
+                  onChange={(e) =>
+                    setPriceHeaderData((prev) => ({
+                      ...prev,
+                      economicAdjustmentFee: parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  inputProps={{ min: 0, max: 100, step: 0.1 }}
+                />
+
+                {/* E-Manifest Fee */}
+                <TextField
+                  label="E-Manifest Fee"
+                  type="number"
+                  value={priceHeaderData.eManifestFee || 25}
+                  onChange={(e) =>
+                    setPriceHeaderData((prev) => ({
+                      ...prev,
+                      eManifestFee: parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  inputProps={{ min: 0, step: 1 }}
+                />
+              </div>
+
+              {/* Additional Options Section */}
+              <div className="mt-6">
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontSize: "14px",
+                    color: "#666666",
+                    marginBottom: 2,
+                    fontWeight: 400,
+                  }}
+                >
+                  Additional Options
+                </Typography>
+
+                <div className="flex flex-wrap gap-4">
+                  {/* Hub Fee */}
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={priceHeaderData.hubFee || false}
+                        onChange={(e) =>
+                          setPriceHeaderData((prev) => ({
+                            ...prev,
+                            hubFee: e.target.checked,
+                          }))
+                        }
+                        sx={{
+                          color: "#65b230",
+                          "&.Mui-checked": {
+                            color: "#65b230",
+                          },
+                        }}
+                      />
+                    }
+                    label="Hub Fee"
+                    sx={{
+                      "& .MuiFormControlLabel-label": {
+                        fontSize: "16px",
+                        color: "rgba(0,0,0,0.87)",
+                      },
+                    }}
+                  />
+
+                  {/* Regional Pricing */}
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={priceHeaderData.regionalPricing || false}
+                        onChange={(e) =>
+                          setPriceHeaderData((prev) => ({
+                            ...prev,
+                            regionalPricing: e.target.checked,
+                          }))
+                        }
+                        sx={{
+                          color: "#65b230",
+                          "&.Mui-checked": {
+                            color: "#65b230",
+                          },
+                        }}
+                      />
+                    }
+                    label="Regional Pricing"
+                    sx={{
+                      "& .MuiFormControlLabel-label": {
+                        fontSize: "16px",
+                        color: "rgba(0,0,0,0.87)",
+                      },
+                    }}
+                  />
+
+                  {/* Zone Transportation */}
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={priceHeaderData.zoneTransportation || false}
+                        onChange={(e) =>
+                          setPriceHeaderData((prev) => ({
+                            ...prev,
+                            zoneTransportation: e.target.checked,
+                          }))
+                        }
+                        sx={{
+                          color: "#65b230",
+                          "&.Mui-checked": {
+                            color: "#65b230",
+                          },
+                        }}
+                      />
+                    }
+                    label="Zone Transportation"
+                    sx={{
+                      "& .MuiFormControlLabel-label": {
+                        fontSize: "16px",
+                        color: "rgba(0,0,0,0.87)",
+                      },
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, gap: 2 }}>
+            <SecondaryButton onClick={handleCancelPriceHeader}>
+              Cancel
+            </SecondaryButton>
+            <PrimaryButton onClick={handleSavePriceHeader}>
+              Save Changes
             </PrimaryButton>
           </DialogActions>
         </Dialog>

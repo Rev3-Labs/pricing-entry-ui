@@ -220,10 +220,85 @@ function generateProfileId(): string {
 }
 
 function generateGeneratorId(): string {
-  const types = ["GEN", "TURB", "ENG"];
-  const type = randomElement(types);
-  const number = randomInt(1, 50);
-  return `${type}${String(number).padStart(2, "0")}`;
+  const generatorNames = [
+    "Acme Manufacturing",
+    "Tech Solutions",
+    "Global Industries",
+    "Clean Earth Southeast",
+    "Eco Solutions",
+    "Industrial Processing",
+    "Chemical Plant Alpha",
+    "Automotive Assembly",
+    "Pharmaceutical Corp",
+    "Oil & Gas Refinery",
+    "Electronics Factory",
+    "Paint & Coatings Co",
+    "Metal Processing Inc",
+    "Textile Manufacturing",
+    "Food Processing Plant",
+    "Waste Management Co",
+    "Environmental Services",
+    "Recycling Center",
+    "Treatment Facility",
+    "Processing Plant",
+  ];
+
+  const states = [
+    "AL",
+    "AK",
+    "AZ",
+    "AR",
+    "CA",
+    "CO",
+    "CT",
+    "DE",
+    "FL",
+    "GA",
+    "HI",
+    "ID",
+    "IL",
+    "IN",
+    "IA",
+    "KS",
+    "KY",
+    "LA",
+    "ME",
+    "MD",
+    "MA",
+    "MI",
+    "MN",
+    "MS",
+    "MO",
+    "MT",
+    "NE",
+    "NV",
+    "NH",
+    "NJ",
+    "NM",
+    "NY",
+    "NC",
+    "ND",
+    "OH",
+    "OK",
+    "OR",
+    "PA",
+    "RI",
+    "SC",
+    "SD",
+    "TN",
+    "TX",
+    "UT",
+    "VT",
+    "VA",
+    "WA",
+    "WV",
+    "WI",
+    "WY",
+  ];
+
+  const name = randomElement(generatorNames);
+  const state = randomElement(states);
+  return `${name} (${state})`;
 }
 
 function generateQuoteName(customerName: string, index: number): string {
@@ -284,16 +359,40 @@ export function generateSampleData() {
     };
     customers.push(customer);
 
-    // Generate 8-12 price headers per customer (40-60 total headers)
-    const numHeaders = randomInt(8, 12);
-    for (let j = 0; j < numHeaders; j++) {
+    // Generate price headers for this customer
+    // First, create a customer-level header
+    const customerHeader: PriceHeader = {
+      priceHeaderId: generatePriceHeaderId(i, 0),
+      customerId: customer.customerId,
+      headerName: `${customer.customerName} - Standard Pricing`,
+      description: `Standard pricing configuration for ${customer.customerName}`,
+      status: "active" as "active" | "inactive" | "in-progress" | "new",
+      effectiveDate: randomDate(new Date("2023-01-01"), new Date("2025-12-31")),
+      expirationDate: randomDate(
+        new Date("2024-01-01"),
+        new Date("2026-12-31")
+      ),
+      invoiceMinimum: randomInt(200, 500),
+      container55gMinimum: randomInt(100, 300),
+      absoluteContainerMinimum: randomInt(50, 150),
+      regionalPricingId: randomInt(1, 5),
+      conversionRateId: randomInt(1, 3),
+      customerPricingTierId: randomInt(1, 4),
+      createdByUser: randomInt(1001, 1010),
+      createdAt: randomDate(new Date("2023-01-01"), new Date("2024-12-31")),
+      updatedAt: randomDate(new Date("2023-01-01"), new Date("2024-12-31")),
+    };
+    priceHeaders.push(customerHeader);
+
+    // Generate 2-4 project-specific headers
+    const numProjectHeaders = randomInt(2, 4);
+    for (let j = 1; j <= numProjectHeaders; j++) {
+      const projectName = generateProjectName();
       const header: PriceHeader = {
         priceHeaderId: generatePriceHeaderId(i, j),
         customerId: customer.customerId,
-        headerName: generateQuoteName(customer.customerName, j),
-        description: `Pricing header for ${
-          customer.customerName
-        } - ${generateProjectName()}`,
+        headerName: `Project: ${projectName}`,
+        description: `Custom pricing configuration for ${projectName} project`,
         status: randomElement(statuses) as
           | "active"
           | "inactive"
@@ -307,12 +406,26 @@ export function generateSampleData() {
           new Date("2024-01-01"),
           new Date("2026-12-31")
         ),
+        // Project-specific settings (different from customer defaults)
+        invoiceMinimum: randomInt(150, 800),
+        container55gMinimum: randomInt(75, 400),
+        absoluteContainerMinimum: randomInt(25, 200),
+        regionalPricingId: randomInt(1, 5),
+        conversionRateId: randomInt(1, 3),
+        customerPricingTierId: randomInt(1, 4),
+        createdByUser: randomInt(1001, 1010),
         createdAt: randomDate(new Date("2023-01-01"), new Date("2024-12-31")),
         updatedAt: randomDate(new Date("2023-01-01"), new Date("2024-12-31")),
       };
       priceHeaders.push(header);
+    }
 
-      // Generate 30-50 price items per header (1200-3000 total items, targeting ~2000)
+    // Generate price items for all headers for this customer
+    const customerHeaders = priceHeaders.filter(
+      (h) => h.customerId === customer.customerId
+    );
+    customerHeaders.forEach((header, headerIndex) => {
+      // Generate 30-50 price items per header
       const numItems = randomInt(30, 50);
       for (let k = 0; k < numItems; k++) {
         const productName = randomElement(productNames);
@@ -346,7 +459,11 @@ export function generateSampleData() {
           uom: randomElement(uomOptions),
           pricingType: randomElement(pricingTypes),
           quoteName: header.headerName,
-          projectName: Math.random() > 0.4 ? generateProjectName() : undefined,
+          projectName: header.headerName.startsWith("Project:")
+            ? header.headerName.replace("Project: ", "")
+            : Math.random() > 0.4
+            ? generateProjectName()
+            : undefined,
           facilityName:
             Math.random() > 0.5 ? randomElement(facilityNames) : undefined,
           createdAt: randomDate(new Date("2023-01-01"), new Date("2024-12-31")),
@@ -354,7 +471,7 @@ export function generateSampleData() {
         };
         priceItems.push(item);
       }
-    }
+    });
   }
 
   return {

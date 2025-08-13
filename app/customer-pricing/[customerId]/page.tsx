@@ -4008,6 +4008,60 @@ export default function AllCustomerPricingPage() {
                   >
                     Upload Excel Template
                   </Typography>
+
+                  {/* Download Template Section */}
+
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: "#65b230",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      "&:hover": {
+                        color: "#4a7c59",
+                      },
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      pb: 2,
+                    }}
+                    onClick={() => {
+                      // Create a basic Excel template with sample headers
+                      const templateData = [
+                        [
+                          "Customer ID",
+                          "Product Name",
+                          "Unit Price",
+                          "Minimum Price",
+                          "UOM",
+                          "Effective Date",
+                          "Notes",
+                        ],
+                        [
+                          "CUST-001",
+                          "Sample Product",
+                          "10.00",
+                          "5.00",
+                          "EA",
+                          "2024-01-01",
+                          "Example entry",
+                        ],
+                        ["", "", "", "", "", "", ""],
+                        ["", "", "", "", "", "", ""],
+                      ];
+
+                      const ws = XLSX.utils.aoa_to_sheet(templateData);
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, "Pricing Template");
+
+                      // Download the file
+                      XLSX.writeFile(wb, "pricing_template.xlsx");
+                    }}
+                  >
+                    <Download size={16} />
+                    Download Example Template
+                  </Typography>
+
                   <Box sx={{ mb: 2 }}>
                     <input
                       accept=".xlsx,.xls"

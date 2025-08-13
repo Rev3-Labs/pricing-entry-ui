@@ -22,7 +22,11 @@ export default function LandingPage() {
   };
 
   const handleViewCustomerPricing = () => {
-    router.push("/customer-pricing");
+    router.push("/customer-pricing/CUST-001");
+  };
+
+  const handleViewInvoiceDashboard = () => {
+    router.push("/invoice-dashboard");
   };
 
   return (
@@ -85,6 +89,29 @@ export default function LandingPage() {
               </div>
             </CardHeader>
           </Card>
+
+          {/* Invoice Dashboard Card */}
+          {/* <Card
+            className="hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+            onClick={handleViewInvoiceDashboard}
+          >
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <DollarSign className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">Invoice Dashboard</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Monitor and manage invoices
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="h-5 w-5 text-gray-400" />
+              </div>
+            </CardHeader>
+          </Card> */}
         </div>
       </div>
     </div>

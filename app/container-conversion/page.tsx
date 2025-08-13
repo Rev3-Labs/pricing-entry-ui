@@ -96,7 +96,7 @@ export default function ContainerConversionPage() {
   };
 
   return (
-    <div className="relative size-full bg-[#fffbfe] min-h-screen">
+    <div className="relative size-full bg-[#eaeaea] min-h-screen">
       <div className="absolute contents left-0 top-0">
         <div className="bg-[#e0e0e0] h-10 w-full">
           <div

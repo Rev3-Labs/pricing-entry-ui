@@ -1192,7 +1192,7 @@ export default function AllCustomerPricingPage() {
       title: "Environmental Services LLC - Volume Discount",
       description:
         "Implement tiered volume discount structure for Environmental Services LLC based on their increased waste volume projections.",
-      status: "Withdrawn",
+      status: "Incomplete",
       requestedBy: "Jennifer Adams",
       requestedDate: "2024-02-01",
       requestType: "Customer",
@@ -1227,7 +1227,7 @@ export default function AllCustomerPricingPage() {
       title: "Clean Energy Solutions - Renewable Energy Credit Pricing",
       description:
         "Develop pricing structure for renewable energy credit trading services for Clean Energy Solutions.",
-      status: "Activated",
+      status: "Resubmitted",
       requestedBy: "Alex Thompson",
       requestedDate: "2024-02-12",
       requestType: "Customer",
@@ -2796,7 +2796,7 @@ export default function AllCustomerPricingPage() {
                                   ? "rgba(76,175,80,0.1)"
                                   : request.status === "Declined"
                                   ? "rgba(244,67,54,0.1)"
-                                  : request.status === "Withdrawn"
+                                  : request.status === "Incomplete"
                                   ? "rgba(158,158,158,0.1)"
                                   : "rgba(158,158,158,0.1)",
                               color:
@@ -2808,7 +2808,7 @@ export default function AllCustomerPricingPage() {
                                   ? "#2e7d32"
                                   : request.status === "Declined"
                                   ? "#d32f2f"
-                                  : request.status === "Withdrawn"
+                                  : request.status === "Incomplete"
                                   ? "#616161"
                                   : "#616161",
                               fontSize: "12px",

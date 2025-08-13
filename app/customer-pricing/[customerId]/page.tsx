@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
   TextField,
@@ -294,13 +294,138 @@ export default function AllCustomerPricingPage() {
   // State for tracking changes
   const [forceRerender, setForceRerender] = useState(0);
 
+  // Flag to prevent multiple executions of the useEffect
+  const hasExecutedRef = useRef(false);
+
+  // Sample price change requests data (using same data as change-requests route)
+  const priceChangeRequests = [
+    {
+      id: "PCR-2024-001",
+      title: "Annual Rate Increase for Acme Corporation",
+      description:
+        "Implement 5% annual rate increase across all services for Acme Corporation effective March 1, 2024. This increase aligns with our annual pricing review and market conditions.",
+      status: "New",
+      requestedBy: "John Smith",
+      requestedDate: "2024-01-15",
+      requestType: "Customer",
+      customerName: "Acme Corporation",
+      assignedTo: "Sarah Johnson",
+    },
+    {
+      id: "PCR-2024-002",
+      title: "Utah State Contract Pricing Update",
+      description:
+        "Update pricing structure for all Utah state contracts to reflect new regulatory requirements and competitive market positioning.",
+      status: "In Progress",
+      requestedBy: "Mike Wilson",
+      requestedDate: "2024-01-20",
+      requestType: "Multiple Customers",
+      assignedTo: "David Brown",
+    },
+    {
+      id: "PCR-2024-003",
+      title: "Global Fuel Surcharge Adjustment",
+      description:
+        "Implement new fuel surcharge calculation methodology across all customers to better reflect current fuel costs and market volatility.",
+      status: "Activated",
+      requestedBy: "Lisa Davis",
+      requestedDate: "2024-01-25",
+      requestType: "General/Global",
+      assignedTo: "Michael Chen",
+    },
+    {
+      id: "PCR-2024-004",
+      title: "Tech Solutions Inc - New Service Pricing",
+      description:
+        "Create pricing for new hazardous waste disposal service for Tech Solutions Inc. This is a new service offering that requires custom pricing structure.",
+      status: "Declined",
+      requestedBy: "Robert Taylor",
+      requestedDate: "2024-01-30",
+      requestType: "Customer",
+      customerName: "Tech Solutions Inc",
+      assignedTo: "Sarah Johnson",
+    },
+    {
+      id: "PCR-2024-005",
+      title: "Environmental Services LLC - Volume Discount",
+      description:
+        "Implement tiered volume discount structure for Environmental Services LLC based on their increased waste volume projections.",
+      status: "Incomplete",
+      requestedBy: "Jennifer Adams",
+      requestedDate: "2024-02-01",
+      requestType: "Customer",
+      customerName: "Environmental Services LLC",
+      assignedTo: "Emily Rodriguez",
+    },
+    {
+      id: "PCR-2024-006",
+      title: "Industry-Wide Compliance Fee Update",
+      description:
+        "Update compliance fees across all customers to reflect new EPA regulations and increased compliance costs.",
+      status: "New",
+      requestedBy: "Tom Wilson",
+      requestedDate: "2024-02-05",
+      requestType: "General/Global",
+      assignedTo: "Alex Thompson",
+    },
+    {
+      id: "PCR-2024-007",
+      title: "Waste Management Corp - Emergency Service Pricing",
+      description:
+        "Establish emergency response service pricing for Waste Management Corp for after-hours and weekend emergency cleanups.",
+      status: "In Progress",
+      requestedBy: "Maria Garcia",
+      requestedDate: "2024-02-10",
+      requestType: "Customer",
+      customerName: "Waste Management Corp",
+      assignedTo: "David Brown",
+    },
+    {
+      id: "PCR-2024-008",
+      title: "Clean Energy Solutions - Renewable Energy Credit Pricing",
+      description:
+        "Develop pricing structure for renewable energy credit trading services for Clean Energy Solutions.",
+      status: "Resubmitted",
+      requestedBy: "Alex Thompson",
+      requestedDate: "2024-02-12",
+      requestType: "Customer",
+      customerName: "Clean Energy Solutions",
+      assignedTo: "Michael Chen",
+    },
+  ];
+
   // Auto-open price change modal if user came from execute price change button
   useEffect(() => {
-    if (executeRequestId && !isLoading) {
-      setSelectedPriceChangeRequests([executeRequestId]);
-      setPriceChangeDialogOpen(true);
+    // Only run once when executeRequestId is present and we're not loading
+    if (executeRequestId && !isLoading && !hasExecutedRef.current) {
+      // Find the price change request by ID
+      const request = priceChangeRequests.find(
+        (req) => req.id === executeRequestId
+      );
+      if (request) {
+        setSelectedPriceChangeRequests([executeRequestId]);
+        // Skip the selection dialog and go directly to configuration dialog
+        setPriceChangeConfigDialogOpen(true);
+        hasExecutedRef.current = true;
+      } else {
+        // If the request ID is invalid, show an error and clear the URL parameter
+        toast.error(`Price change request ${executeRequestId} not found`);
+        // Remove the invalid parameter from the URL without triggering router navigation
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete("executeRequestId");
+        const newUrl = `${
+          window.location.pathname
+        }?${newSearchParams.toString()}`;
+        window.history.replaceState({}, "", newUrl);
+        hasExecutedRef.current = true;
+      }
     }
-  }, [executeRequestId, isLoading]);
+
+    // Reset the flag when executeRequestId changes to null/undefined
+    if (!executeRequestId) {
+      hasExecutedRef.current = false;
+    }
+  }, [executeRequestId, isLoading, priceChangeRequests]);
 
   // Helper function to calculate unit price preview for percentage increase
   const getUnitPricePreview = (
@@ -735,6 +860,16 @@ export default function AllCustomerPricingPage() {
     // Enable edit mode
     setIsEditMode(true);
 
+    // Clear URL parameter if user came from executeRequestId
+    if (executeRequestId) {
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete("executeRequestId");
+      const newUrl = `${
+        window.location.pathname
+      }?${newSearchParams.toString()}`;
+      window.history.replaceState({}, "", newUrl);
+    }
+
     // Reset dialog state but keep the configuration data
     setPriceChangeConfigDialogOpen(false);
     setSelectedPriceChangeRequests([]);
@@ -753,6 +888,16 @@ export default function AllCustomerPricingPage() {
     // Reset Excel upload state
     setExcelFile(null);
     setExcelUploadMode(null);
+
+    // Clear URL parameter if user came from executeRequestId
+    if (executeRequestId) {
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete("executeRequestId");
+      const newUrl = `${
+        window.location.pathname
+      }?${newSearchParams.toString()}`;
+      window.history.replaceState({}, "", newUrl);
+    }
   };
 
   const handleExcelFileUpload = (
@@ -775,7 +920,20 @@ export default function AllCustomerPricingPage() {
 
   const handleBackToPriceChangeSelection = () => {
     setPriceChangeConfigDialogOpen(false);
-    setPriceChangeDialogOpen(true);
+    // If user came from URL parameter, don't go back to selection dialog
+    if (executeRequestId) {
+      // Clear the URL parameter and close all dialogs
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete("executeRequestId");
+      const newUrl = `${
+        window.location.pathname
+      }?${newSearchParams.toString()}`;
+      window.history.replaceState({}, "", newUrl);
+      setSelectedPriceChangeRequests([]);
+    } else {
+      // Normal flow - go back to selection dialog
+      setPriceChangeDialogOpen(true);
+    }
   };
 
   // New handler functions for edit mode
@@ -1940,103 +2098,6 @@ export default function AllCustomerPricingPage() {
   const handleDeleteCancel = () => {
     setDeleteConfirmOpen(false);
   };
-
-  // Sample price change requests data (using same data as change-requests route)
-  const priceChangeRequests = [
-    {
-      id: "PCR-2024-001",
-      title: "Annual Rate Increase for Acme Corporation",
-      description:
-        "Implement 5% annual rate increase across all services for Acme Corporation effective March 1, 2024. This increase aligns with our annual pricing review and market conditions.",
-      status: "New",
-      requestedBy: "John Smith",
-      requestedDate: "2024-01-15",
-      requestType: "Customer",
-      customerName: "Acme Corporation",
-      assignedTo: "Sarah Johnson",
-    },
-    {
-      id: "PCR-2024-002",
-      title: "Utah State Contract Pricing Update",
-      description:
-        "Update pricing structure for all Utah state contracts to reflect new regulatory requirements and competitive market positioning.",
-      status: "In Progress",
-      requestedBy: "Mike Wilson",
-      requestedDate: "2024-01-20",
-      requestType: "Multiple Customers",
-      assignedTo: "David Brown",
-    },
-    {
-      id: "PCR-2024-003",
-      title: "Global Fuel Surcharge Adjustment",
-      description:
-        "Implement new fuel surcharge calculation methodology across all customers to better reflect current fuel costs and market volatility.",
-      status: "Activated",
-      requestedBy: "Lisa Davis",
-      requestedDate: "2024-01-25",
-      requestType: "General/Global",
-      assignedTo: "Michael Chen",
-    },
-    {
-      id: "PCR-2024-004",
-      title: "Tech Solutions Inc - New Service Pricing",
-      description:
-        "Create pricing for new hazardous waste disposal service for Tech Solutions Inc. This is a new service offering that requires custom pricing structure.",
-      status: "Declined",
-      requestedBy: "Robert Taylor",
-      requestedDate: "2024-01-30",
-      requestType: "Customer",
-      customerName: "Tech Solutions Inc",
-      assignedTo: "Sarah Johnson",
-    },
-    {
-      id: "PCR-2024-005",
-      title: "Environmental Services LLC - Volume Discount",
-      description:
-        "Implement tiered volume discount structure for Environmental Services LLC based on their increased waste volume projections.",
-      status: "Withdrawn",
-      requestedBy: "Jennifer Adams",
-      requestedDate: "2024-02-01",
-      requestType: "Customer",
-      customerName: "Environmental Services LLC",
-      assignedTo: "Emily Rodriguez",
-    },
-    {
-      id: "PCR-2024-006",
-      title: "Industry-Wide Compliance Fee Update",
-      description:
-        "Update compliance fees across all customers to reflect new EPA regulations and increased compliance costs.",
-      status: "New",
-      requestedBy: "Tom Wilson",
-      requestedDate: "2024-02-05",
-      requestType: "General/Global",
-      assignedTo: "Alex Thompson",
-    },
-    {
-      id: "PCR-2024-007",
-      title: "Waste Management Corp - Emergency Service Pricing",
-      description:
-        "Establish emergency response service pricing for Waste Management Corp for after-hours and weekend emergency cleanups.",
-      status: "In Progress",
-      requestedBy: "Maria Garcia",
-      requestedDate: "2024-02-10",
-      requestType: "Customer",
-      customerName: "Waste Management Corp",
-      assignedTo: "David Brown",
-    },
-    {
-      id: "PCR-2024-008",
-      title: "Clean Energy Solutions - Renewable Energy Credit Pricing",
-      description:
-        "Develop pricing structure for renewable energy credit trading services for Clean Energy Solutions.",
-      status: "Activated",
-      requestedBy: "Alex Thompson",
-      requestedDate: "2024-02-12",
-      requestType: "Customer",
-      customerName: "Clean Energy Solutions",
-      assignedTo: "Michael Chen",
-    },
-  ];
 
   // Filter price change requests based on search term and assigned to
   const filteredPriceChangeRequests = useMemo(() => {
@@ -3717,7 +3778,7 @@ export default function AllCustomerPricingPage() {
                                   ? "rgba(76,175,80,0.1)"
                                   : request.status === "Declined"
                                   ? "rgba(244,67,54,0.1)"
-                                  : request.status === "Withdrawn"
+                                  : request.status === "Incomplete"
                                   ? "rgba(158,158,158,0.1)"
                                   : "rgba(158,158,158,0.1)",
                               color:
@@ -3729,7 +3790,7 @@ export default function AllCustomerPricingPage() {
                                   ? "#2e7d32"
                                   : request.status === "Declined"
                                   ? "#d32f2f"
-                                  : request.status === "Withdrawn"
+                                  : request.status === "Incomplete"
                                   ? "#616161"
                                   : "#616161",
                               fontSize: "12px",

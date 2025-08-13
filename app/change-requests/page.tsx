@@ -45,8 +45,15 @@ interface PriceChangeRequest {
     | "Expire Pricing";
   customerId?: string;
   customerName?: string;
+  priority: string;
   assignedTo: string;
-  status: "New" | "In Progress" | "Activated" | "Declined" | "Withdrawn";
+  status:
+    | "New"
+    | "In Progress"
+    | "Activated"
+    | "Declined"
+    | "Incomplete"
+    | "Resubmitted";
   submittedBy: string;
   submittedDate: string;
   finalizedDate?: string;
@@ -75,6 +82,7 @@ interface CreateRequestModalState {
     | "Price Decrease"
     | "Expire Pricing";
   customerId: string;
+  priority: string;
   assignedTo: string;
   attachments: File[];
 }
@@ -94,6 +102,7 @@ class PriceChangeRequestService {
         requestType: "Price Increase",
         customerId: "CUST-001",
         customerName: "Acme Corporation",
+        priority: "high",
         assignedTo: "Sarah Johnson",
         status: "New",
         submittedBy: "John Smith",
@@ -109,6 +118,7 @@ class PriceChangeRequestService {
         requestType: "Price Increase",
         customerId: "CUST-003",
         customerName: "Green Energy Co",
+        priority: "medium",
         assignedTo: "David Brown",
         status: "In Progress",
         submittedBy: "Mike Wilson",
@@ -123,6 +133,7 @@ class PriceChangeRequestService {
         requestType: "Price Increase",
         customerId: "CUST-004",
         customerName: "Industrial Cleanup Ltd",
+        priority: "high",
         assignedTo: "Michael Chen",
         status: "Activated",
         submittedBy: "Lisa Davis",
@@ -138,6 +149,7 @@ class PriceChangeRequestService {
         requestType: "New Item Pricing",
         customerId: "CUST-002",
         customerName: "Tech Solutions Inc",
+        priority: "medium",
         assignedTo: "Sarah Johnson",
         status: "New",
         submittedBy: "Robert Taylor",
@@ -152,8 +164,9 @@ class PriceChangeRequestService {
         requestType: "Price Decrease",
         customerId: "CUST-005",
         customerName: "Environmental Services LLC",
+        priority: "medium",
         assignedTo: "Emily Rodriguez",
-        status: "Withdrawn",
+        status: "Incomplete",
         submittedBy: "Jennifer Adams",
         submittedDate: "2024-02-01",
         attachments: ["volume_analysis.xlsx"],
@@ -166,6 +179,7 @@ class PriceChangeRequestService {
         requestType: "Price Increase",
         customerId: "CUST-007",
         customerName: "Clean Energy Solutions",
+        priority: "urgent",
         assignedTo: "Alex Thompson",
         status: "Declined",
         submittedBy: "Tom Wilson",
@@ -180,6 +194,7 @@ class PriceChangeRequestService {
         requestType: "New Item Pricing",
         customerId: "CUST-006",
         customerName: "Waste Management Corp",
+        priority: "urgent",
         assignedTo: "David Brown",
         status: "Activated",
         submittedBy: "Maria Garcia",
@@ -196,8 +211,9 @@ class PriceChangeRequestService {
         requestType: "New Item Pricing",
         customerId: "CUST-007",
         customerName: "Clean Energy Solutions",
+        priority: "medium",
         assignedTo: "Michael Chen",
-        status: "New",
+        status: "Resubmitted",
         submittedBy: "Alex Thompson",
         submittedDate: "2024-02-12",
         attachments: [
@@ -271,6 +287,7 @@ export default function PriceChangeRequestsPage() {
     description: "",
     requestType: "New Customer",
     customerId: "",
+    priority: "",
     assignedTo: "",
     attachments: [],
   });
@@ -353,6 +370,7 @@ export default function PriceChangeRequestsPage() {
       description: "",
       requestType: "New Customer",
       customerId: "",
+      priority: "",
       assignedTo: "",
       attachments: [],
     });
@@ -373,6 +391,7 @@ export default function PriceChangeRequestsPage() {
           requestType: createModal.requestType,
           customerId: createModal.customerId || undefined,
           customerName: customer?.name || undefined,
+          priority: createModal.priority,
           assignedTo: createModal.assignedTo,
           submittedBy: "Current User", // This would come from auth context
           attachments: createModal.attachments.map((f) => f.name),
@@ -391,6 +410,7 @@ export default function PriceChangeRequestsPage() {
         description: "",
         requestType: "New Customer",
         customerId: "",
+        priority: "",
         assignedTo: "",
         attachments: [],
       });
@@ -407,6 +427,7 @@ export default function PriceChangeRequestsPage() {
       description: "",
       requestType: "New Customer",
       customerId: "",
+      priority: "",
       assignedTo: "",
       attachments: [],
     });
@@ -459,14 +480,48 @@ export default function PriceChangeRequestsPage() {
         label: "Declined",
         className: "bg-red-50 text-red-700 border border-red-200",
       },
-      Withdrawn: {
-        label: "Withdrawn",
+      Incomplete: {
+        label: "Incomplete",
         className: "bg-gray-50 text-gray-600 border border-gray-200",
+      },
+      Resubmitted: {
+        label: "Resubmitted",
+        className: "bg-purple-50 text-purple-700 border border-purple-200",
       },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || {
       label: status,
+      className: "bg-gray-50 text-gray-600 border border-gray-200",
+    };
+
+    return (
+      <span
+        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-['Roboto:Medium',_sans-serif] font-medium ${config.className}`}
+      >
+        {config.label}
+      </span>
+    );
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    const priorityConfig = {
+      urgent: {
+        label: "Urgent",
+        className: "bg-red-50 text-red-700 border border-red-200",
+      },
+      high: {
+        label: "High",
+        className: "bg-orange-50 text-orange-700 border border-orange-200",
+      },
+      medium: {
+        label: "Medium",
+        className: "bg-blue-50 text-blue-700 border border-blue-200",
+      },
+    };
+
+    const config = priorityConfig[priority as keyof typeof priorityConfig] || {
+      label: priority || "Not Set",
       className: "bg-gray-50 text-gray-600 border border-gray-200",
     };
 
@@ -540,7 +595,7 @@ export default function PriceChangeRequestsPage() {
     },
     {
       field: "subject",
-      headerName: "Subject",
+      headerName: "Description",
       width: 300,
       flex: 1,
       minWidth: 250,
@@ -563,6 +618,13 @@ export default function PriceChangeRequestsPage() {
       width: 120,
       flex: 0,
       renderCell: (params) => getRequestTypeBadge(params.value),
+    },
+    {
+      field: "priority",
+      headerName: "Priority",
+      width: 100,
+      flex: 0,
+      renderCell: (params) => getPriorityBadge(params.value),
     },
     {
       field: "customerName",
@@ -684,7 +746,7 @@ export default function PriceChangeRequestsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#fffbfe] py-8">
+      <div className="min-h-screen bg-[#eaeaea] py-8">
         <div className="w-full max-w-[1800px] mx-auto px-2">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -700,7 +762,7 @@ export default function PriceChangeRequestsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fffbfe] py-8">
+    <div className="min-h-screen bg-[#eaeaea] py-8">
       <div className="w-full max-w-[1800px] mx-auto px-2">
         {/* Header */}
         <div className="mb-8">
@@ -742,10 +804,10 @@ export default function PriceChangeRequestsPage() {
 
             {/* Filters */}
             <div className="flex flex-wrap gap-4 items-end mb-4">
-              {/* Subject Filter */}
+              {/* Description Filter */}
               <div className="w-48">
                 <TextField
-                  label="Subject"
+                  label="Description"
                   variant="outlined"
                   fullWidth
                   value={filters.subject}
@@ -812,7 +874,7 @@ export default function PriceChangeRequestsPage() {
                     <MenuItem value="In Progress">In Progress</MenuItem>
                     <MenuItem value="Activated">Activated</MenuItem>
                     <MenuItem value="Declined">Declined</MenuItem>
-                    <MenuItem value="Withdrawn">Withdrawn</MenuItem>
+                    <MenuItem value="Incomplete">Incomplete</MenuItem>
                   </Select>
                 </FormControl>
               </div>
@@ -1101,7 +1163,7 @@ export default function PriceChangeRequestsPage() {
 
                 {/* Description */}
                 <TextField
-                  label="Description"
+                  label="Description *"
                   variant="outlined"
                   fullWidth
                   multiline
@@ -1155,7 +1217,7 @@ export default function PriceChangeRequestsPage() {
 
                 {/* Customer */}
                 <FormControl variant="outlined" fullWidth>
-                  <InputLabel id="create-customer-label">Customer</InputLabel>
+                  <InputLabel id="create-customer-label">Customer *</InputLabel>
                   <Select
                     labelId="create-customer-label"
                     value={createModal.customerId}
@@ -1165,22 +1227,45 @@ export default function PriceChangeRequestsPage() {
                         customerId: e.target.value as string,
                       }))
                     }
-                    label="Customer"
+                    label="Customer *"
                     style={{ fontVariationSettings: "'wdth' 100" }}
                   >
+                    <MenuItem value="">Select customer</MenuItem>
                     {CUSTOMERS.map((customer) => (
                       <MenuItem key={customer.id} value={customer.id}>
-                        {customer.name}
+                        {customer.name} ({customer.id})
                         {customer.status === "inactive" && " (Inactive)"}
                       </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
 
+                {/* Priority */}
+                <FormControl variant="outlined" fullWidth>
+                  <InputLabel id="create-priority-label">Priority</InputLabel>
+                  <Select
+                    labelId="create-priority-label"
+                    value={createModal.priority}
+                    onChange={(e) =>
+                      setCreateModal((prev) => ({
+                        ...prev,
+                        priority: e.target.value as string,
+                      }))
+                    }
+                    label="Priority"
+                    style={{ fontVariationSettings: "'wdth' 100" }}
+                  >
+                    <MenuItem value="">Select priority</MenuItem>
+                    <MenuItem value="urgent">Urgent</MenuItem>
+                    <MenuItem value="high">High</MenuItem>
+                    <MenuItem value="medium">Medium</MenuItem>
+                  </Select>
+                </FormControl>
+
                 {/* Assigned To */}
                 <FormControl variant="outlined" fullWidth>
                   <InputLabel id="create-assigned-to-label">
-                    Assigned To *
+                    Assigned To
                   </InputLabel>
                   <Select
                     labelId="create-assigned-to-label"
@@ -1191,7 +1276,7 @@ export default function PriceChangeRequestsPage() {
                         assignedTo: e.target.value as string,
                       }))
                     }
-                    label="Assigned To *"
+                    label="Assigned To"
                     style={{ fontVariationSettings: "'wdth' 100" }}
                   >
                     <MenuItem value="">Select team member</MenuItem>
@@ -1206,7 +1291,7 @@ export default function PriceChangeRequestsPage() {
                 {/* Attachments */}
                 <div>
                   <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
-                    Attachments
+                    Documents
                   </label>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
@@ -1216,7 +1301,6 @@ export default function PriceChangeRequestsPage() {
                         onChange={handleFileUpload}
                         className="flex-1 font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#000000] bg-transparent border border-[#b9b9b9] rounded px-3 py-2 focus:outline-none focus:border-[#65b230] focus:ring-1 focus:ring-[#65b230]"
                       />
-                      <Upload className="h-4 w-4 text-[#49454f]" />
                     </div>
 
                     {createModal.attachments.length > 0 && (

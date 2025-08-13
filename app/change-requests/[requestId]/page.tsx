@@ -57,8 +57,9 @@ interface PriceChangeRequest {
     | "Expire Pricing";
   customerId?: string;
   customerName?: string;
+  priority: string;
   assignedTo: string;
-  status: "New" | "In Progress" | "Activated" | "Declined" | "Withdrawn";
+  status: "New" | "In Progress" | "Activated" | "Declined" | "Incomplete";
   submittedBy: string;
   submittedDate: string;
   attachments: string[];
@@ -85,8 +86,9 @@ interface EditModeState {
     | "Expire Pricing";
   customerId: string;
   customerName: string;
+  priority: string;
   assignedTo: string;
-  status: "New" | "In Progress" | "Activated" | "Declined" | "Withdrawn";
+  status: "New" | "In Progress" | "Activated" | "Declined" | "Incomplete";
 }
 
 interface Note {
@@ -123,6 +125,7 @@ class PriceChangeRequestService {
         requestType: "Price Increase",
         customerId: "CUST-001",
         customerName: "Acme Corporation",
+        priority: "high",
         assignedTo: "Sarah Johnson",
         status: "New",
         submittedBy: "John Smith",
@@ -217,6 +220,7 @@ class PriceChangeRequestService {
         requestType: "Price Increase",
         customerId: "CUST-003",
         customerName: "Utah State Agencies",
+        priority: "medium",
         assignedTo: "David Brown",
         status: "In Progress",
         submittedBy: "Mike Wilson",
@@ -277,6 +281,7 @@ class PriceChangeRequestService {
         requestType: "Price Increase",
         customerId: "CUST-007",
         customerName: "Clean Energy Solutions",
+        priority: "high",
         assignedTo: "Michael Chen",
         status: "Activated",
         submittedBy: "Lisa Davis",
@@ -413,6 +418,7 @@ export default function PriceChangeRequestDetailsPage() {
     requestType: "New Customer",
     customerId: "",
     customerName: "",
+    priority: "",
     assignedTo: "",
     status: "New",
   });
@@ -441,6 +447,7 @@ export default function PriceChangeRequestDetailsPage() {
             requestType: data.requestType,
             customerId: data.customerId || "",
             customerName: data.customerName || "",
+            priority: data.priority,
             assignedTo: data.assignedTo,
             status: data.status,
           });
@@ -606,6 +613,7 @@ export default function PriceChangeRequestDetailsPage() {
         requestType: editMode.requestType,
         customerId: editMode.customerId || undefined,
         customerName: editMode.customerName || undefined,
+        priority: editMode.priority,
         assignedTo: editMode.assignedTo,
       };
 
@@ -657,8 +665,14 @@ export default function PriceChangeRequestDetailsPage() {
         bgColor: "bg-[rgba(211,47,47,0.1)]",
         icon: XCircle,
       },
-      Withdrawn: {
-        label: "Withdrawn",
+      Incomplete: {
+        label: "Incomplete",
+        className: "text-[#63666a]",
+        bgColor: "bg-[rgba(99,102,106,0.1)]",
+        icon: AlertCircle,
+      },
+      Resubmitted: {
+        label: "Resubmitted",
         className: "text-[#63666a]",
         bgColor: "bg-[rgba(99,102,106,0.1)]",
         icon: AlertCircle,
@@ -679,6 +693,42 @@ export default function PriceChangeRequestDetailsPage() {
         className={`flex items-center gap-2 px-3 py-1 rounded-[50px] ${config.bgColor} ${config.className}`}
       >
         <IconComponent className="h-4 w-4" />
+        <span className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px]">
+          {config.label}
+        </span>
+      </div>
+    );
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    const priorityConfig = {
+      urgent: {
+        label: "Urgent",
+        className: "text-[#d32f2f]",
+        bgColor: "bg-[rgba(211,47,47,0.1)]",
+      },
+      high: {
+        label: "High",
+        className: "text-[#ed6c02]",
+        bgColor: "bg-[rgba(237,108,2,0.1)]",
+      },
+      medium: {
+        label: "Medium",
+        className: "text-[#1976d2]",
+        bgColor: "bg-[rgba(25,118,210,0.1)]",
+      },
+    };
+
+    const config = priorityConfig[priority as keyof typeof priorityConfig] || {
+      label: priority || "Not Set",
+      className: "text-[#63666a]",
+      bgColor: "bg-[rgba(99,102,106,0.1)]",
+    };
+
+    return (
+      <div
+        className={`flex max-w-fit items-center px-3 py-1 rounded-[50px] ${config.bgColor} ${config.className}`}
+      >
         <span className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px]">
           {config.label}
         </span>
@@ -750,7 +800,7 @@ export default function PriceChangeRequestDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="bg-[#fffbfe] min-h-screen">
+      <div className="bg-[#eaeaea] min-h-screen">
         <div className="bg-[#eaeaea] min-h-screen">
           <div className="flex flex-col gap-6 px-6 py-6 max-w-7xl mx-auto">
             <div className="flex items-center justify-center h-64">
@@ -769,7 +819,7 @@ export default function PriceChangeRequestDetailsPage() {
 
   if (!request) {
     return (
-      <div className="bg-[#fffbfe] min-h-screen">
+      <div className="bg-[#eaeaea] min-h-screen">
         <div className="bg-[#eaeaea] min-h-screen">
           <div className="flex flex-col gap-6 px-6 py-6 max-w-7xl mx-auto">
             <div className="bg-[#ffffff] rounded shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)] p-8">
@@ -809,7 +859,7 @@ export default function PriceChangeRequestDetailsPage() {
   }
 
   return (
-    <div className="bg-[#fffbfe] min-h-screen">
+    <div className="bg-[#eaeaea] min-h-screen">
       <div className="bg-[#eaeaea] min-h-screen">
         <div className="flex flex-col gap-6 px-6 py-6 max-w-7xl mx-auto">
           {/* Main Card */}
@@ -856,7 +906,7 @@ export default function PriceChangeRequestDetailsPage() {
                       <User className="h-4 w-4 text-[#63666a]" />
 
                       <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#63666a]">
-                        Submitted By
+                        Created By
                       </span>
 
                       <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
@@ -897,7 +947,7 @@ export default function PriceChangeRequestDetailsPage() {
                         }}
                       >
                         <CheckCircle className="w-4 h-4 text-white" />
-                        <span>Execute Price Change</span>
+                        <span>Initiate Price Entry</span>
                       </MuiButton>
                     </div>
                   </div>
@@ -959,10 +1009,11 @@ export default function PriceChangeRequestDetailsPage() {
                                       return "#fff7ed"; // bg-orange-50
                                     case "Activated":
                                       return "#16a34a"; // bg-green-600
+                                    case "Incomplete":
+                                      return "#f9fafb"; // bg-gray-50
                                     case "Declined":
                                       return "#fef2f2"; // bg-red-50
-                                    case "Withdrawn":
-                                      return "#f9fafb"; // bg-gray-50
+
                                     default:
                                       return "#f9fafb"; // bg-gray-50
                                   }
@@ -977,10 +1028,11 @@ export default function PriceChangeRequestDetailsPage() {
                                       return "#fed7aa"; // border-orange-200
                                     case "Activated":
                                       return "#16a34a"; // border-green-600
+                                    case "Incomplete":
+                                      return "#e5e7eb"; // border-gray-200
                                     case "Declined":
                                       return "#fecaca"; // border-red-200
-                                    case "Withdrawn":
-                                      return "#e5e7eb"; // border-gray-200
+
                                     default:
                                       return "#e5e7eb"; // border-gray-200
                                   }
@@ -1000,7 +1052,7 @@ export default function PriceChangeRequestDetailsPage() {
                                         return "#16a34a"; // bg-green-600
                                       case "Declined":
                                         return "#fef2f2"; // bg-red-50
-                                      case "Withdrawn":
+                                      case "Incomplete":
                                         return "#f9fafb"; // bg-gray-50
                                       default:
                                         return "#f9fafb"; // bg-gray-50
@@ -1016,7 +1068,7 @@ export default function PriceChangeRequestDetailsPage() {
                                         return "#ffffff"; // text-white
                                       case "Declined":
                                         return "#b91c1c"; // text-red-700
-                                      case "Withdrawn":
+                                      case "Incomplete":
                                         return "#4b5563"; // text-gray-600
                                       default:
                                         return "#4b5563"; // text-gray-600
@@ -1039,7 +1091,7 @@ export default function PriceChangeRequestDetailsPage() {
                                         return "#16a34a"; // border-green-600
                                       case "Declined":
                                         return "#fecaca"; // border-red-200
-                                      case "Withdrawn":
+                                      case "Incomplete":
                                         return "#e5e7eb"; // border-gray-200
                                       default:
                                         return "#e5e7eb"; // border-gray-200
@@ -1078,7 +1130,7 @@ export default function PriceChangeRequestDetailsPage() {
                                         return "#16a34a"; // bg-green-600
                                       case "Declined":
                                         return "#fef2f2"; // bg-red-50
-                                      case "Withdrawn":
+                                      case "Incomplete":
                                         return "#f9fafb"; // bg-gray-50
                                       default:
                                         return "#f9fafb"; // bg-gray-50
@@ -1094,7 +1146,7 @@ export default function PriceChangeRequestDetailsPage() {
                                         return "#ffffff"; // text-white
                                       case "Declined":
                                         return "#b91c1c"; // text-red-700
-                                      case "Withdrawn":
+                                      case "Incomplete":
                                         return "#4b5563"; // text-gray-600
                                       default:
                                         return "#4b5563"; // text-gray-600
@@ -1137,7 +1189,7 @@ export default function PriceChangeRequestDetailsPage() {
                                         id="split-button-menu"
                                         autoFocusItem
                                       >
-                                        {["Declined", "Withdrawn"].map(
+                                        {["Incomplete", "Declined"].map(
                                           (status) => (
                                             <MenuItem
                                               key={status}
@@ -1229,24 +1281,71 @@ export default function PriceChangeRequestDetailsPage() {
                         <div className="space-y-6">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                              <TextField
-                                label="Subject *"
-                                variant="outlined"
-                                fullWidth
-                                value={editMode.subject}
-                                onChange={(e) =>
-                                  setEditMode((prev) => ({
-                                    ...prev,
-                                    subject: e.target.value,
-                                  }))
-                                }
-                                placeholder="Brief summary of the change"
-                                InputProps={{
-                                  style: {
+                              <FormControl variant="outlined" fullWidth>
+                                <InputLabel id="edit-assigned-to-label">
+                                  Assigned To *
+                                </InputLabel>
+                                <Select
+                                  labelId="edit-assigned-to-label"
+                                  value={editMode.assignedTo}
+                                  onChange={(e) =>
+                                    setEditMode((prev) => ({
+                                      ...prev,
+                                      assignedTo: e.target.value as string,
+                                    }))
+                                  }
+                                  label="Assigned To *"
+                                  style={{
                                     fontVariationSettings: "'wdth' 100",
-                                  },
-                                }}
-                              />
+                                  }}
+                                >
+                                  <MenuItem value="Sarah Johnson">
+                                    Sarah Johnson
+                                  </MenuItem>
+                                  <MenuItem value="John Smith">
+                                    John Smith
+                                  </MenuItem>
+                                  <MenuItem value="David Brown">
+                                    David Brown
+                                  </MenuItem>
+                                  <MenuItem value="Mike Wilson">
+                                    Mike Wilson
+                                  </MenuItem>
+                                  <MenuItem value="Michael Chen">
+                                    Michael Chen
+                                  </MenuItem>
+                                  <MenuItem value="Lisa Davis">
+                                    Lisa Davis
+                                  </MenuItem>
+                                </Select>
+                              </FormControl>
+                            </div>
+
+                            <div>
+                              <FormControl variant="outlined" fullWidth>
+                                <InputLabel id="edit-priority-label">
+                                  Priority
+                                </InputLabel>
+                                <Select
+                                  labelId="edit-priority-label"
+                                  value={editMode.priority}
+                                  onChange={(e) =>
+                                    setEditMode((prev) => ({
+                                      ...prev,
+                                      priority: e.target.value as string,
+                                    }))
+                                  }
+                                  label="Priority"
+                                  style={{
+                                    fontVariationSettings: "'wdth' 100",
+                                  }}
+                                >
+                                  <MenuItem value="">Select priority</MenuItem>
+                                  <MenuItem value="urgent">Urgent</MenuItem>
+                                  <MenuItem value="high">High</MenuItem>
+                                  <MenuItem value="medium">Medium</MenuItem>
+                                </Select>
+                              </FormControl>
                             </div>
 
                             <div>
@@ -1329,69 +1428,49 @@ export default function PriceChangeRequestDetailsPage() {
                                   }}
                                 >
                                   <MenuItem value="CUST-001">
-                                    Acme Corporation
+                                    Acme Corporation (CUST-001)
                                   </MenuItem>
                                   <MenuItem value="CUST-002">
-                                    Tech Solutions Inc
+                                    Tech Solutions Inc (CUST-002)
                                   </MenuItem>
                                   <MenuItem value="CUST-003">
-                                    Utah State Agencies (Inactive)
+                                    Utah State Agencies (CUST-003)
                                   </MenuItem>
                                   <MenuItem value="CUST-004">
-                                    Industrial Cleanup Ltd
+                                    Industrial Cleanup Ltd (CUST-004)
                                   </MenuItem>
                                   <MenuItem value="CUST-005">
-                                    Environmental Services LLC
+                                    Environmental Services LLC (CUST-005)
                                   </MenuItem>
                                   <MenuItem value="CUST-006">
-                                    Waste Management Corp (Inactive)
+                                    Waste Management Corp (CUST-006)
                                   </MenuItem>
                                   <MenuItem value="CUST-007">
-                                    Clean Energy Solutions
+                                    Clean Energy Solutions (CUST-007)
                                   </MenuItem>
                                 </Select>
                               </FormControl>
                             </div>
 
                             <div>
-                              <FormControl variant="outlined" fullWidth>
-                                <InputLabel id="edit-assigned-to-label">
-                                  Assigned To *
-                                </InputLabel>
-                                <Select
-                                  labelId="edit-assigned-to-label"
-                                  value={editMode.assignedTo}
-                                  onChange={(e) =>
-                                    setEditMode((prev) => ({
-                                      ...prev,
-                                      assignedTo: e.target.value as string,
-                                    }))
-                                  }
-                                  label="Assigned To *"
-                                  style={{
+                              <TextField
+                                label="Subject *"
+                                variant="outlined"
+                                fullWidth
+                                value={editMode.subject}
+                                onChange={(e) =>
+                                  setEditMode((prev) => ({
+                                    ...prev,
+                                    subject: e.target.value,
+                                  }))
+                                }
+                                placeholder="Brief summary of the change"
+                                InputProps={{
+                                  style: {
                                     fontVariationSettings: "'wdth' 100",
-                                  }}
-                                >
-                                  <MenuItem value="Sarah Johnson">
-                                    Sarah Johnson
-                                  </MenuItem>
-                                  <MenuItem value="John Smith">
-                                    John Smith
-                                  </MenuItem>
-                                  <MenuItem value="David Brown">
-                                    David Brown
-                                  </MenuItem>
-                                  <MenuItem value="Mike Wilson">
-                                    Mike Wilson
-                                  </MenuItem>
-                                  <MenuItem value="Michael Chen">
-                                    Michael Chen
-                                  </MenuItem>
-                                  <MenuItem value="Lisa Davis">
-                                    Lisa Davis
-                                  </MenuItem>
-                                </Select>
-                              </FormControl>
+                                  },
+                                }}
+                              />
                             </div>
                           </div>
 
@@ -1423,11 +1502,29 @@ export default function PriceChangeRequestDetailsPage() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                               <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
-                                Subject
+                                Assigned To
                               </label>
-                              <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
-                                {request.subject}
-                              </p>
+                              <div className="mt-1 flex items-center space-x-2">
+                                <User className="h-4 w-4 text-[#63666a]" />
+                                <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
+                                  {request.assignedTo}
+                                </span>
+                                {request.assignedTo === "Sarah Johnson" && (
+                                  <div className="bg-[#65b230] px-2 py-1 rounded-[50px]">
+                                    <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[12px] leading-[20px] text-[#ffffff]">
+                                      Me
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
+                                Priority
+                              </label>
+                              <div className="mt-1">
+                                {getPriorityBadge(request.priority)}
+                              </div>
                             </div>
                             <div>
                               <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
@@ -1462,21 +1559,11 @@ export default function PriceChangeRequestDetailsPage() {
                             </div>
                             <div>
                               <label className="font-['Roboto:Medium',_sans-serif] font-medium text-[14px] leading-[21px] text-[#1c1b1f] mb-2 block">
-                                Assigned To
+                                Subject
                               </label>
-                              <div className="mt-1 flex items-center space-x-2">
-                                <User className="h-4 w-4 text-[#63666a]" />
-                                <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
-                                  {request.assignedTo}
-                                </span>
-                                {request.assignedTo === "Sarah Johnson" && (
-                                  <div className="bg-[#65b230] px-2 py-1 rounded-[50px]">
-                                    <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[12px] leading-[20px] text-[#ffffff]">
-                                      Me
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
+                              <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[24px] text-[#1c1b1f]">
+                                {request.subject}
+                              </p>
                             </div>
                           </div>
                           <div>
@@ -1889,8 +1976,8 @@ export default function PriceChangeRequestDetailsPage() {
                     lineHeight: "20px",
                   }}
                 >
+                  <MenuItem value="Incomplete">Incomplete</MenuItem>
                   <MenuItem value="Declined">Declined</MenuItem>
-                  <MenuItem value="Withdrawn">Withdrawn</MenuItem>
                 </Select>
               </FormControl>
             </div>

@@ -58,7 +58,7 @@ export default function LandingPage() {
                   <div>
                     <CardTitle className="text-xl">Change Requests</CardTitle>
                     <p className="text-sm text-gray-500 mt-1">
-                      View Price Change Requests Flow
+                      View Price Requests Flow
                     </p>
                   </div>
                 </div>

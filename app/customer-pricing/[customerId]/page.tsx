@@ -4176,7 +4176,7 @@ export default function AllCustomerPricingPage() {
               color: "#1c1b1f",
             }}
           >
-            Select Price Change Request
+            Select Price Request
           </DialogTitle>
           <DialogContent sx={{ p: 3 }}>
             <div className="flex items-center justify-between mb-4">
@@ -4276,7 +4276,7 @@ export default function AllCustomerPricingPage() {
                               lineHeight: "24px",
                             }}
                           >
-                            {request.title}
+                            {request.id}: {request.title}
                           </Typography>
 
                           <Chip
@@ -4410,7 +4410,7 @@ export default function AllCustomerPricingPage() {
               alignItems: "center",
             }}
           >
-            Configure Price Change
+            Configure Price Entry
             <IconButton
               onClick={handleCancelPriceChangeConfig}
               sx={{
@@ -4439,7 +4439,7 @@ export default function AllCustomerPricingPage() {
                 variant="subtitle2"
                 sx={{ mb: 1, color: "#495057", fontWeight: 600 }}
               >
-                Selected Price Change Request
+                Selected Price Request
               </Typography>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                 {selectedPriceChangeRequests.map((requestId) => {
@@ -4449,7 +4449,7 @@ export default function AllCustomerPricingPage() {
                   return request ? (
                     <Chip
                       key={requestId}
-                      label={request.title}
+                      label={`${request.id}: ${request.title}`}
                       size="small"
                       sx={{
                         backgroundColor: "#65b230",
@@ -4697,7 +4697,7 @@ export default function AllCustomerPricingPage() {
               Back to Selection
             </SecondaryButton>
             <PrimaryButton onClick={handlePriceChangeConfigSubmit}>
-              Begin Price Change
+              Begin Price Entry
             </PrimaryButton>
           </DialogActions>
         </Dialog>

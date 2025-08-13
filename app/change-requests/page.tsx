@@ -769,7 +769,7 @@ export default function PriceChangeRequestsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="font-['Roboto:Medium',_sans-serif] font-medium text-[32px] leading-[40px] text-[#1c1b1f] mb-2">
-                Price Change Requests
+                Price Requests
               </h1>
               <div className="flex items-center space-x-4 my-2">
                 <span className="inline-flex items-center bg-[rgba(101,178,48,0.1)] text-[#2e7d32] rounded-full px-3 py-1 text-sm font-['Roboto:Medium',_sans-serif] font-medium">
@@ -1132,7 +1132,7 @@ export default function PriceChangeRequestsPage() {
               {/* Modal Header */}
               <div className="p-6 border-b border-[#e0e0e0]">
                 <h2 className="font-['Roboto:Medium',_sans-serif] font-medium text-[24px] leading-[32px] text-[#1c1b1f] mb-2">
-                  Create New Price Change Request
+                  Create New Price Request
                 </h2>
                 <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#49454f]">
                   Create a formal request for pricing changes. All fields marked

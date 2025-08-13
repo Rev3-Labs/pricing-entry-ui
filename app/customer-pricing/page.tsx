@@ -2680,7 +2680,7 @@ export default function AllCustomerPricingPage() {
               color: "#1c1b1f",
             }}
           >
-            Select Price Change Request
+            Select Price Request
           </DialogTitle>
           <DialogContent sx={{ p: 3 }}>
             <div className="flex items-center justify-between mb-4">
@@ -2780,7 +2780,7 @@ export default function AllCustomerPricingPage() {
                               lineHeight: "24px",
                             }}
                           >
-                            {request.title}
+                            {request.id}: {request.title}
                           </Typography>
 
                           <Chip
@@ -2938,7 +2938,7 @@ export default function AllCustomerPricingPage() {
                   return request ? (
                     <Chip
                       key={requestId}
-                      label={request.title}
+                      label={`${request.id}: ${request.title}`}
                       size="small"
                       sx={{
                         backgroundColor: "#65b230",

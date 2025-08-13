@@ -602,6 +602,11 @@ export default function AllCustomerPricingPage() {
     const allItems = [...allPricingData.priceItems];
 
     return allItems.filter((item) => {
+      // Always include new rows (temporary IDs) regardless of filters
+      if (item.priceItemId.startsWith("temp-")) {
+        return true;
+      }
+
       // Get the associated customer and header for this item
       const header = allPricingData.priceHeaders.find(
         (h) => h.priceHeaderId === item.priceHeaderId
@@ -754,6 +759,17 @@ export default function AllCustomerPricingPage() {
       const unitPrice = parseFloat(String(item.unitPrice)) || 0;
       const minimumPrice = parseFloat(String(item.minimumPrice)) || 0;
 
+      // Debug logging for price values
+      if (item.priceItemId.startsWith("temp-")) {
+        console.log("Processing new row prices:", {
+          priceItemId: item.priceItemId,
+          originalUnitPrice: item.unitPrice,
+          parsedUnitPrice: unitPrice,
+          originalMinimumPrice: item.minimumPrice,
+          parsedMinimumPrice: minimumPrice,
+        });
+      }
+
       return {
         id: item.priceItemId,
         customerId: customer?.customerId || "",
@@ -777,22 +793,101 @@ export default function AllCustomerPricingPage() {
         header: header,
         isNew: isNewItem,
         isModified: isModifiedItem,
+        isNewEntry: item.priceItemId.startsWith("temp-"), // Set to true for temporary rows
       };
     });
 
-    // No longer adding new entry row to DataGrid - using form dialog instead
+    // Since new rows are now included in filteredPriceItems, we just need to ensure they're at the top
+    let finalRows = [...baseRows];
+
+    // Move any new entry rows to the top
+    const newEntryRows = finalRows.filter((row) => row.isNewEntry);
+    const regularRows = finalRows.filter((row) => !row.isNewEntry);
+
+    if (newEntryRows.length > 0) {
+      finalRows = [...newEntryRows, ...regularRows];
+    }
+
+    // Ensure no duplicate IDs (safety check)
+    const uniqueRows = finalRows.filter(
+      (row, index, self) => index === self.findIndex((r) => r.id === row.id)
+    );
+
+    if (uniqueRows.length !== finalRows.length) {
+      console.warn("Duplicate rows detected and removed:", {
+        originalCount: finalRows.length,
+        uniqueCount: uniqueRows.length,
+        duplicateIds: finalRows
+          .filter(
+            (row, index, self) =>
+              index !== self.findIndex((r) => r.id === row.id)
+          )
+          .map((r) => r.id),
+      });
+    }
+
+    // Validate row structure and ensure all required properties exist
+    const validatedRows = uniqueRows
+      .map((row) => {
+        if (!row.id) {
+          console.error("Row missing ID:", row);
+          return null;
+        }
+
+        // Ensure all required properties exist with fallback values
+        return {
+          id: row.id,
+          customerId: row.customerId || "",
+          customerName: row.customerName || "",
+          productName: row.productName || "",
+          profileId: row.profileId || "",
+          generatorId: row.generatorId || "",
+          contractId: row.contractId || "",
+          projectName: row.projectName || "",
+          region: row.region || "",
+          facilityName: row.facilityName || "",
+          description: row.description || "",
+          containerSize: row.containerSize || "",
+          uom: row.uom || "",
+          unitPrice: row.unitPrice !== undefined ? row.unitPrice : 0,
+          minimumPrice: row.minimumPrice !== undefined ? row.minimumPrice : 0,
+          effectiveDate: row.effectiveDate || "",
+          expirationDate: row.expirationDate || "",
+          entryDate: row.entryDate || "",
+          enteredBy: row.enteredBy || "",
+          header: row.header,
+          isNew: row.isNew || false,
+          isModified: row.isModified || false,
+          isNewEntry: row.isNewEntry || false,
+          isEditing: (row as any).isEditing || false,
+        };
+      })
+      .filter(Boolean); // Remove any null rows
 
     console.log("Rows computed:", {
       baseRows,
       filteredItemsCount: filteredPriceItems.length,
       newRowId,
       forceRerender,
+      finalRowsCount: validatedRows.length,
+      hasDuplicateIds: finalRows.length !== uniqueRows.length,
+      allIds: validatedRows.map((r) => r!.id),
+      sampleRow: validatedRows[0]
+        ? {
+            id: validatedRows[0].id,
+            unitPrice: validatedRows[0].unitPrice,
+            minimumPrice: validatedRows[0].minimumPrice,
+            isNewEntry: validatedRows[0].isNewEntry,
+            keys: Object.keys(validatedRows[0]),
+          }
+        : null,
     });
-    return baseRows;
+    return validatedRows;
   }, [
     filteredPriceItems,
     allPricingData.priceHeaders,
     allPricingData.customers,
+    allPricingData.priceItems,
     newRowId,
     forceRerender,
   ]);
@@ -938,152 +1033,92 @@ export default function AllCustomerPricingPage() {
 
   // New handler functions for edit mode
   const handleAddNewEntry = () => {
-    setShowNewEntryForm(true);
-    // Initialize new entry data with empty values
-    setNewEntryData({
+    // Create a new row ID for the temporary row
+    const tempRowId = `temp-${Date.now()}`;
+
+    // Create a new empty row with default values
+    const newRow = {
+      id: tempRowId,
+      customerId: customerId || "",
+      customerName:
+        allPricingData?.customers?.find((c) => c.customerId === customerId)
+          ?.customerName || "",
       productName: "",
-      unitPrice: "",
-      minimumPrice: "",
-      effectiveDate: "",
-      expirationDate: "",
-      projectName: "",
       profileId: "",
       generatorId: "",
       contractId: "",
+      projectName: "",
+      region: "North",
       facilityName: "",
+      description: "",
       containerSize: "",
       uom: "",
-      region: "North",
-    });
-  };
-
-  const handleSaveNewEntry = () => {
-    console.log("=== SAVE NEW ENTRY TRIGGERED ===");
-    console.log("New entry data to save:", newEntryData);
-
-    // Use the tracked new entry data instead of trying to find it in rows
-    if (!newEntryData || Object.keys(newEntryData).length === 0) {
-      console.error("No new entry data found");
-      toast.error("No new entry to save");
-      return;
-    }
-
-    // Convert and validate the entered data
-    const convertValue = (value: any, fieldName: string): any => {
-      if (value === null || value === undefined || value === "") {
-        return "";
-      }
-
-      // Handle numeric fields
-      if (fieldName === "unitPrice" || fieldName === "minimumPrice") {
-        const numValue = parseFloat(String(value));
-        return isNaN(numValue) ? 0 : numValue;
-      }
-
-      // Handle date fields
-      if (fieldName === "effectiveDate" || fieldName === "expirationDate") {
-        if (value instanceof Date) {
-          return value.toISOString().split("T")[0];
-        }
-        if (typeof value === "string" && value.trim()) {
-          return value.trim();
-        }
-        return "";
-      }
-
-      // Handle string fields
-      return String(value).trim();
+      unitPrice: 0,
+      minimumPrice: 0,
+      effectiveDate: new Date().toISOString().split("T")[0],
+      expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0],
+      entryDate: new Date().toISOString().split("T")[0],
+      enteredBy: "",
+      header: undefined,
+      isNew: true,
+      isModified: false,
+      isNewEntry: true, // Flag to identify this as a new entry row
+      isEditing: true, // Flag to indicate this row should be in edit mode
     };
 
-    const convertedData = {
-      productName: convertValue(newEntryData.productName, "productName"),
-      unitPrice: convertValue(newEntryData.unitPrice, "unitPrice"),
-      minimumPrice: convertValue(newEntryData.minimumPrice, "minimumPrice"),
-      effectiveDate: convertValue(newEntryData.effectiveDate, "effectiveDate"),
-      expirationDate: convertValue(
-        newEntryData.expirationDate,
-        "expirationDate"
-      ),
-      projectName: convertValue(newEntryData.projectName, "projectName"),
-      profileId: convertValue(newEntryData.profileId, "profileId"),
-      generatorId: convertValue(newEntryData.generatorId, "generatorId"),
-      contractId: convertValue(newEntryData.contractId, "contractId"),
-      facilityName: convertValue(newEntryData.facilityName, "facilityName"),
-      containerSize: convertValue(newEntryData.containerSize, "containerSize"),
-      uom: convertValue(newEntryData.uom, "uom"),
-    };
+    console.log("Created new row:", newRow);
 
-    console.log("Converted data:", convertedData);
-
-    // Check if user has actually entered any data
-    const hasEnteredData = Object.values(convertedData).some(
-      (value) => value !== "" && value !== 0
-    );
-
-    if (!hasEnteredData) {
-      console.log("No data entered");
-      toast.error("Please enter some data before saving");
-      return;
-    }
-
-    // Validate required fields
-    if (!convertedData.productName) {
-      toast.error("Product name is required");
-      return;
-    }
-    if (!convertedData.unitPrice || convertedData.unitPrice <= 0) {
-      toast.error("Valid unit price is required");
-      return;
-    }
-
-    // Create a new price item from the entered data
-    const newPriceItem: PriceItem = {
-      priceItemId: newRowId || `new-${Date.now()}`,
-      priceHeaderId: allPricingData.priceHeaders[0]?.priceHeaderId || "",
-      productName: convertedData.productName,
-      region: newEntryData.region || "North",
-      unitPrice: convertedData.unitPrice,
-      minimumPrice: convertedData.minimumPrice,
-      effectiveDate:
-        convertedData.effectiveDate || new Date().toISOString().split("T")[0],
-      expirationDate:
-        convertedData.expirationDate ||
-        new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+    // Add the new row to the beginning of the rows array
+    setAllPricingData((prev) => {
+      const newPriceItem: PriceItem = {
+        priceItemId: tempRowId,
+        priceHeaderId: prev.priceHeaders[0]?.priceHeaderId || "",
+        productName: "",
+        region: "North",
+        unitPrice: 0,
+        minimumPrice: 0,
+        effectiveDate: new Date().toISOString().split("T")[0],
+        expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
           .toISOString()
           .split("T")[0],
-      status: "new",
-      uom: convertedData.uom,
-      containerSize: convertedData.containerSize,
-      facilityName: convertedData.facilityName,
-      projectName: convertedData.projectName,
-      profileId: convertedData.profileId,
-      generatorId: convertedData.generatorId,
-      contractId: convertedData.contractId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+        status: "new",
+        uom: "",
+        containerSize: "",
+        facilityName: "",
+        projectName: "",
+        profileId: "",
+        generatorId: "",
+        contractId: "",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
 
-    console.log("Created new price item:", newPriceItem);
-
-    // Add the new item to the main data
-    setAllPricingData((prev) => {
       const updated = {
         ...prev,
-        priceItems: [newPriceItem, ...prev.priceItems], // Add at the top
+        priceItems: [newPriceItem, ...prev.priceItems],
       };
-      console.log("Added new price item to data:", newPriceItem);
-      console.log("Updated price items count:", updated.priceItems.length);
+      console.log("Updated allPricingData:", {
+        newPriceItem,
+        totalPriceItems: updated.priceItems.length,
+        firstItem: updated.priceItems[0],
+      });
       return updated;
     });
 
     // Add to newRows set to track it
-    setNewRows((prev) => new Set([...prev, newPriceItem.priceItemId]));
+    setNewRows((prev) => new Set([...prev, tempRowId]));
 
-    // Reset editing state
-    setShowNewEntryForm(false);
-    setNewEntryData({});
+    // Set the new row ID for tracking
+    setNewRowId(tempRowId);
 
-    toast.success("New entry added successfully");
+    // Force a re-render to ensure the DataGrid updates
+    setForceRerender((prev) => prev + 1);
+
+    toast.success(
+      "New row added. You can now edit the values directly in the table."
+    );
   };
 
   const handleSaveEditEntry = () => {
@@ -1707,13 +1742,14 @@ export default function AllCustomerPricingPage() {
       toast.error("Please select at least one row to edit");
       return;
     }
+    // If multiple rows are selected, open the bulk edit dialog
     if (selectedIds.length > 1) {
-      toast.error("Please select only one row to edit at a time");
+      setApplyChangesDialogOpen(true);
       return;
     }
 
     // Find the selected row data
-    const selectedRow = rows.find((row) => row.id === selectedIds[0]);
+    const selectedRow = rows?.find((row) => row?.id === selectedIds[0]);
     if (!selectedRow) {
       toast.error("Selected row not found");
       return;
@@ -1987,88 +2023,134 @@ export default function AllCustomerPricingPage() {
       return;
     }
 
-    // Check if any selected rows have effective dates less than or equal to today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Set to start of day for comparison
+    // Separate new rows (temporary rows) from existing rows
+    const selectedNewRows = selectedIds.filter((id) => id.startsWith("temp-"));
+    const selectedExistingRows = selectedIds.filter(
+      (id) => !id.startsWith("temp-")
+    );
 
-    console.log("Today's date:", today.toISOString());
-    console.log("Selected IDs:", selectedIds);
+    // Handle new rows immediately (no validation needed)
+    if (selectedNewRows.length > 0) {
+      // Remove from allPricingData
+      setAllPricingData((prev) => ({
+        ...prev,
+        priceItems: prev.priceItems.filter(
+          (item) => !selectedNewRows.includes(item.priceItemId)
+        ),
+      }));
 
-    const rowsWithPastEffectiveDates = selectedIds.filter((id) => {
-      const row = allPricingData.priceItems.find(
-        (item) => item.priceItemId === id
-      );
-      if (!row) {
-        console.log(`Row not found for ID: ${id}`);
-        return false;
+      // Remove from newRows set
+      setNewRows((prev) => {
+        const updated = new Set(prev);
+        selectedNewRows.forEach((id) => updated.delete(id));
+        return updated;
+      });
+
+      // Clear newRowId if any of the deleted rows was the current new row
+      if (newRowId && selectedNewRows.includes(newRowId)) {
+        setNewRowId(null);
       }
 
-      console.log(`Row found:`, row);
+      // Clear selection and force re-render
+      setSelectedRows([]);
+      setForceRerender((prev) => prev + 1);
 
-      // Check if the row itself has an effective date
-      if (row.effectiveDate) {
-        const effectiveDate = new Date(row.effectiveDate);
-        effectiveDate.setHours(0, 0, 0, 0);
+      toast.success(
+        `${selectedNewRows.length} new row(s) removed successfully`
+      );
+    }
+
+    // Handle existing rows with validation (if any)
+    if (selectedExistingRows.length > 0) {
+      // Check if any selected rows have effective dates less than or equal to today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Set to start of day for comparison
+
+      console.log("Today's date:", today.toISOString());
+      console.log("Selected existing row IDs:", selectedExistingRows);
+
+      const rowsWithPastEffectiveDates = selectedExistingRows.filter((id) => {
+        const row = allPricingData.priceItems.find(
+          (item) => item.priceItemId === id
+        );
+        if (!row) {
+          console.log(`Row not found for ID: ${id}`);
+          return false;
+        }
+
+        console.log(`Row found:`, row);
+
+        // Check if the row itself has an effective date
+        if (row.effectiveDate) {
+          const effectiveDate = new Date(row.effectiveDate);
+          effectiveDate.setHours(0, 0, 0, 0);
+          console.log(
+            `Row effective date: ${
+              row.effectiveDate
+            } -> ${effectiveDate.toISOString()}`
+          );
+
+          if (effectiveDate <= today) {
+            console.log(
+              `Row has past effective date: ${effectiveDate.toISOString()} <= ${today.toISOString()}`
+            );
+            return true;
+          }
+        }
+
+        // Find the corresponding price header to get the effective date
+        const header = allPricingData.priceHeaders.find(
+          (h) => h.priceHeaderId === row.priceHeaderId
+        );
+        if (!header) {
+          console.log(
+            `Header not found for priceHeaderId: ${row.priceHeaderId}`
+          );
+          return false;
+        }
+
+        if (!header.effectiveDate) {
+          console.log(`Header has no effective date:`, header);
+          return false;
+        }
+
+        const effectiveDate = new Date(header.effectiveDate);
+        effectiveDate.setHours(0, 0, 0, 0); // Set to start of day for comparison
+
         console.log(
-          `Row effective date: ${
-            row.effectiveDate
+          `Header effective date: ${
+            header.effectiveDate
           } -> ${effectiveDate.toISOString()}`
         );
 
         if (effectiveDate <= today) {
           console.log(
-            `Row has past effective date: ${effectiveDate.toISOString()} <= ${today.toISOString()}`
+            `Header has past effective date: ${effectiveDate.toISOString()} <= ${today.toISOString()}`
           );
           return true;
         }
-      }
 
-      // Find the corresponding price header to get the effective date
-      const header = allPricingData.priceHeaders.find(
-        (h) => h.priceHeaderId === row.priceHeaderId
-      );
-      if (!header) {
-        console.log(`Header not found for priceHeaderId: ${row.priceHeaderId}`);
         return false;
-      }
-
-      if (!header.effectiveDate) {
-        console.log(`Header has no effective date:`, header);
-        return false;
-      }
-
-      const effectiveDate = new Date(header.effectiveDate);
-      effectiveDate.setHours(0, 0, 0, 0); // Set to start of day for comparison
+      });
 
       console.log(
-        `Header effective date: ${
-          header.effectiveDate
-        } -> ${effectiveDate.toISOString()}`
+        "Rows with past effective dates:",
+        rowsWithPastEffectiveDates
       );
 
-      if (effectiveDate <= today) {
-        console.log(
-          `Header has past effective date: ${effectiveDate.toISOString()} <= ${today.toISOString()}`
-        );
-        return true;
+      if (rowsWithPastEffectiveDates.length > 0) {
+        console.log("Validation failed - showing error dialog");
+        setValidationErrorDetails({
+          count: rowsWithPastEffectiveDates.length,
+          rows: rowsWithPastEffectiveDates,
+        });
+        setDeleteValidationErrorOpen(true);
+        return;
       }
 
-      return false;
-    });
-
-    console.log("Rows with past effective dates:", rowsWithPastEffectiveDates);
-
-    if (rowsWithPastEffectiveDates.length > 0) {
-      console.log("Validation failed - showing error dialog");
-      setValidationErrorDetails({
-        count: rowsWithPastEffectiveDates.length,
-        rows: rowsWithPastEffectiveDates,
-      });
-      setDeleteValidationErrorOpen(true);
-      return;
+      // If validation passes, show confirmation dialog for existing rows
+      setDeleteConfirmOpen(true);
     }
-
-    setDeleteConfirmOpen(true);
   };
 
   const handleDeleteConfirm = () => {
@@ -2141,7 +2223,7 @@ export default function AllCustomerPricingPage() {
                 }
                 onChange={(event) => {
                   if (event.target.checked) {
-                    setSelectedRows(rows.map((row) => row.id));
+                    setSelectedRows(rows?.map((row) => row.id) || []);
                   } else {
                     setSelectedRows([]);
                   }
@@ -2158,8 +2240,7 @@ export default function AllCustomerPricingPage() {
               />
             ),
             renderCell: (params: any) => {
-              // Don't show checkbox for the new entry row
-              if (params.row.isNewEntry) {
+              if (!params || !params.row) {
                 return null;
               }
               return (
@@ -2196,8 +2277,12 @@ export default function AllCustomerPricingPage() {
       width: 120,
       flex: 0.5,
       minWidth: 100,
-      // editable: true, // Disabled direct editing
+      editable: true,
       renderCell: (params: any) => {
+        if (!params || !params.row) {
+          console.warn("Invalid params in profileId renderCell:", params);
+          return <div>-</div>;
+        }
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isModified = modifiedFields?.has("profileId");
         return (
@@ -2218,8 +2303,12 @@ export default function AllCustomerPricingPage() {
       width: 150,
       flex: 1,
       minWidth: 120,
-      // editable: true, // Disabled direct editing
+      editable: true,
       renderCell: (params: any) => {
+        if (!params || !params.row) {
+          console.warn("Invalid params in projectName renderCell:", params);
+          return <div>-</div>;
+        }
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isModified = modifiedFields?.has("projectName");
         return (
@@ -2286,6 +2375,10 @@ export default function AllCustomerPricingPage() {
       minWidth: 80,
       // editable: true, // Disabled direct editing
       renderCell: (params: any) => {
+        if (!params || !params.row) {
+          console.warn("Invalid params in region renderCell:", params);
+          return <div>-</div>;
+        }
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isModified = modifiedFields?.has("region");
         return (
@@ -2313,6 +2406,10 @@ export default function AllCustomerPricingPage() {
         label: value,
       })),
       renderCell: (params: any) => {
+        if (!params || !params.row) {
+          console.warn("Invalid params in facilityName renderCell:", params);
+          return <div>-</div>;
+        }
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isModified = modifiedFields?.has("facilityName");
         return (
@@ -2333,7 +2430,7 @@ export default function AllCustomerPricingPage() {
       width: 100,
       flex: 0,
       minWidth: 80,
-      // editable: true, // Disabled direct editing
+      editable: true,
       renderCell: (params: any) => {
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isModified = modifiedFields?.has("productName");
@@ -2377,7 +2474,7 @@ export default function AllCustomerPricingPage() {
       width: 100,
       flex: 0,
       minWidth: 80,
-      // editable: true, // Disabled direct editing
+      editable: true,
       type: "singleSelect",
       valueOptions: ["Each", "Gallon", "Pound", "Container", "Ton"],
       renderCell: (params: any) => {
@@ -2401,7 +2498,7 @@ export default function AllCustomerPricingPage() {
       width: 130,
       flex: 0.8,
       minWidth: 110,
-      // editable: true, // Disabled direct editing
+      editable: true,
       type: "singleSelect",
       valueOptions: getUniqueContainerSizes().map((value) => ({
         value,
@@ -2428,17 +2525,32 @@ export default function AllCustomerPricingPage() {
       width: 120,
       flex: 0,
       minWidth: 100,
-      // editable: isEditMode, // Disabled direct editing
+      editable: true,
       type: "number",
       valueGetter: (params: any) => {
-        return params.value || 0;
+        // Ensure we get the actual value from the row data
+        if (!params || !params.row) {
+          console.warn("Invalid params in unitPrice valueGetter:", params);
+          return 0;
+        }
+        const value = params.row.unitPrice;
+        return value !== undefined && value !== null ? value : 0;
       },
       valueSetter: (params: any) => {
+        if (!params || !params.row) {
+          console.error("Invalid params in unitPrice valueSetter:", params);
+          return { id: "temp", unitPrice: 0 };
+        }
         const value = parseFloat(params.value) || 0;
-        return { ...params.row, unitPrice: value };
+        return { ...params.row, unitPrice: value, id: params.row.id };
       },
       renderCell: (params: any) => {
-        const price = formatCurrency(params.value);
+        if (!params || !params.row) {
+          console.warn("Invalid params in unitPrice renderCell:", params);
+          return <div>$0.00</div>;
+        }
+        // Use the row data directly instead of params.value to ensure we get the actual value
+        const price = formatCurrency(params.row.unitPrice);
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isPriceModified = modifiedFields?.has("unitPrice");
         return (
@@ -2459,17 +2571,32 @@ export default function AllCustomerPricingPage() {
       width: 120,
       flex: 0,
       minWidth: 100,
-      // editable: isEditMode, // Disabled direct editing
+      editable: true,
       type: "number",
       valueGetter: (params: any) => {
-        return params.value || 0;
+        // Ensure we get the actual value from the row data
+        if (!params || !params.row) {
+          console.warn("Invalid params in minimumPrice valueGetter:", params);
+          return 0;
+        }
+        const value = params.row.minimumPrice;
+        return value !== undefined && value !== null ? value : 0;
       },
       valueSetter: (params: any) => {
+        if (!params || !params.row) {
+          console.error("Invalid params in minimumPrice valueSetter:", params);
+          return { id: "temp", minimumPrice: 0 };
+        }
         const value = parseFloat(params.value) || 0;
-        return { ...params.row, minimumPrice: value };
+        return { ...params.row, minimumPrice: value, id: params.row.id };
       },
       renderCell: (params: any) => {
-        const price = formatCurrency(params.value);
+        if (!params || !params.row) {
+          console.warn("Invalid params in minimumPrice renderCell:", params);
+          return <div>$0.00</div>;
+        }
+        // Use the row data directly instead of params.value to ensure we get the actual value
+        const price = formatCurrency(params.row.minimumPrice);
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isPriceModified = modifiedFields?.has("minimumPrice");
         return (
@@ -2502,6 +2629,7 @@ export default function AllCustomerPricingPage() {
       },
       valueSetter: (params: any) => {
         if (!params || !params.row) {
+          console.error("Invalid params in effectiveDate valueSetter:", params);
           return { id: "temp", effectiveDate: "" };
         }
 
@@ -2509,12 +2637,20 @@ export default function AllCustomerPricingPage() {
           const value = params.value;
           const dateString =
             value instanceof Date ? value.toISOString().split("T")[0] : "";
-          return { ...params.row, effectiveDate: dateString };
+          return {
+            ...params.row,
+            effectiveDate: dateString,
+            id: params.row.id,
+          };
         } catch {
-          return { ...params.row, effectiveDate: "" };
+          return { ...params.row, effectiveDate: "", id: params.row.id };
         }
       },
       renderCell: (params: any) => {
+        if (!params || !params.row) {
+          console.warn("Invalid params in effectiveDate renderCell:", params);
+          return <div>-</div>;
+        }
         // Get the original value from the row data for display
         const originalValue = params.row.effectiveDate;
         const date = originalValue ? formatDate(originalValue) : "";
@@ -2550,6 +2686,10 @@ export default function AllCustomerPricingPage() {
       },
       valueSetter: (params: any) => {
         if (!params || !params.row) {
+          console.error(
+            "Invalid params in expirationDate valueSetter:",
+            params
+          );
           return { id: "temp", expirationDate: "" };
         }
 
@@ -2557,12 +2697,20 @@ export default function AllCustomerPricingPage() {
           const value = params.value;
           const dateString =
             value instanceof Date ? value.toISOString().split("T")[0] : "";
-          return { ...params.row, expirationDate: dateString };
+          return {
+            ...params.row,
+            expirationDate: dateString,
+            id: params.row.id,
+          };
         } catch {
-          return { ...params.row, expirationDate: "" };
+          return { ...params.row, expirationDate: "", id: params.row.id };
         }
       },
       renderCell: (params: any) => {
+        if (!params || !params.row) {
+          console.warn("Invalid params in expirationDate renderCell:", params);
+          return <div>-</div>;
+        }
         // Get the original value from the row data for display
         const originalValue = params.row.expirationDate;
         const date = originalValue ? formatDate(originalValue) : "";
@@ -3290,11 +3438,11 @@ export default function AllCustomerPricingPage() {
                       {/* Add Line Button */}
                       <PrimaryButton
                         onClick={handleAddNewEntry}
-                        disabled={showNewEntryForm}
+                        disabled={false}
                         icon={Plus}
                         size="small"
                       >
-                        {showNewEntryForm ? "Adding..." : "Add Line"}
+                        Add Line
                       </PrimaryButton>
 
                       <SecondaryButton
@@ -3303,7 +3451,10 @@ export default function AllCustomerPricingPage() {
                         icon={PenSquare}
                         size="small"
                       >
-                        Edit ({getSelectedRowIds().length})
+                        {getSelectedRowIds().length === 1
+                          ? "Edit"
+                          : "Bulk Edit"}{" "}
+                        ({getSelectedRowIds().length})
                       </SecondaryButton>
                       <SecondaryButton
                         onClick={handleDeleteSelected}
@@ -3390,16 +3541,87 @@ export default function AllCustomerPricingPage() {
                       columns={columns || []}
                       getRowId={(row) => row.id}
                       density="comfortable"
-                      // Disabled direct grid editing - users must use modals
-                      // editMode={isEditMode ? "row" : undefined}
-                      // processRowUpdate={
-                      //   isEditMode ? processRowUpdate : undefined
-                      // }
-                      // onProcessRowUpdateError={(error) => {
-                      //   console.error("Row update error:", error);
-                      //   toast.error("Failed to update row. Please try again.");
-                      // }}
-                      getRowClassName={(params) => {
+                      editMode="cell"
+                      processRowUpdate={(newRow, oldRow) => {
+                        console.log("Processing row update:", {
+                          newRow,
+                          oldRow,
+                          newRowId: newRow?.id,
+                          oldRowId: oldRow?.id,
+                          newRowKeys: Object.keys(newRow || {}),
+                          oldRowKeys: Object.keys(oldRow || {}),
+                        });
+
+                        // Ensure the row has an ID
+                        if (!newRow?.id) {
+                          console.error("Row update missing ID:", newRow);
+                          toast.error("Row update failed: missing ID");
+                          return oldRow; // Return the old row to prevent the update
+                        }
+
+                        // If this is a new entry row, handle it specially
+                        if (newRow.isNewEntry) {
+                          // Update the local state
+                          setAllPricingData((prev) => {
+                            const updated = {
+                              ...prev,
+                              priceItems: prev.priceItems.map((item) =>
+                                item.priceItemId === newRow.id
+                                  ? {
+                                      ...item,
+                                      productName: newRow.productName || "",
+                                      profileId: newRow.profileId || "",
+                                      generatorId: newRow.generatorId || "",
+                                      contractId: newRow.contractId || "",
+                                      projectName: newRow.projectName || "",
+                                      region: newRow.region || "North",
+                                      facilityName: newRow.facilityName || "",
+                                      containerSize: newRow.containerSize || "",
+                                      uom: newRow.uom || "",
+                                      unitPrice:
+                                        parseFloat(newRow.unitPrice) || 0,
+                                      minimumPrice:
+                                        parseFloat(newRow.minimumPrice) || 0,
+                                      effectiveDate: newRow.effectiveDate || "",
+                                      expirationDate:
+                                        newRow.expirationDate || "",
+                                      updatedAt: new Date().toISOString(),
+                                    }
+                                  : item
+                              ),
+                            };
+                            return updated;
+                          });
+
+                          // Mark as modified
+                          setModifiedRows(
+                            (prev) => new Set([...prev, newRow.id])
+                          );
+
+                          return newRow;
+                        }
+
+                        // For existing rows, handle normal updates
+                        if (oldRow.isModified !== newRow.isModified) {
+                          setModifiedRows((prev) => {
+                            const updated = new Set(prev);
+                            if (newRow.isModified) {
+                              updated.add(newRow.id);
+                            } else {
+                              updated.delete(newRow.id);
+                            }
+                            return updated;
+                          });
+                        }
+
+                        // Always return the new row with the ID preserved
+                        return { ...newRow, id: newRow.id };
+                      }}
+                      onProcessRowUpdateError={(error) => {
+                        console.error("Row update error:", error);
+                        toast.error("Failed to update row. Please try again.");
+                      }}
+                      getRowClassName={(params: any) => {
                         // Add special styling for different row types
                         if (params.row.isNew) {
                           return "new-row";
@@ -3422,7 +3644,6 @@ export default function AllCustomerPricingPage() {
                             backgroundColor: "#fefce8",
                           },
                         },
-
                         "& .MuiDataGrid-cell": {
                           fontSize: "0.875rem",
                           padding: "12px 16px",
@@ -3478,6 +3699,299 @@ export default function AllCustomerPricingPage() {
             </div>
           </div>
         </div>
+
+        {/* Bulk Edit Dialog */}
+        <Dialog
+          open={applyChangesDialogOpen}
+          onClose={() => setApplyChangesDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle
+            sx={{
+              fontFamily: "Roboto:Medium, sans-serif",
+              fontWeight: 500,
+              fontSize: "22px",
+              lineHeight: "28px",
+              color: "#1c1b1f",
+            }}
+          >
+            Bulk Edit Selected Rows ({getSelectedRowIds().length})
+          </DialogTitle>
+          <DialogContent sx={{ p: 3 }}>
+            <Typography variant="body2" sx={{ mb: 3, color: "#666" }}>
+              Update the following fields for all selected rows. Leave fields
+              empty to keep existing values.
+            </Typography>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Container Size */}
+              <FormControl variant="outlined" size="small" fullWidth>
+                <InputLabel>Container Size</InputLabel>
+                <Select
+                  value={bulkEditForm.containerSize}
+                  onChange={(e) =>
+                    setBulkEditForm((prev) => ({
+                      ...prev,
+                      containerSize: e.target.value,
+                    }))
+                  }
+                  label="Container Size"
+                >
+                  <MenuItem value="">Keep existing</MenuItem>
+                  <MenuItem value="5G">5G</MenuItem>
+                  <MenuItem value="15G">15G</MenuItem>
+                  <MenuItem value="20G">20G</MenuItem>
+                  <MenuItem value="30G">30G</MenuItem>
+                  <MenuItem value="55G">55G</MenuItem>
+                  <MenuItem value="Tri-Wall">Tri-Wall</MenuItem>
+                  <MenuItem value="275G">275G</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* UOM */}
+              <FormControl variant="outlined" size="small" fullWidth>
+                <InputLabel>UOM</InputLabel>
+                <Select
+                  value={bulkEditForm.uom}
+                  onChange={(e) =>
+                    setBulkEditForm((prev) => ({
+                      ...prev,
+                      uom: e.target.value,
+                    }))
+                  }
+                  label="UOM"
+                >
+                  <MenuItem value="">Keep existing</MenuItem>
+                  <MenuItem value="Each">Each</MenuItem>
+                  <MenuItem value="Gallon">Gallon</MenuItem>
+                  <MenuItem value="Pound">Pound</MenuItem>
+                  <MenuItem value="Container">Container</MenuItem>
+                  <MenuItem value="Ton">Ton</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* Unit Price with Inline Toggle */}
+              <div className="relative">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium text-gray-700">
+                    Unit Price
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUnitPriceEditMode("absolute");
+                        setBulkEditForm((prev) => ({
+                          ...prev,
+                          unitPricePercentageIncrease: "",
+                        }));
+                      }}
+                      className={`px-2 py-1 text-xs rounded-l border transition-colors ${
+                        unitPriceEditMode === "absolute"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      $
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUnitPriceEditMode("percentage");
+                        setBulkEditForm((prev) => ({
+                          ...prev,
+                          unitPrice: "",
+                        }));
+                      }}
+                      className={`px-2 py-1 text-xs rounded-r border-l-0 border transition-colors ${
+                        unitPriceEditMode === "percentage"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      %
+                    </button>
+                  </div>
+                </div>
+                {unitPriceEditMode === "absolute" ? (
+                  <TextField
+                    type="number"
+                    value={bulkEditForm.unitPrice}
+                    onChange={(e) => {
+                      setBulkEditForm((prev) => ({
+                        ...prev,
+                        unitPrice: e.target.value,
+                      }));
+                    }}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    placeholder="Enter new unit price"
+                    inputProps={{ min: 0, step: 0.01 }}
+                    helperText="Set absolute unit price"
+                  />
+                ) : (
+                  <TextField
+                    type="number"
+                    value={bulkEditForm.unitPricePercentageIncrease}
+                    onChange={(e) => {
+                      setBulkEditForm((prev) => ({
+                        ...prev,
+                        unitPricePercentageIncrease: e.target.value,
+                      }));
+                    }}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    placeholder="e.g., 5 for 5% increase"
+                    inputProps={{ min: 0, step: 0.1 }}
+                    helperText="Enter percentage to increase existing price"
+                  />
+                )}
+              </div>
+
+              {/* Minimum Price with Inline Toggle */}
+              <div className="relative">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium text-gray-700">
+                    Minimum Price
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMinimumPriceEditMode("absolute");
+                        setBulkEditForm((prev) => ({
+                          ...prev,
+                          minimumPricePercentageIncrease: "",
+                        }));
+                      }}
+                      className={`px-2 py-1 text-xs rounded-l border transition-colors ${
+                        minimumPriceEditMode === "absolute"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      $
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMinimumPriceEditMode("percentage");
+                        setBulkEditForm((prev) => ({
+                          ...prev,
+                          minimumPrice: "",
+                        }));
+                      }}
+                      className={`px-2 py-1 text-xs rounded-r border-l-0 border transition-colors ${
+                        minimumPriceEditMode === "percentage"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      %
+                    </button>
+                  </div>
+                </div>
+                {minimumPriceEditMode === "absolute" ? (
+                  <TextField
+                    type="number"
+                    value={bulkEditForm.minimumPrice}
+                    onChange={(e) => {
+                      setBulkEditForm((prev) => ({
+                        ...prev,
+                        minimumPrice: e.target.value,
+                      }));
+                    }}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    placeholder="Enter new minimum price"
+                    inputProps={{ min: 0, step: 0.01 }}
+                    helperText="Set absolute minimum price"
+                  />
+                ) : (
+                  <TextField
+                    type="number"
+                    value={bulkEditForm.minimumPricePercentageIncrease}
+                    onChange={(e) => {
+                      setBulkEditForm((prev) => ({
+                        ...prev,
+                        minimumPricePercentageIncrease: e.target.value,
+                      }));
+                    }}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    placeholder="e.g., 5 for 5% increase"
+                    inputProps={{ min: 0, step: 0.1 }}
+                    helperText="Enter percentage to increase existing minimum price"
+                  />
+                )}
+              </div>
+
+              {/* Effective Date */}
+              <TextField
+                label="Effective Date"
+                type="date"
+                value={bulkEditForm.effectiveDate}
+                onChange={(e) =>
+                  setBulkEditForm((prev) => ({
+                    ...prev,
+                    effectiveDate: e.target.value,
+                  }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                placeholder="Keep existing"
+                InputLabelProps={{ shrink: true }}
+              />
+
+              {/* Expiration Date */}
+              <TextField
+                label="Expiration Date"
+                type="date"
+                value={bulkEditForm.expirationDate}
+                onChange={(e) =>
+                  setBulkEditForm((prev) => ({
+                    ...prev,
+                    expirationDate: e.target.value,
+                  }))
+                }
+                variant="outlined"
+                size="small"
+                fullWidth
+                placeholder="Keep existing"
+                InputLabelProps={{ shrink: true }}
+              />
+            </div>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, gap: 2 }}>
+            <SecondaryButton
+              onClick={() => {
+                setApplyChangesDialogOpen(false);
+                // Reset the bulk edit form when canceling
+                setBulkEditForm({
+                  containerSize: "",
+                  uom: "",
+                  unitPrice: "",
+                  unitPricePercentageIncrease: "",
+                  minimumPrice: "",
+                  minimumPricePercentageIncrease: "",
+                  effectiveDate: "",
+                  expirationDate: "",
+                });
+              }}
+            >
+              Cancel
+            </SecondaryButton>
+            <PrimaryButton onClick={handleApplyChangesSubmit}>
+              Apply Changes
+            </PrimaryButton>
+          </DialogActions>
+        </Dialog>
 
         {/* Advanced Filters Dialog */}
         <Dialog
@@ -3878,9 +4392,10 @@ export default function AllCustomerPricingPage() {
         {/* Price Change Configuration Dialog */}
         <Dialog
           open={priceChangeConfigDialogOpen}
-          onClose={handleCancelPriceChangeConfig}
+          onClose={() => {}} // Prevent closing by clicking outside
           maxWidth="md"
           fullWidth
+          disableEscapeKeyDown
         >
           <DialogTitle
             sx={{
@@ -3890,9 +4405,24 @@ export default function AllCustomerPricingPage() {
               lineHeight: "28px",
               color: "#1c1b1f",
               pb: 1,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
             }}
           >
             Configure Price Change
+            <IconButton
+              onClick={handleCancelPriceChangeConfig}
+              sx={{
+                color: "#666",
+                "&:hover": {
+                  color: "#1c1b1f",
+                  backgroundColor: "rgba(0, 0, 0, 0.04)",
+                },
+              }}
+            >
+              <X size={20} />
+            </IconButton>
           </DialogTitle>
           <DialogContent sx={{ p: 3 }}>
             {/* Selected Requests Summary */}
@@ -4929,7 +5459,7 @@ export default function AllCustomerPricingPage() {
             <SecondaryButton onClick={handleCancelNewEntry}>
               Cancel
             </SecondaryButton>
-            <PrimaryButton onClick={handleSaveNewEntry}>Add Line</PrimaryButton>
+            <PrimaryButton onClick={handleAddNewEntry}>Add Line</PrimaryButton>
           </DialogActions>
         </Dialog>
 

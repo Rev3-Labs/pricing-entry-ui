@@ -112,6 +112,29 @@ export default function LandingPage() {
               </div>
             </CardHeader>
           </Card> */}
+
+          {/* Invoice Search Card */}
+          {/* <Card
+            className="hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+            onClick={() => router.push("/invoice-search")}
+          >
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <Search className="h-6 w-6 text-orange-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">Invoice Search</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Search and filter invoices
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="h-5 w-5 text-gray-400" />
+              </div>
+            </CardHeader>
+          </Card> */}
         </div>
       </div>
     </div>

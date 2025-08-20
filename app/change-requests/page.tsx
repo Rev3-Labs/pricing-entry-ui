@@ -1242,7 +1242,7 @@ export default function PriceChangeRequestsPage() {
 
                 {/* Priority */}
                 <FormControl variant="outlined" fullWidth>
-                  <InputLabel id="create-priority-label">Priority</InputLabel>
+                  <InputLabel id="create-priority-label">Priority *</InputLabel>
                   <Select
                     labelId="create-priority-label"
                     value={createModal.priority}
@@ -1252,7 +1252,7 @@ export default function PriceChangeRequestsPage() {
                         priority: e.target.value as string,
                       }))
                     }
-                    label="Priority"
+                    label="Priority *"
                     style={{ fontVariationSettings: "'wdth' 100" }}
                   >
                     <MenuItem value="">Select priority</MenuItem>

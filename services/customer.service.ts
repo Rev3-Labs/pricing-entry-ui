@@ -83,6 +83,7 @@ export interface PriceItem {
   uom?: string;
   contractId?: string;
   generatorId?: string;
+  generatorState?: string;
   vendorId?: string;
   containerSize?: string;
   billingUom?: string;

@@ -58,6 +58,7 @@ export interface PriceItem {
   uom?: string;
   contractId?: string;
   generatorId?: string;
+  generatorState?: string;
   vendorId?: string;
   containerSize?: string;
   billingUom?: string;
@@ -243,6 +244,10 @@ function generateGeneratorId(): string {
     "Processing Plant",
   ];
 
+  return randomElement(generatorNames);
+}
+
+function generateGeneratorState(): string {
   const states = [
     "AL",
     "AK",
@@ -296,9 +301,7 @@ function generateGeneratorId(): string {
     "WY",
   ];
 
-  const name = randomElement(generatorNames);
-  const state = randomElement(states);
-  return `${name} (${state})`;
+  return randomElement(states);
 }
 
 function generateQuoteName(customerName: string, index: number): string {
@@ -455,6 +458,7 @@ export function generateSampleData() {
           contractId: Math.random() > 0.3 ? generateContractId() : undefined,
           profileId: Math.random() > 0.3 ? generateProfileId() : undefined,
           generatorId: Math.random() > 0.5 ? generateGeneratorId() : undefined,
+          generatorState: Math.random() > 0.5 ? generateGeneratorState() : undefined,
           containerSize: randomElement(containerSizes),
           uom: randomElement(uomOptions),
           pricingType: randomElement(pricingTypes),

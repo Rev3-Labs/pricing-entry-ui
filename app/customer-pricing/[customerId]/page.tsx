@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   TextField,
   Select,
@@ -172,6 +173,7 @@ export default function AllCustomerPricingPage() {
   const [bulkEditForm, setBulkEditForm] = useState({
     containerSize: "",
     uom: "",
+    generatorState: "",
     unitPrice: "",
     unitPricePercentageIncrease: "",
     minimumPrice: "",
@@ -248,6 +250,8 @@ export default function AllCustomerPricingPage() {
     }>
   >([]);
   const [priceHeaderLoading, setPriceHeaderLoading] = useState(false);
+  const [isCreatingNewHeader, setIsCreatingNewHeader] = useState(false);
+  const [newHeaderName, setNewHeaderName] = useState("");
 
   // State to store the current price change configuration
   const [currentPriceChangeConfig, setCurrentPriceChangeConfig] = useState<{
@@ -659,6 +663,10 @@ export default function AllCustomerPricingPage() {
         (item.generatorId &&
           item.generatorId
             .toLowerCase()
+            .includes(filters.generator.toLowerCase())) ||
+        (item.generatorState &&
+          item.generatorState
+            .toLowerCase()
             .includes(filters.generator.toLowerCase()));
 
       const matchesContainerSize =
@@ -777,6 +785,7 @@ export default function AllCustomerPricingPage() {
         productName: item.productName,
         profileId: item.profileId,
         generatorId: item.generatorId,
+        generatorState: item.generatorState,
         contractId: item.contractId,
         projectName: item.projectName,
         region: item.region || "",
@@ -842,6 +851,7 @@ export default function AllCustomerPricingPage() {
           productName: row.productName || "",
           profileId: row.profileId || "",
           generatorId: row.generatorId || "",
+          generatorState: row.generatorState || "",
           contractId: row.contractId || "",
           projectName: row.projectName || "",
           region: row.region || "",
@@ -1046,6 +1056,7 @@ export default function AllCustomerPricingPage() {
       productName: "",
       profileId: "",
       generatorId: "",
+      generatorState: "",
       contractId: "",
       projectName: "",
       region: "North",
@@ -1090,6 +1101,7 @@ export default function AllCustomerPricingPage() {
         projectName: "",
         profileId: "",
         generatorId: "",
+        generatorState: "",
         contractId: "",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -1173,6 +1185,10 @@ export default function AllCustomerPricingPage() {
       projectName: convertValue(editingEntryData.projectName, "projectName"),
       profileId: convertValue(editingEntryData.profileId, "profileId"),
       generatorId: convertValue(editingEntryData.generatorId, "generatorId"),
+      generatorState: convertValue(
+        editingEntryData.generatorState,
+        "generatorState"
+      ),
       contractId: convertValue(editingEntryData.contractId, "contractId"),
       facilityName: convertValue(editingEntryData.facilityName, "facilityName"),
       containerSize: convertValue(
@@ -1207,6 +1223,7 @@ export default function AllCustomerPricingPage() {
             projectName: convertedData.projectName,
             profileId: convertedData.profileId,
             generatorId: convertedData.generatorId,
+            generatorState: convertedData.generatorState,
             unitPrice: convertedData.unitPrice,
             minimumPrice: convertedData.minimumPrice,
             uom: convertedData.uom,
@@ -1364,24 +1381,145 @@ export default function AllCustomerPricingPage() {
   };
 
   const handleSavePriceHeader = () => {
-    // TODO: Implement save logic for price header updates
-    console.log("Saving price header data:", priceHeaderData);
+    // Validation for new header
+    if (isCreatingNewHeader) {
+      if (!newHeaderName.trim()) {
+        toast.error("Please enter a header name");
+        return;
+      }
 
-    // For now, just close the modal
+      if (
+        !priceHeaderData.eei ||
+        !priceHeaderData.fuelSurcharge ||
+        !priceHeaderData.invoiceMinimum ||
+        !priceHeaderData.containerConversion ||
+        !priceHeaderData.itemMinimums ||
+        !priceHeaderData.economicAdjustmentFee ||
+        !priceHeaderData.eManifestFee ||
+        !priceHeaderData.effectiveDate ||
+        !priceHeaderData.expirationDate ||
+        !priceHeaderData.globalContainerMinimum ||
+        priceHeaderData.globalContainerMinimum === 0
+      ) {
+        toast.error("Please fill in all required fields");
+        return;
+      }
+
+      // Validate custom E&I fields if "Custom" is selected
+      if (priceHeaderData.eei === "Custom") {
+        if (
+          !priceHeaderData.customEeiRate ||
+          priceHeaderData.customEeiRate === 0 ||
+          !priceHeaderData.customEeiEffectiveDate ||
+          !priceHeaderData.customEeiExpirationDate
+        ) {
+          toast.error("Please fill in all custom E&I fields");
+          return;
+        }
+
+        // Validate that custom E&I expiration date is after effective date
+        if (
+          new Date(priceHeaderData.customEeiExpirationDate) <=
+          new Date(priceHeaderData.customEeiEffectiveDate)
+        ) {
+          toast.error(
+            "Custom E&I expiration date must be after effective date"
+          );
+          return;
+        }
+      }
+
+      // Validate that expiration date is after effective date
+      if (
+        new Date(priceHeaderData.expirationDate) <=
+        new Date(priceHeaderData.effectiveDate)
+      ) {
+        toast.error("Expiration date must be after effective date");
+        return;
+      }
+
+      // Create new header logic
+      console.log("Creating new price header:", {
+        name: newHeaderName,
+        data: priceHeaderData,
+      });
+
+      // TODO: Implement API call to create new price header
+
+      toast.success(`Price header "${newHeaderName}" created successfully`);
+    } else {
+      // Update existing header logic
+      console.log("Updating existing price header:", {
+        headerId: selectedPriceHeaderId,
+        data: priceHeaderData,
+      });
+
+      // TODO: Implement API call to update existing price header
+
+      toast.success("Price header updated successfully");
+    }
+
+    // Reset modal state
     setShowPriceHeaderModal(false);
     setPriceHeaderData({});
-
-    toast.success("Price header updated successfully");
+    setIsCreatingNewHeader(false);
+    setNewHeaderName("");
+    setSelectedPriceHeaderId(null);
   };
 
   const handleCancelPriceHeader = () => {
     setShowPriceHeaderModal(false);
     setPriceHeaderData({});
+    setIsCreatingNewHeader(false);
+    setNewHeaderName("");
+    setSelectedPriceHeaderId(null);
   };
 
-  const handlePriceHeaderSelectionChange = (headerId: string) => {
+  const handlePriceHeaderSelectionChange = (value: string) => {
+    if (value === "__new__") {
+      // Switch to new header creation mode
+      setIsCreatingNewHeader(true);
+      setSelectedPriceHeaderId(null);
+      setNewHeaderName("");
+
+      // Set default values for new header
+      const today = new Date();
+      const oneYearFromNow = new Date();
+      oneYearFromNow.setFullYear(today.getFullYear() + 1);
+
+      setPriceHeaderData({
+        headerName: "",
+        effectiveDate: today.toISOString().split("T")[0], // Today
+        expirationDate: oneYearFromNow.toISOString().split("T")[0], // One year from today
+        status: "",
+        createdBy: "",
+        createdAt: "",
+        updatedAt: "",
+        eei: "",
+        fuelSurcharge: "",
+        invoiceMinimum: "",
+        containerConversion: "",
+        itemMinimums: "",
+        economicAdjustmentFee: "",
+        eManifestFee: "",
+        hubFee: false,
+        regionalPricing: false,
+        zoneTransportation: false,
+        // Custom E&I fields
+        customEeiRate: "",
+        customEeiEffectiveDate: "",
+        customEeiExpirationDate: "",
+        // Global container minimum
+        globalContainerMinimum: "",
+      });
+      return;
+    }
+
+    // Switch to existing header editing mode
+    setIsCreatingNewHeader(false);
+    setNewHeaderName("");
     setPriceHeaderLoading(true);
-    setSelectedPriceHeaderId(headerId);
+    setSelectedPriceHeaderId(value);
 
     // Simulate loading with a brief delay to show the spinner
     setTimeout(() => {
@@ -1390,7 +1528,7 @@ export default function AllCustomerPricingPage() {
         (header) => header.customerId === currentCustomer?.customerId
       );
 
-      if (headerId === "customer-default") {
+      if (value === "customer-default") {
         // Set default values for new customer header
         setPriceHeaderData({
           headerName: "",
@@ -1414,7 +1552,7 @@ export default function AllCustomerPricingPage() {
         });
       } else {
         const selectedHeader = customerPriceHeaders.find(
-          (header) => header.priceHeaderId === headerId
+          (header) => header.priceHeaderId === value
         );
         if (selectedHeader) {
           setPriceHeaderData({
@@ -1530,6 +1668,7 @@ export default function AllCustomerPricingPage() {
         projectName: convertValue(newRow.projectName, "projectName"),
         profileId: convertValue(newRow.profileId, "profileId"),
         generatorId: convertValue(newRow.generatorId, "generatorId"),
+        generatorState: convertValue(newRow.generatorState, "generatorState"),
         contractId: convertValue(newRow.contractId, "contractId"),
         facilityName: convertValue(newRow.facilityName, "facilityName"),
         containerSize: convertValue(newRow.containerSize, "containerSize"),
@@ -1577,6 +1716,7 @@ export default function AllCustomerPricingPage() {
         projectName: convertedData.projectName,
         profileId: convertedData.profileId,
         generatorId: convertedData.generatorId,
+        generatorState: convertedData.generatorState,
         contractId: convertedData.contractId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -1624,6 +1764,7 @@ export default function AllCustomerPricingPage() {
       "projectName",
       "profileId",
       "generatorId",
+      "generatorState",
       "unitPrice",
       "minimumPrice",
       "uom",
@@ -1670,6 +1811,7 @@ export default function AllCustomerPricingPage() {
               projectName: convertedNewRow.projectName,
               profileId: convertedNewRow.profileId,
               generatorId: convertedNewRow.generatorId,
+              generatorState: convertedNewRow.generatorState,
               unitPrice: convertedNewRow.unitPrice,
               minimumPrice: convertedNewRow.minimumPrice,
               uom: convertedNewRow.uom,
@@ -1766,6 +1908,7 @@ export default function AllCustomerPricingPage() {
       projectName: selectedRow.projectName || "",
       profileId: selectedRow.profileId || "",
       generatorId: selectedRow.generatorId || "",
+      generatorState: selectedRow.generatorState || "",
       contractId: selectedRow.contractId || "",
       facilityName: selectedRow.facilityName || "",
       containerSize: selectedRow.containerSize || "",
@@ -1813,6 +1956,9 @@ export default function AllCustomerPricingPage() {
               containerSize: bulkEditForm.containerSize,
             }),
             ...(bulkEditForm.uom && { uom: bulkEditForm.uom }),
+            ...(bulkEditForm.generatorState && {
+              generatorState: bulkEditForm.generatorState,
+            }),
             ...(bulkEditForm.unitPrice ||
             bulkEditForm.unitPricePercentageIncrease
               ? {
@@ -1866,6 +2012,7 @@ export default function AllCustomerPricingPage() {
           const modifiedFields = new Set<string>();
           if (bulkEditForm.containerSize) modifiedFields.add("containerSize");
           if (bulkEditForm.uom) modifiedFields.add("uom");
+          if (bulkEditForm.generatorState) modifiedFields.add("generatorState");
           if (
             bulkEditForm.unitPrice ||
             bulkEditForm.unitPricePercentageIncrease
@@ -1897,6 +2044,7 @@ export default function AllCustomerPricingPage() {
     setBulkEditForm({
       containerSize: "",
       uom: "",
+      generatorState: "",
       unitPrice: "",
       unitPricePercentageIncrease: "",
       minimumPrice: "",
@@ -1915,6 +2063,7 @@ export default function AllCustomerPricingPage() {
     setBulkEditForm({
       containerSize: "",
       uom: "",
+      generatorState: "",
       unitPrice: "",
       unitPricePercentageIncrease: "",
       minimumPrice: "",
@@ -2333,6 +2482,28 @@ export default function AllCustomerPricingPage() {
       renderCell: (params: any) => {
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isModified = modifiedFields?.has("generatorId");
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
+    },
+    {
+      field: "generatorState",
+      headerName: "Generator State",
+      width: 120,
+      flex: 0.5,
+      minWidth: 100,
+      // editable: true, // Disabled direct editing
+      renderCell: (params: any) => {
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("generatorState");
         return (
           <div
             style={{
@@ -2866,7 +3037,7 @@ export default function AllCustomerPricingPage() {
         Generator: item.generatorId || "",
         "Gov. Contract": item.contractId || "",
         Project: item.projectName || "",
-        "Generator State": item.region || "",
+        "Generator State": item.generatorState || "",
         Facility: item.facilityName || "",
         "Container Size": item.containerSize || "",
         UOM: item.uom || "",
@@ -3496,8 +3667,40 @@ export default function AllCustomerPricingPage() {
                           {currentPriceChangeConfig.excelUploadMode === "upload"
                             ? "Excel Upload"
                             : "Manual Entry"}{" "}
-                          • {currentPriceChangeConfig.selectedRequests.length}{" "}
-                          change request
+                          {currentPriceChangeConfig.selectedRequests.length >
+                            0 && (
+                            <>
+                              {" "}
+                              •{" "}
+                              <Box sx={{ display: "inline-flex", gap: 1 }}>
+                                {currentPriceChangeConfig.selectedRequests.map(
+                                  (requestId) => {
+                                    const request = priceChangeRequests.find(
+                                      (r) => r.id === requestId
+                                    );
+                                    return request ? (
+                                      <Chip
+                                        key={requestId}
+                                        label={`${request.id}: ${request.title}`}
+                                        size="small"
+                                        component={Link}
+                                        href={`/change-requests/${request.id}`}
+                                        sx={{
+                                          backgroundColor: "#65b230",
+                                          color: "white",
+                                          fontSize: "12px",
+                                          cursor: "pointer",
+                                          "&:hover": {
+                                            backgroundColor: "#4a8a1f",
+                                          },
+                                        }}
+                                      />
+                                    ) : null;
+                                  }
+                                )}
+                              </Box>
+                            </>
+                          )}
                         </Typography>
                       </div>
                     </div>
@@ -3976,6 +4179,7 @@ export default function AllCustomerPricingPage() {
                 setBulkEditForm({
                   containerSize: "",
                   uom: "",
+                  generatorState: "",
                   unitPrice: "",
                   unitPricePercentageIncrease: "",
                   minimumPrice: "",
@@ -4564,6 +4768,7 @@ export default function AllCustomerPricingPage() {
                           "Unit Price",
                           "Minimum Price",
                           "UOM",
+                          "Generator State",
                           "Effective Date",
                           "Notes",
                         ],
@@ -4573,11 +4778,12 @@ export default function AllCustomerPricingPage() {
                           "10.00",
                           "5.00",
                           "EA",
+                          "CA",
                           "2024-01-01",
                           "Example entry",
                         ],
-                        ["", "", "", "", "", "", ""],
-                        ["", "", "", "", "", "", ""],
+                        ["", "", "", "", "", "", "", ""],
+                        ["", "", "", "", "", "", "", ""],
                       ];
 
                       const ws = XLSX.utils.aoa_to_sheet(templateData);
@@ -5402,6 +5608,70 @@ export default function AllCustomerPricingPage() {
                 fullWidth
               />
 
+              {/* Generator State */}
+              <FormControl variant="outlined" size="small" fullWidth>
+                <InputLabel>Generator State</InputLabel>
+                <Select
+                  value={newEntryData.generatorState || ""}
+                  onChange={(e) =>
+                    handleNewEntryCellEdit("generatorState", e.target.value)
+                  }
+                  label="Generator State"
+                >
+                  <MenuItem value="">Select State</MenuItem>
+                  <MenuItem value="AL">AL</MenuItem>
+                  <MenuItem value="AK">AK</MenuItem>
+                  <MenuItem value="AZ">AZ</MenuItem>
+                  <MenuItem value="AR">AR</MenuItem>
+                  <MenuItem value="CA">CA</MenuItem>
+                  <MenuItem value="CO">CO</MenuItem>
+                  <MenuItem value="CT">CT</MenuItem>
+                  <MenuItem value="DE">DE</MenuItem>
+                  <MenuItem value="FL">FL</MenuItem>
+                  <MenuItem value="GA">GA</MenuItem>
+                  <MenuItem value="HI">HI</MenuItem>
+                  <MenuItem value="ID">ID</MenuItem>
+                  <MenuItem value="IL">IL</MenuItem>
+                  <MenuItem value="IN">IN</MenuItem>
+                  <MenuItem value="IA">IA</MenuItem>
+                  <MenuItem value="KS">KS</MenuItem>
+                  <MenuItem value="KY">KY</MenuItem>
+                  <MenuItem value="LA">LA</MenuItem>
+                  <MenuItem value="ME">ME</MenuItem>
+                  <MenuItem value="MD">MD</MenuItem>
+                  <MenuItem value="MA">MA</MenuItem>
+                  <MenuItem value="MI">MI</MenuItem>
+                  <MenuItem value="MN">MN</MenuItem>
+                  <MenuItem value="MS">MS</MenuItem>
+                  <MenuItem value="MO">MO</MenuItem>
+                  <MenuItem value="MT">MT</MenuItem>
+                  <MenuItem value="NE">NE</MenuItem>
+                  <MenuItem value="NV">NV</MenuItem>
+                  <MenuItem value="NH">NH</MenuItem>
+                  <MenuItem value="NJ">NJ</MenuItem>
+                  <MenuItem value="NM">NM</MenuItem>
+                  <MenuItem value="NY">NY</MenuItem>
+                  <MenuItem value="NC">NC</MenuItem>
+                  <MenuItem value="ND">ND</MenuItem>
+                  <MenuItem value="OH">OH</MenuItem>
+                  <MenuItem value="OK">OK</MenuItem>
+                  <MenuItem value="OR">OR</MenuItem>
+                  <MenuItem value="PA">PA</MenuItem>
+                  <MenuItem value="RI">RI</MenuItem>
+                  <MenuItem value="SC">SC</MenuItem>
+                  <MenuItem value="SD">SD</MenuItem>
+                  <MenuItem value="TN">TN</MenuItem>
+                  <MenuItem value="TX">TX</MenuItem>
+                  <MenuItem value="UT">UT</MenuItem>
+                  <MenuItem value="VT">VT</MenuItem>
+                  <MenuItem value="VA">VA</MenuItem>
+                  <MenuItem value="WA">WA</MenuItem>
+                  <MenuItem value="WV">WV</MenuItem>
+                  <MenuItem value="WI">WI</MenuItem>
+                  <MenuItem value="WY">WY</MenuItem>
+                </Select>
+              </FormControl>
+
               {/* Contract ID */}
               <TextField
                 label="Contract ID"
@@ -5602,6 +5872,70 @@ export default function AllCustomerPricingPage() {
                 fullWidth
               />
 
+              {/* Generator State */}
+              <FormControl variant="outlined" size="small" fullWidth>
+                <InputLabel>Generator State</InputLabel>
+                <Select
+                  value={editingEntryData.generatorState || ""}
+                  onChange={(e) =>
+                    handleEditEntryCellEdit("generatorState", e.target.value)
+                  }
+                  label="Generator State"
+                >
+                  <MenuItem value="">Select State</MenuItem>
+                  <MenuItem value="AL">AL</MenuItem>
+                  <MenuItem value="AK">AK</MenuItem>
+                  <MenuItem value="AZ">AZ</MenuItem>
+                  <MenuItem value="AR">AR</MenuItem>
+                  <MenuItem value="CA">CA</MenuItem>
+                  <MenuItem value="CO">CO</MenuItem>
+                  <MenuItem value="CT">CT</MenuItem>
+                  <MenuItem value="DE">DE</MenuItem>
+                  <MenuItem value="FL">FL</MenuItem>
+                  <MenuItem value="GA">GA</MenuItem>
+                  <MenuItem value="HI">HI</MenuItem>
+                  <MenuItem value="ID">ID</MenuItem>
+                  <MenuItem value="IL">IL</MenuItem>
+                  <MenuItem value="IN">IN</MenuItem>
+                  <MenuItem value="IA">IA</MenuItem>
+                  <MenuItem value="KS">KS</MenuItem>
+                  <MenuItem value="KY">KY</MenuItem>
+                  <MenuItem value="LA">LA</MenuItem>
+                  <MenuItem value="ME">ME</MenuItem>
+                  <MenuItem value="MD">MD</MenuItem>
+                  <MenuItem value="MA">MA</MenuItem>
+                  <MenuItem value="MI">MI</MenuItem>
+                  <MenuItem value="MN">MN</MenuItem>
+                  <MenuItem value="MS">MS</MenuItem>
+                  <MenuItem value="MO">MO</MenuItem>
+                  <MenuItem value="MT">MT</MenuItem>
+                  <MenuItem value="NE">NE</MenuItem>
+                  <MenuItem value="NV">NV</MenuItem>
+                  <MenuItem value="NH">NH</MenuItem>
+                  <MenuItem value="NJ">NJ</MenuItem>
+                  <MenuItem value="NM">NM</MenuItem>
+                  <MenuItem value="NY">NY</MenuItem>
+                  <MenuItem value="NC">NC</MenuItem>
+                  <MenuItem value="ND">ND</MenuItem>
+                  <MenuItem value="OH">OH</MenuItem>
+                  <MenuItem value="OK">OK</MenuItem>
+                  <MenuItem value="OR">OR</MenuItem>
+                  <MenuItem value="PA">PA</MenuItem>
+                  <MenuItem value="RI">RI</MenuItem>
+                  <MenuItem value="SC">SC</MenuItem>
+                  <MenuItem value="SD">SD</MenuItem>
+                  <MenuItem value="TN">TN</MenuItem>
+                  <MenuItem value="TX">TX</MenuItem>
+                  <MenuItem value="UT">UT</MenuItem>
+                  <MenuItem value="VT">VT</MenuItem>
+                  <MenuItem value="VA">VA</MenuItem>
+                  <MenuItem value="WA">WA</MenuItem>
+                  <MenuItem value="WV">WV</MenuItem>
+                  <MenuItem value="WI">WI</MenuItem>
+                  <MenuItem value="WY">WY</MenuItem>
+                </Select>
+              </FormControl>
+
               {/* Contract ID */}
               <TextField
                 label="Contract ID"
@@ -5681,7 +6015,9 @@ export default function AllCustomerPricingPage() {
               color: "#1c1b1f",
             }}
           >
-            Custom Header Settings
+            {isCreatingNewHeader
+              ? "Create New Price Header"
+              : "Custom Header Settings"}
           </DialogTitle>
           <DialogContent sx={{ p: 3 }}>
             {/* Price Header Selection */}
@@ -5689,12 +6025,26 @@ export default function AllCustomerPricingPage() {
               <FormControl variant="outlined" size="small" fullWidth>
                 <InputLabel>Select Price Header</InputLabel>
                 <Select
-                  value={selectedPriceHeaderId || ""}
+                  value={
+                    isCreatingNewHeader
+                      ? "__new__"
+                      : selectedPriceHeaderId || ""
+                  }
                   onChange={(e) =>
                     handlePriceHeaderSelectionChange(e.target.value)
                   }
                   label="Select Price Header"
                 >
+                  <MenuItem value="__new__">
+                    <div className="flex items-center">
+                      <span className="text-[#65b230] font-medium">
+                        + Add New Header
+                      </span>
+                    </div>
+                  </MenuItem>
+                  {availablePriceHeaders.length > 0 && (
+                    <div className="border-t border-gray-200 my-1" />
+                  )}
                   {availablePriceHeaders.map((header) => (
                     <MenuItem key={header.id} value={header.id}>
                       {header.name}
@@ -5702,6 +6052,23 @@ export default function AllCustomerPricingPage() {
                   ))}
                 </Select>
               </FormControl>
+
+              {/* New Header Name Field */}
+              {isCreatingNewHeader && (
+                <div className="mt-4">
+                  <TextField
+                    label="Header Name"
+                    value={newHeaderName}
+                    onChange={(e) => setNewHeaderName(e.target.value)}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    placeholder="Enter a name for the new price header"
+                    helperText="This name will be used to identify the price header"
+                    error={isCreatingNewHeader && newHeaderName.trim() === ""}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Main Content with Loading Overlay */}
@@ -5720,36 +6087,190 @@ export default function AllCustomerPricingPage() {
 
               <div className="grid grid-cols-2 gap-6">
                 {/* EEI */}
-                <FormControl variant="outlined" size="small" fullWidth>
-                  <InputLabel>EEI</InputLabel>
+                <FormControl
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  error={isCreatingNewHeader && !priceHeaderData.eei}
+                >
+                  <InputLabel>E&I {isCreatingNewHeader && "*"}</InputLabel>
                   <Select
-                    value={priceHeaderData.eei || "Regular"}
-                    onChange={(e) =>
-                      setPriceHeaderData((prev) => ({
-                        ...prev,
-                        eei: e.target.value,
-                      }))
+                    value={
+                      priceHeaderData.eei ||
+                      (isCreatingNewHeader ? "" : "Regular")
                     }
-                    label="EEI"
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setPriceHeaderData((prev) => {
+                        const updated: any = {
+                          ...prev,
+                          eei: newValue,
+                        };
+
+                        // Set default dates for custom E&I if "Custom" is selected
+                        if (newValue === "Custom") {
+                          // Only set defaults if the custom fields don't already have values
+                          if (!prev.customEeiEffectiveDate) {
+                            const today = new Date();
+                            updated.customEeiEffectiveDate = today
+                              .toISOString()
+                              .split("T")[0];
+                          }
+                          if (!prev.customEeiExpirationDate) {
+                            const oneYearFromNow = new Date();
+                            oneYearFromNow.setFullYear(
+                              new Date().getFullYear() + 1
+                            );
+                            updated.customEeiExpirationDate = oneYearFromNow
+                              .toISOString()
+                              .split("T")[0];
+                          }
+                        } else {
+                          // Clear custom E&I fields if not "Custom"
+                          updated.customEeiRate = "";
+                          updated.customEeiEffectiveDate = "";
+                          updated.customEeiExpirationDate = "";
+                        }
+
+                        return updated;
+                      });
+                    }}
+                    label={`EEI ${isCreatingNewHeader ? "*" : ""}`}
                   >
                     <MenuItem value="Regular">Regular</MenuItem>
                     <MenuItem value="Custom">Custom</MenuItem>
                     <MenuItem value="None">None</MenuItem>
                   </Select>
+                  {isCreatingNewHeader && !priceHeaderData.eei && (
+                    <div className="text-red-500 text-xs mt-1 ml-3">
+                      This field is required
+                    </div>
+                  )}
                 </FormControl>
 
+                {/* Custom E&I Fields - Only show when "Custom" is selected */}
+                {priceHeaderData.eei === "Custom" && (
+                  <div className="col-span-2 mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <Typography
+                      variant="subtitle2"
+                      sx={{
+                        fontSize: "14px",
+                        color: "#1976d2",
+                        marginBottom: 3,
+                        fontWeight: 500,
+                      }}
+                    >
+                      Custom E&I Configuration
+                    </Typography>
+                    <div className="grid grid-cols-3 gap-4">
+                      {/* E&I Rate */}
+                      <TextField
+                        label="E&I Rate (%) *"
+                        type="number"
+                        value={priceHeaderData.customEeiRate || ""}
+                        onChange={(e) =>
+                          setPriceHeaderData((prev) => ({
+                            ...prev,
+                            customEeiRate: parseFloat(e.target.value) || 0,
+                          }))
+                        }
+                        variant="outlined"
+                        size="small"
+                        fullWidth
+                        inputProps={{ min: 0, max: 100, step: 0.01 }}
+                        error={
+                          !priceHeaderData.customEeiRate ||
+                          priceHeaderData.customEeiRate === 0
+                        }
+                        helperText={
+                          !priceHeaderData.customEeiRate ||
+                          priceHeaderData.customEeiRate === 0
+                            ? "Enter E&I rate percentage"
+                            : ""
+                        }
+                      />
+
+                      {/* Custom E&I Effective Date */}
+                      <TextField
+                        label="E&I Effective Date *"
+                        type="date"
+                        value={priceHeaderData.customEeiEffectiveDate || ""}
+                        onChange={(e) =>
+                          setPriceHeaderData((prev) => ({
+                            ...prev,
+                            customEeiEffectiveDate: e.target.value,
+                          }))
+                        }
+                        variant="outlined"
+                        size="small"
+                        fullWidth
+                        error={!priceHeaderData.customEeiEffectiveDate}
+                        helperText={
+                          !priceHeaderData.customEeiEffectiveDate
+                            ? "Select E&I effective date"
+                            : ""
+                        }
+                        InputLabelProps={{
+                          shrink: true,
+                        }}
+                      />
+
+                      {/* Custom E&I Expiration Date */}
+                      <TextField
+                        label="E&I Expiration Date *"
+                        type="date"
+                        value={priceHeaderData.customEeiExpirationDate || ""}
+                        onChange={(e) =>
+                          setPriceHeaderData((prev) => ({
+                            ...prev,
+                            customEeiExpirationDate: e.target.value,
+                          }))
+                        }
+                        variant="outlined"
+                        size="small"
+                        fullWidth
+                        error={!priceHeaderData.customEeiExpirationDate}
+                        helperText={
+                          !priceHeaderData.customEeiExpirationDate
+                            ? "Select E&I expiration date"
+                            : ""
+                        }
+                        InputLabelProps={{
+                          shrink: true,
+                        }}
+                      />
+                    </div>
+                    <div className="mt-2 text-xs text-blue-600">
+                      Note: Custom E&I rates apply only to this price header and
+                      override standard rates
+                    </div>
+                  </div>
+                )}
+
                 {/* Fuel Surcharge (FSC) */}
-                <FormControl variant="outlined" size="small" fullWidth>
-                  <InputLabel>Fuel Surcharge (FSC)</InputLabel>
+                <FormControl
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  error={isCreatingNewHeader && !priceHeaderData.fuelSurcharge}
+                >
+                  <InputLabel>
+                    Fuel Surcharge (FSC) {isCreatingNewHeader && "*"}
+                  </InputLabel>
                   <Select
-                    value={priceHeaderData.fuelSurcharge || "Standard Monthly"}
+                    value={
+                      priceHeaderData.fuelSurcharge ||
+                      (isCreatingNewHeader ? "" : "Standard Monthly")
+                    }
                     onChange={(e) =>
                       setPriceHeaderData((prev) => ({
                         ...prev,
                         fuelSurcharge: e.target.value,
                       }))
                     }
-                    label="Fuel Surcharge (FSC)"
+                    label={`Fuel Surcharge (FSC) ${
+                      isCreatingNewHeader ? "*" : ""
+                    }`}
                   >
                     <MenuItem value="Standard Monthly">
                       Standard Monthly
@@ -5757,13 +6278,21 @@ export default function AllCustomerPricingPage() {
                     <MenuItem value="Custom Rate">Custom Rate</MenuItem>
                     <MenuItem value="None">None</MenuItem>
                   </Select>
+                  {isCreatingNewHeader && !priceHeaderData.fuelSurcharge && (
+                    <div className="text-red-500 text-xs mt-1 ml-3">
+                      This field is required
+                    </div>
+                  )}
                 </FormControl>
 
                 {/* Invoice Minimum */}
                 <TextField
-                  label="Invoice Minimum"
+                  label={`Invoice Minimum ${isCreatingNewHeader ? "*" : ""}`}
                   type="number"
-                  value={priceHeaderData.invoiceMinimum || 350}
+                  value={
+                    priceHeaderData.invoiceMinimum ||
+                    (isCreatingNewHeader ? "" : 350)
+                  }
                   onChange={(e) =>
                     setPriceHeaderData((prev) => ({
                       ...prev,
@@ -5774,15 +6303,36 @@ export default function AllCustomerPricingPage() {
                   size="small"
                   fullWidth
                   inputProps={{ min: 0, step: 1 }}
+                  error={
+                    isCreatingNewHeader &&
+                    (!priceHeaderData.invoiceMinimum ||
+                      priceHeaderData.invoiceMinimum === "")
+                  }
+                  helperText={
+                    isCreatingNewHeader &&
+                    (!priceHeaderData.invoiceMinimum ||
+                      priceHeaderData.invoiceMinimum === "")
+                      ? "This field is required"
+                      : ""
+                  }
                 />
 
                 {/* Container Conversion */}
-                <FormControl variant="outlined" size="small" fullWidth>
-                  <InputLabel>Container Conversion</InputLabel>
+                <FormControl
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  error={
+                    isCreatingNewHeader && !priceHeaderData.containerConversion
+                  }
+                >
+                  <InputLabel>
+                    Container Breakdown Type {isCreatingNewHeader && "*"}
+                  </InputLabel>
                   <Select
                     value={
                       priceHeaderData.containerConversion ||
-                      "Standard Conversion 1"
+                      (isCreatingNewHeader ? "" : "Standard Conversion 1")
                     }
                     onChange={(e) =>
                       setPriceHeaderData((prev) => ({
@@ -5790,7 +6340,9 @@ export default function AllCustomerPricingPage() {
                         containerConversion: e.target.value,
                       }))
                     }
-                    label="Container Conversion"
+                    label={`Container Conversion ${
+                      isCreatingNewHeader ? "*" : ""
+                    }`}
                   >
                     <MenuItem value="Standard Conversion 1">
                       Standard Conversion 1
@@ -5802,32 +6354,95 @@ export default function AllCustomerPricingPage() {
                       Custom Conversion
                     </MenuItem>
                   </Select>
+                  {isCreatingNewHeader &&
+                    !priceHeaderData.containerConversion && (
+                      <div className="text-red-500 text-xs mt-1 ml-3">
+                        This field is required
+                      </div>
+                    )}
                 </FormControl>
 
+                {/* Global Container Minimum */}
+                <TextField
+                  label={`Global Container Minimum ${
+                    isCreatingNewHeader ? "*" : ""
+                  }`}
+                  type="number"
+                  value={
+                    priceHeaderData.globalContainerMinimum ||
+                    (isCreatingNewHeader ? "" : 40)
+                  }
+                  onChange={(e) =>
+                    setPriceHeaderData((prev) => ({
+                      ...prev,
+                      globalContainerMinimum: parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  inputProps={{ min: 0, step: 0.01 }}
+                  error={
+                    isCreatingNewHeader &&
+                    (!priceHeaderData.globalContainerMinimum ||
+                      priceHeaderData.globalContainerMinimum === 0)
+                  }
+                  helperText={
+                    isCreatingNewHeader &&
+                    (!priceHeaderData.globalContainerMinimum ||
+                      priceHeaderData.globalContainerMinimum === 0)
+                      ? "Enter global container minimum amount"
+                      : ""
+                  }
+                  InputProps={{
+                    startAdornment: (
+                      <span className="text-gray-500 mr-2">$</span>
+                    ),
+                  }}
+                />
+
                 {/* Item Minimums */}
-                <FormControl variant="outlined" size="small" fullWidth>
-                  <InputLabel>Item Minimums</InputLabel>
+                <FormControl
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  error={isCreatingNewHeader && !priceHeaderData.itemMinimums}
+                >
+                  <InputLabel>
+                    Item Container Minimums {isCreatingNewHeader && "*"}
+                  </InputLabel>
                   <Select
-                    value={priceHeaderData.itemMinimums || "Standard Tables"}
+                    value={
+                      priceHeaderData.itemMinimums ||
+                      (isCreatingNewHeader ? "" : "Standard Tables")
+                    }
                     onChange={(e) =>
                       setPriceHeaderData((prev) => ({
                         ...prev,
                         itemMinimums: e.target.value,
                       }))
                     }
-                    label="Item Minimums"
+                    label={`Item Minimums ${isCreatingNewHeader ? "*" : ""}`}
                   >
                     <MenuItem value="Standard Tables">Standard Tables</MenuItem>
                     <MenuItem value="Custom Tables">Custom Tables</MenuItem>
                     <MenuItem value="None">None</MenuItem>
                   </Select>
+                  {isCreatingNewHeader && !priceHeaderData.itemMinimums && (
+                    <div className="text-red-500 text-xs mt-1 ml-3">
+                      This field is required
+                    </div>
+                  )}
                 </FormControl>
 
                 {/* Economic Adjustment Fee (EAF) % */}
                 <TextField
-                  label="Economic Adjustment Fee (EAF) %"
+                  label={`EAF ${isCreatingNewHeader ? "*" : ""}`}
                   type="number"
-                  value={priceHeaderData.economicAdjustmentFee || 3}
+                  value={
+                    priceHeaderData.economicAdjustmentFee ||
+                    (isCreatingNewHeader ? "" : 3)
+                  }
                   onChange={(e) =>
                     setPriceHeaderData((prev) => ({
                       ...prev,
@@ -5838,13 +6453,31 @@ export default function AllCustomerPricingPage() {
                   size="small"
                   fullWidth
                   inputProps={{ min: 0, max: 100, step: 0.1 }}
+                  error={
+                    isCreatingNewHeader &&
+                    (!priceHeaderData.economicAdjustmentFee ||
+                      priceHeaderData.economicAdjustmentFee === "")
+                  }
+                  helperText={
+                    isCreatingNewHeader &&
+                    (!priceHeaderData.economicAdjustmentFee ||
+                      priceHeaderData.economicAdjustmentFee === "")
+                      ? "This field is required"
+                      : ""
+                  }
+                  InputProps={{
+                    endAdornment: <span className="text-gray-500 ml-2">%</span>,
+                  }}
                 />
 
                 {/* E-Manifest Fee */}
                 <TextField
-                  label="E-Manifest Fee"
+                  label={`E-Manifest Fee ${isCreatingNewHeader ? "*" : ""}`}
                   type="number"
-                  value={priceHeaderData.eManifestFee || 25}
+                  value={
+                    priceHeaderData.eManifestFee ||
+                    (isCreatingNewHeader ? "" : 25)
+                  }
                   onChange={(e) =>
                     setPriceHeaderData((prev) => ({
                       ...prev,
@@ -5854,8 +6487,119 @@ export default function AllCustomerPricingPage() {
                   variant="outlined"
                   size="small"
                   fullWidth
-                  inputProps={{ min: 0, step: 1 }}
+                  inputProps={{ min: 0, step: 0.01 }}
+                  error={
+                    isCreatingNewHeader &&
+                    (!priceHeaderData.eManifestFee ||
+                      priceHeaderData.eManifestFee === "")
+                  }
+                  helperText={
+                    isCreatingNewHeader &&
+                    (!priceHeaderData.eManifestFee ||
+                      priceHeaderData.eManifestFee === "")
+                      ? "This field is required"
+                      : ""
+                  }
+                  InputProps={{
+                    startAdornment: (
+                      <span className="text-gray-500 mr-2">$</span>
+                    ),
+                  }}
                 />
+              </div>
+
+              {/* Date Fields Section */}
+              <div className="mt-6">
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontSize: "14px",
+                    color: "#666666",
+                    marginBottom: 2,
+                    fontWeight: 400,
+                  }}
+                >
+                  Date Settings{" "}
+                  {isCreatingNewHeader && (
+                    <span className="text-sm text-gray-500 ml-2">
+                      (Effective and expiration dates are required)
+                    </span>
+                  )}
+                </Typography>
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Effective Date */}
+                  <TextField
+                    label={`Effective Date ${isCreatingNewHeader ? "*" : ""}`}
+                    type="date"
+                    value={priceHeaderData.effectiveDate || ""}
+                    onChange={(e) =>
+                      setPriceHeaderData((prev) => ({
+                        ...prev,
+                        effectiveDate: e.target.value,
+                      }))
+                    }
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    error={
+                      isCreatingNewHeader &&
+                      (!priceHeaderData.effectiveDate ||
+                        priceHeaderData.effectiveDate === "")
+                    }
+                    helperText={
+                      isCreatingNewHeader &&
+                      (!priceHeaderData.effectiveDate ||
+                        priceHeaderData.effectiveDate === "")
+                        ? "This field is required"
+                        : ""
+                    }
+                    InputLabelProps={{
+                      shrink: true,
+                    }}
+                    placeholder={
+                      isCreatingNewHeader ? "Select effective date" : ""
+                    }
+                  />
+
+                  {/* Expiration Date */}
+                  <TextField
+                    label={`Expiration Date ${isCreatingNewHeader ? "*" : ""}`}
+                    type="date"
+                    value={priceHeaderData.expirationDate || ""}
+                    onChange={(e) =>
+                      setPriceHeaderData((prev) => ({
+                        ...prev,
+                        expirationDate: e.target.value,
+                      }))
+                    }
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    error={
+                      isCreatingNewHeader &&
+                      (!priceHeaderData.expirationDate ||
+                        priceHeaderData.expirationDate === "")
+                    }
+                    helperText={
+                      isCreatingNewHeader &&
+                      (!priceHeaderData.expirationDate ||
+                        priceHeaderData.expirationDate === "")
+                        ? "This field is required"
+                        : ""
+                    }
+                    InputLabelProps={{
+                      shrink: true,
+                    }}
+                    placeholder={
+                      isCreatingNewHeader ? "Select expiration date" : ""
+                    }
+                  />
+                </div>
+                {isCreatingNewHeader && (
+                  <div className="mt-2 text-xs text-gray-500">
+                    Note: Expiration date must be after the effective date
+                  </div>
+                )}
               </div>
 
               {/* Additional Options Section */}
@@ -5965,7 +6709,7 @@ export default function AllCustomerPricingPage() {
               Cancel
             </SecondaryButton>
             <PrimaryButton onClick={handleSavePriceHeader}>
-              Save Changes
+              {isCreatingNewHeader ? "Create Header" : "Save Changes"}
             </PrimaryButton>
           </DialogActions>
         </Dialog>

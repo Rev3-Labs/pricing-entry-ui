@@ -77,7 +77,7 @@ export const Button: React.FC<ButtonProps> = ({
         );
       }
     }
-    return <span>{children}</span>;
+    return <span className="flex items-center gap-2">{children}</span>;
   };
 
   return (

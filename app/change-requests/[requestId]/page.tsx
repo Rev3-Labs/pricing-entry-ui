@@ -947,7 +947,7 @@ export default function PriceChangeRequestDetailsPage() {
                         }}
                       >
                         <CheckCircle className="w-4 h-4 text-white" />
-                        <span>Initiate Price Entry</span>
+                        <span>Execute Price Entry</span>
                       </MuiButton>
                     </div>
                   </div>
@@ -1684,16 +1684,7 @@ export default function PriceChangeRequestDetailsPage() {
                                 </div>
                               ),
                             },
-                            {
-                              field: "type",
-                              headerName: "Request Type",
-                              flex: 0.5,
-                              renderCell: (params) => (
-                                <span className="font-['Roboto:Regular',_sans-serif] font-normal text-[14px] leading-[20px] text-[#49454f]">
-                                  {params.value}
-                                </span>
-                              ),
-                            },
+
                             {
                               field: "uploadDate",
                               headerName: "Upload Date",

@@ -89,6 +89,7 @@ export interface PriceItem {
   billingUom?: string;
   pricingType?: string;
   facilityName?: string;
+  priceRequestId?: string; // ID of the associated price change request
   createdAt?: string;
   updatedAt?: string;
   // Legacy fields for backward compatibility

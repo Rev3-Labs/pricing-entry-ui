@@ -160,9 +160,6 @@ const ContainerConversionContent = React.forwardRef<
   return (
     <div className="p-6">
       <div className="mb-6">
-        <Typography variant="h6" className="mb-2">
-          Container Conversion Rules
-        </Typography>
         <Typography variant="body2" color="textSecondary">
           Configure multipliers for predefined container size ranges. Only the
           multiplier values can be edited.
@@ -227,6 +224,224 @@ const ContainerConversionContent = React.forwardRef<
 });
 
 ContainerConversionContent.displayName = "ContainerConversionContent";
+
+// Fuel Surcharge Component
+const FuelSurchargeContent = React.forwardRef<
+  { handleSave: () => void },
+  {
+    onClose: () => void;
+    initialRules: Array<{
+      id: string;
+      lowPrice: string;
+      highPrice: string;
+      transportation: string;
+    }>;
+    onSave: (
+      rules: Array<{
+        id: string;
+        lowPrice: string;
+        highPrice: string;
+        transportation: string;
+      }>
+    ) => void;
+  }
+>(({ onClose, initialRules, onSave }, ref) => {
+  const [rules, setRules] = useState(initialRules);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const addRule = () => {
+    const newId = (rules.length + 1).toString();
+    setRules([
+      ...rules,
+      { id: newId, lowPrice: "", highPrice: "", transportation: "" },
+    ]);
+  };
+
+  const removeRule = (id: string) => {
+    if (rules.length > 1) {
+      setRules(rules.filter((rule) => rule.id !== id));
+    }
+  };
+
+  const updateRule = (
+    id: string,
+    field: "lowPrice" | "highPrice" | "transportation",
+    value: string
+  ) => {
+    setRules(
+      rules.map((rule) => (rule.id === id ? { ...rule, [field]: value } : rule))
+    );
+
+    // Clear error when user starts typing
+    if (errors[`${id}-${field}`]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[`${id}-${field}`];
+        return newErrors;
+      });
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    rules.forEach((rule) => {
+      if (!rule.lowPrice) {
+        newErrors[`${rule.id}-lowPrice`] = "Low price is required";
+      } else if (isNaN(Number(rule.lowPrice)) || Number(rule.lowPrice) < 0) {
+        newErrors[`${rule.id}-lowPrice`] =
+          "Low price must be a positive number";
+      }
+
+      if (!rule.highPrice) {
+        newErrors[`${rule.id}-highPrice`] = "High price is required";
+      } else if (isNaN(Number(rule.highPrice)) || Number(rule.highPrice) < 0) {
+        newErrors[`${rule.id}-highPrice`] =
+          "High price must be a positive number";
+      }
+
+      if (!rule.transportation) {
+        newErrors[`${rule.id}-transportation`] =
+          "Transportation percentage is required";
+      } else if (
+        isNaN(Number(rule.transportation)) ||
+        Number(rule.transportation) < 0
+      ) {
+        newErrors[`${rule.id}-transportation`] =
+          "Transportation must be a positive number";
+      }
+
+      // Validate price range logic
+      if (rule.lowPrice && rule.highPrice) {
+        const low = parseFloat(rule.lowPrice);
+        const high = parseFloat(rule.highPrice);
+        if (low >= high) {
+          newErrors[`${rule.id}-highPrice`] =
+            "High price must be greater than low price";
+        }
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Expose handleSave function to parent component
+  React.useImperativeHandle(ref, () => ({
+    handleSave: () => {
+      if (validateForm()) {
+        console.log("Saving fuel surcharge rules:", rules);
+        toast.success("Fuel surcharge rules saved successfully!");
+        // Save the rules to parent component
+        onSave(rules);
+        // Close the modal after successful save
+        onClose();
+      }
+    },
+  }));
+
+  return (
+    <div className="p-6">
+      <div className="mb-6">
+        <Typography variant="body2" color="textSecondary">
+          Define fuel surcharge percentages based on price ranges. Each row
+          represents a price range with an associated transportation surcharge
+          percentage.
+        </Typography>
+      </div>
+
+      <div className="space-y-4">
+        {rules.map((rule, index) => (
+          <Card key={rule.id} className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <TextField
+                  label="Low Price"
+                  type="number"
+                  value={rule.lowPrice}
+                  onChange={(e) =>
+                    updateRule(rule.id, "lowPrice", e.target.value)
+                  }
+                  size="small"
+                  fullWidth
+                  inputProps={{ min: 0, step: 0.001 }}
+                  error={!!errors[`${rule.id}-lowPrice`]}
+                  helperText={errors[`${rule.id}-lowPrice`]}
+                  InputProps={{
+                    startAdornment: (
+                      <span className="text-gray-500 mr-2">$</span>
+                    ),
+                  }}
+                />
+              </div>
+
+              <div className="flex-1">
+                <TextField
+                  label="High Price"
+                  type="number"
+                  value={rule.highPrice}
+                  onChange={(e) =>
+                    updateRule(rule.id, "highPrice", e.target.value)
+                  }
+                  size="small"
+                  fullWidth
+                  inputProps={{ min: 0, step: 0.001 }}
+                  error={!!errors[`${rule.id}-highPrice`]}
+                  helperText={errors[`${rule.id}-highPrice`]}
+                  InputProps={{
+                    startAdornment: (
+                      <span className="text-gray-500 mr-2">$</span>
+                    ),
+                  }}
+                />
+              </div>
+
+              <div className="flex-1">
+                <TextField
+                  label="Transportation %"
+                  type="number"
+                  value={rule.transportation}
+                  onChange={(e) =>
+                    updateRule(rule.id, "transportation", e.target.value)
+                  }
+                  size="small"
+                  fullWidth
+                  inputProps={{ min: 0, step: 0.1 }}
+                  error={!!errors[`${rule.id}-transportation`]}
+                  helperText={errors[`${rule.id}-transportation`]}
+                  InputProps={{
+                    endAdornment: <span className="text-gray-500 ml-2">%</span>,
+                  }}
+                />
+              </div>
+
+              <IconButton
+                onClick={() => removeRule(rule.id)}
+                disabled={rules.length === 1}
+                color="error"
+                size="small"
+              >
+                <Trash2 className="h-4 w-4" />
+              </IconButton>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <div className="mt-6 flex gap-3">
+        <SecondaryButton
+          onClick={addRule}
+          startIcon={<Plus className="h-4 w-4" />}
+          size="small"
+        >
+          Add Fuel Surcharge Range
+        </SecondaryButton>
+      </div>
+    </div>
+  );
+});
+
+FuelSurchargeContent.displayName = "FuelSurchargeContent";
 
 interface FilterState {
   customer: string;
@@ -420,7 +635,29 @@ export default function AllCustomerPricingPage() {
     { id: "7", fromSize: "221G", toSize: "275G", multiplier: "5" },
     { id: "8", fromSize: "276G", toSize: "350G", multiplier: "6" },
   ]);
+
+  // Fuel Surcharge Modal State
+  const [fuelSurchargeModalOpen, setFuelSurchargeModalOpen] = useState(false);
+  const [customFuelSurchargeRules, setCustomFuelSurchargeRules] = useState<
+    Array<{
+      id: string;
+      lowPrice: string;
+      highPrice: string;
+      transportation: string;
+    }>
+  >([
+    { id: "1", lowPrice: "0.00", highPrice: "1.159", transportation: "0" },
+    { id: "2", lowPrice: "1.16", highPrice: "1.22", transportation: "1" },
+    { id: "3", lowPrice: "1.23", highPrice: "1.29", transportation: "2" },
+    { id: "4", lowPrice: "1.30", highPrice: "1.36", transportation: "3" },
+    { id: "5", lowPrice: "1.37", highPrice: "1.43", transportation: "4" },
+    { id: "6", lowPrice: "1.44", highPrice: "1.50", transportation: "5" },
+    { id: "7", lowPrice: "1.51", highPrice: "1.57", transportation: "6" },
+    { id: "8", lowPrice: "1.58", highPrice: "1.64", transportation: "7" },
+    { id: "9", lowPrice: "1.65", highPrice: "1.71", transportation: "8" },
+  ]);
   const containerConversionRef = useRef<{ handleSave: () => void }>(null);
+  const fuelSurchargeRef = useRef<{ handleSave: () => void }>(null);
 
   // State to store the current price change configuration
   const [currentPriceChangeConfig, setCurrentPriceChangeConfig] = useState<{
@@ -565,6 +802,52 @@ export default function AllCustomerPricingPage() {
       customerName: "Clean Energy Solutions",
       assignedTo: "Michael Chen",
     },
+    {
+      id: "PCR-2024-009",
+      title: "Industrial Cleanup Ltd - Container Pricing Update",
+      description:
+        "Update container pricing structure for Industrial Cleanup Ltd to reflect new container costs and market conditions.",
+      status: "New",
+      requestedBy: "Sarah Johnson",
+      requestedDate: "2024-02-15",
+      requestType: "Customer",
+      customerName: "Industrial Cleanup Ltd",
+      assignedTo: "Emily Rodriguez",
+    },
+    {
+      id: "PCR-2024-010",
+      title: "Municipal Waste Services - Regional Pricing",
+      description:
+        "Implement regional pricing adjustments for municipal waste services across different geographic areas.",
+      status: "In Progress",
+      requestedBy: "David Brown",
+      requestedDate: "2024-02-18",
+      requestType: "Multiple Customers",
+      assignedTo: "Alex Thompson",
+    },
+    {
+      id: "PCR-2024-011",
+      title: "Hazardous Materials Corp - Safety Fee Update",
+      description:
+        "Update safety handling fees for hazardous materials processing to reflect new safety protocols and equipment costs.",
+      status: "New",
+      requestedBy: "Michael Chen",
+      requestedDate: "2024-02-20",
+      requestType: "General/Global",
+      assignedTo: "Sarah Johnson",
+    },
+    {
+      id: "PCR-2024-012",
+      title: "Green Disposal Inc - Eco-Friendly Service Pricing",
+      description:
+        "Establish pricing for new eco-friendly disposal services including biodegradable packaging and carbon offset options.",
+      status: "New",
+      requestedBy: "Emily Rodriguez",
+      requestedDate: "2024-02-22",
+      requestType: "Customer",
+      customerName: "Green Disposal Inc",
+      assignedTo: "David Brown",
+    },
   ];
 
   // Auto-open price change modal if user came from execute price change button
@@ -685,7 +968,7 @@ export default function AllCustomerPricingPage() {
     eei: "Regular",
     fuelSurcharge: "Standard Monthly",
     invoiceMinimum: 350,
-    containerConversion: "Standard Conversion 1",
+    containerConversion: "Standard Conversion",
     itemMinimums: "Standard Tables",
     economicAdjustmentFee: 3,
     eManifestFee: 25,
@@ -947,6 +1230,30 @@ export default function AllCustomerPricingPage() {
         });
       }
 
+      const generatedPriceRequestId =
+        item.priceRequestId ||
+        (() => {
+          // Generate a dummy price request ID for existing rows
+          // Create a deterministic ID based on the item ID to ensure consistency
+          const hash = item.priceItemId.split("").reduce((a, b) => {
+            a = ((a << 5) - a + b.charCodeAt(0)) & 0xffffffff;
+            return a;
+          }, 0);
+          const requestNumber = (Math.abs(hash) % 12) + 1; // Generate numbers 1-12 to match our mock data
+          const dummyId = `PCR-${new Date().getFullYear()}-${String(
+            requestNumber
+          ).padStart(3, "0")}`;
+
+          // Log when generating dummy IDs for debugging
+          if (!item.priceRequestId) {
+            console.log(
+              `Generated dummy price request ID for ${item.priceItemId}: ${dummyId}`
+            );
+          }
+
+          return dummyId;
+        })();
+
       return {
         id: item.priceItemId,
         customerId: customer?.customerId || "",
@@ -968,6 +1275,7 @@ export default function AllCustomerPricingPage() {
         expirationDate: item.expirationDate || "",
         entryDate: header?.createdAt || "",
         enteredBy: header?.createdByUser?.toString() || "",
+        priceRequestId: generatedPriceRequestId,
         header: header,
         isNew: isNewItem,
         isModified: isModifiedItem,
@@ -1034,6 +1342,7 @@ export default function AllCustomerPricingPage() {
           expirationDate: row.expirationDate || "",
           entryDate: row.entryDate || "",
           enteredBy: row.enteredBy || "",
+          priceRequestId: row.priceRequestId || "",
           header: row.header,
           isNew: row.isNew || false,
           isModified: row.isModified || false,
@@ -1112,11 +1421,14 @@ export default function AllCustomerPricingPage() {
   // New handlers for price change configuration
   const handlePriceChangeConfigSubmit = () => {
     // Save the current price change configuration
-    setCurrentPriceChangeConfig({
+    const config = {
       selectedRequests: [...selectedPriceChangeRequests],
       excelUploadMode,
       excelFile: excelFile ? excelFile.name : null,
-    });
+    };
+
+    console.log("Setting current price change configuration:", config);
+    setCurrentPriceChangeConfig(config);
 
     // TODO: Implement the actual price change creation logic with the configuration
     console.log("Creating price changes with:", {
@@ -1215,6 +1527,16 @@ export default function AllCustomerPricingPage() {
     // Create a new row ID for the temporary row
     const tempRowId = `temp-${Date.now()}`;
 
+    // Get the price request ID from the current price change configuration
+    const priceRequestId =
+      currentPriceChangeConfig?.selectedRequests?.[0] || "";
+
+    console.log("Creating new entry with price request ID:", {
+      priceRequestId,
+      currentPriceChangeConfig,
+      selectedRequests: currentPriceChangeConfig?.selectedRequests,
+    });
+
     // Create a new empty row with default values
     const newRow = {
       id: tempRowId,
@@ -1241,6 +1563,7 @@ export default function AllCustomerPricingPage() {
         .split("T")[0],
       entryDate: new Date().toISOString().split("T")[0],
       enteredBy: "",
+      priceRequestId: priceRequestId, // Set the price request ID from the configuration
       header: undefined,
       isNew: true,
       isModified: false,
@@ -1272,6 +1595,7 @@ export default function AllCustomerPricingPage() {
         generatorId: "",
         generatorState: "",
         contractId: "",
+        priceRequestId: priceRequestId, // Add the price request ID
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -1297,9 +1621,15 @@ export default function AllCustomerPricingPage() {
     // Force a re-render to ensure the DataGrid updates
     setForceRerender((prev) => prev + 1);
 
-    toast.success(
-      "New row added. You can now edit the values directly in the table."
-    );
+    if (priceRequestId) {
+      toast.success(
+        `New row added with price request ID: ${priceRequestId}. You can now edit the values directly in the table.`
+      );
+    } else {
+      toast.warning(
+        "New row added but no price change request is selected. The Price Request ID column will be empty."
+      );
+    }
   };
 
   const handleSaveEditEntry = () => {
@@ -1513,7 +1843,7 @@ export default function AllCustomerPricingPage() {
           eei: "Regular",
           fuelSurcharge: "Standard Monthly",
           invoiceMinimum: selectedHeader.invoiceMinimum || 350,
-          containerConversion: "Standard Conversion 1",
+          containerConversion: "Standard Conversion",
           itemMinimums: "Standard Tables",
           economicAdjustmentFee: 3,
           eManifestFee: 25,
@@ -1536,7 +1866,7 @@ export default function AllCustomerPricingPage() {
         eei: "Regular",
         fuelSurcharge: "Standard Monthly",
         invoiceMinimum: 350,
-        containerConversion: "Standard Conversion 1",
+        containerConversion: "Standard Conversion",
         itemMinimums: "Standard Tables",
         economicAdjustmentFee: 3,
         eManifestFee: 25,
@@ -1711,7 +2041,7 @@ export default function AllCustomerPricingPage() {
           eei: "Regular",
           fuelSurcharge: "Standard Monthly",
           invoiceMinimum: 350,
-          containerConversion: "Standard Conversion 1",
+          containerConversion: "Standard Conversion",
           itemMinimums: "Standard Tables",
           economicAdjustmentFee: 3,
           eManifestFee: 25,
@@ -1742,7 +2072,7 @@ export default function AllCustomerPricingPage() {
             invoiceMinimum: selectedHeader.invoiceMinimum || 350,
             containerConversion: selectedHeader.headerName.includes("Project")
               ? "Custom Conversion"
-              : "Standard Conversion 1",
+              : "Standard Conversion",
             itemMinimums: selectedHeader.headerName.includes("Project")
               ? "Custom Tables"
               : "Standard Tables",
@@ -3111,6 +3441,41 @@ export default function AllCustomerPricingPage() {
         );
       },
     },
+    {
+      field: "priceRequestId",
+      headerName: "Price Request ID",
+      width: 140,
+      flex: 0,
+      minWidth: 120,
+      editable: false,
+      renderCell: (params: any) => {
+        const requestId = params.value;
+        if (!requestId) {
+          return (
+            <div
+              style={{
+                color: "#999",
+                fontStyle: "italic",
+                fontSize: "0.875rem",
+              }}
+            >
+              -
+            </div>
+          );
+        }
+        return (
+          <Link
+            href={`/change-requests/${requestId}`}
+            className="text-blue-600 hover:text-blue-800 underline cursor-pointer text-sm"
+            style={{
+              fontSize: "0.875rem",
+            }}
+          >
+            {requestId}
+          </Link>
+        );
+      },
+    },
   ];
 
   const toggleModifiedRowsFilter = () => {
@@ -3775,7 +4140,6 @@ export default function AllCustomerPricingPage() {
                         )}
                       </div>
 
-                      {/* Add Line Button */}
                       <PrimaryButton
                         onClick={handleAddNewEntry}
                         disabled={false}
@@ -4052,7 +4416,7 @@ export default function AllCustomerPricingPage() {
                       //   // Only allow editing when in edit mode and not for certain columns
                       //   if (!isEditMode) return false;
                       //
-                      //   // Don't allow editing for selection column, entry date, or entered by
+                      //   // Don't allow editing for selection column, entry date, entered by, or price request ID
                       //   if (
                       //     params.field === "selection" ||
                       //     params.field === "entryDate" ||
@@ -6431,12 +6795,16 @@ export default function AllCustomerPricingPage() {
                       priceHeaderData.fuelSurcharge ||
                       (isCreatingNewHeader ? "" : "Standard Monthly")
                     }
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === "Custom Rate") {
+                        setFuelSurchargeModalOpen(true);
+                      }
                       setPriceHeaderData((prev) => ({
                         ...prev,
-                        fuelSurcharge: e.target.value,
-                      }))
-                    }
+                        fuelSurcharge: value,
+                      }));
+                    }}
                     label={`Fuel Surcharge (FSC) ${
                       isCreatingNewHeader ? "*" : ""
                     }`}
@@ -6444,12 +6812,26 @@ export default function AllCustomerPricingPage() {
                     <MenuItem value="Standard Monthly">
                       Standard Monthly
                     </MenuItem>
+                    <MenuItem value="Standard Weekly">Standard Weekly</MenuItem>
                     <MenuItem value="Custom Rate">Custom</MenuItem>
                     <MenuItem value="None">None</MenuItem>
                   </Select>
                   {isCreatingNewHeader && !priceHeaderData.fuelSurcharge && (
                     <div className="text-red-500 text-xs mt-1 ml-3">
                       This field is required
+                    </div>
+                  )}
+
+                  {/* Edit Custom Fuel Surcharge Button - Only show when Custom Rate is selected */}
+                  {priceHeaderData.fuelSurcharge === "Custom Rate" && (
+                    <div className="mt-2">
+                      <SecondaryButton
+                        onClick={() => setFuelSurchargeModalOpen(true)}
+                        startIcon={<Edit className="h-4 w-4" />}
+                        size="small"
+                      >
+                        Edit Custom Fuel Surcharge
+                      </SecondaryButton>
                     </div>
                   )}
                 </FormControl>
@@ -6471,7 +6853,7 @@ export default function AllCustomerPricingPage() {
                     <Select
                       value={
                         priceHeaderData.containerConversion ||
-                        (isCreatingNewHeader ? "" : "Standard Conversion 1")
+                        (isCreatingNewHeader ? "" : "Standard Conversion")
                       }
                       onChange={(e) => {
                         const value = e.target.value;
@@ -6549,12 +6931,10 @@ export default function AllCustomerPricingPage() {
                         isCreatingNewHeader ? "*" : ""
                       }`}
                     >
-                      <MenuItem value="Standard Conversion 1">
-                        Standard Conversion 1
+                      <MenuItem value="Standard Conversion">
+                        Standard Conversion
                       </MenuItem>
-                      <MenuItem value="Standard Conversion 2">
-                        Standard Conversion 2
-                      </MenuItem>
+
                       <MenuItem value="Custom Conversion">
                         Custom Conversion
                       </MenuItem>
@@ -7031,6 +7411,68 @@ export default function AllCustomerPricingPage() {
               }}
             >
               Save Conversions
+            </PrimaryButton>
+          </DialogActions>
+        </Dialog>
+
+        {/* Fuel Surcharge Modal */}
+        <Dialog
+          open={fuelSurchargeModalOpen}
+          onClose={() => setFuelSurchargeModalOpen(false)}
+          maxWidth="lg"
+          fullWidth
+          PaperProps={{
+            sx: {
+              height: "90vh",
+              maxHeight: "90vh",
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              m: 0,
+              p: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Typography variant="h6">
+              Custom Fuel Surcharge Configuration
+            </Typography>
+            <IconButton
+              onClick={() => setFuelSurchargeModalOpen(false)}
+              sx={{ color: "grey.500" }}
+            >
+              <X />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent sx={{ p: 0, overflow: "hidden" }}>
+            <div style={{ height: "100%", overflow: "auto" }}>
+              <FuelSurchargeContent
+                ref={fuelSurchargeRef}
+                onClose={() => setFuelSurchargeModalOpen(false)}
+                initialRules={customFuelSurchargeRules}
+                onSave={(rules) => {
+                  setCustomFuelSurchargeRules(rules);
+                  // You can also save to localStorage or API here
+                  console.log("Saving custom fuel surcharge rules:", rules);
+                }}
+              />
+            </div>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, gap: 2 }}>
+            <SecondaryButton onClick={() => setFuelSurchargeModalOpen(false)}>
+              Cancel
+            </SecondaryButton>
+            <PrimaryButton
+              onClick={() => {
+                if (fuelSurchargeRef.current) {
+                  fuelSurchargeRef.current.handleSave();
+                }
+              }}
+            >
+              Save Fuel Surcharge Ranges
             </PrimaryButton>
           </DialogActions>
         </Dialog>

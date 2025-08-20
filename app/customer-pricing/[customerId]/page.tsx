@@ -26,6 +26,7 @@ import {
   Divider,
   IconButton,
   Button as MuiButton,
+  Button,
   ButtonGroup,
   ClickAwayListener,
   Grow,
@@ -78,6 +79,154 @@ import {
   loadSampleDataFromLocalStorage,
   saveSampleDataToLocalStorage,
 } from "@/scripts/generate-sample-data";
+
+// Container Conversion Component
+const ContainerConversionContent = React.forwardRef<
+  { handleSave: () => void },
+  {
+    onClose: () => void;
+    initialConversions: Array<{
+      id: string;
+      fromSize: string;
+      toSize: string;
+      multiplier: string;
+    }>;
+    onSave: (
+      conversions: Array<{
+        id: string;
+        fromSize: string;
+        toSize: string;
+        multiplier: string;
+      }>
+    ) => void;
+  }
+>(({ onClose, initialConversions, onSave }, ref) => {
+  const [conversions, setConversions] = useState(initialConversions);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Generate container sizes from 1G to 350G
+  const containerSizes = Array.from({ length: 350 }, (_, i) => `${i + 1}G`);
+
+  const updateConversion = (id: string, field: "multiplier", value: string) => {
+    setConversions(
+      conversions.map((conv) =>
+        conv.id === id ? { ...conv, [field]: value } : conv
+      )
+    );
+
+    // Clear error when user starts typing
+    if (errors[`${id}-${field}`]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[`${id}-${field}`];
+        return newErrors;
+      });
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    conversions.forEach((conv) => {
+      if (!conv.multiplier) {
+        newErrors[`${conv.id}-multiplier`] = "Multiplier is required";
+      } else if (
+        isNaN(Number(conv.multiplier)) ||
+        Number(conv.multiplier) <= 0
+      ) {
+        newErrors[`${conv.id}-multiplier`] =
+          "Multiplier must be a positive number";
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Expose handleSave function to parent component
+  React.useImperativeHandle(ref, () => ({
+    handleSave: () => {
+      if (validateForm()) {
+        console.log("Saving conversions:", conversions);
+        toast.success("Container conversions saved successfully!");
+        // Save the conversions to parent component
+        onSave(conversions);
+        // Close the modal after successful save
+        onClose();
+      }
+    },
+  }));
+
+  return (
+    <div className="p-6">
+      <div className="mb-6">
+        <Typography variant="h6" className="mb-2">
+          Container Conversion Rules
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          Configure multipliers for predefined container size ranges. Only the
+          multiplier values can be edited.
+        </Typography>
+      </div>
+
+      <div className="space-y-4">
+        {conversions.map((conversion, index) => (
+          <Card key={conversion.id} className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <FormControl fullWidth size="small" className="mb-3">
+                  <InputLabel>From Size</InputLabel>
+                  <Select value={conversion.fromSize} disabled>
+                    {containerSizes.map((size) => (
+                      <MenuItem key={size} value={size}>
+                        {size}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </div>
+
+              <div className="flex-1">
+                <FormControl fullWidth size="small" className="mb-3">
+                  <InputLabel>To Size</InputLabel>
+                  <Select value={conversion.toSize} disabled>
+                    {containerSizes.map((size) => (
+                      <MenuItem key={size} value={size}>
+                        {size}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </div>
+
+              <div className="flex-1">
+                <TextField
+                  label="Multiplier"
+                  type="number"
+                  value={conversion.multiplier}
+                  onChange={(e) =>
+                    updateConversion(
+                      conversion.id,
+                      "multiplier",
+                      e.target.value
+                    )
+                  }
+                  size="small"
+                  fullWidth
+                  inputProps={{ min: 0, step: 0.01 }}
+                  error={!!errors[`${conversion.id}-multiplier`]}
+                  helperText={errors[`${conversion.id}-multiplier`]}
+                />
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+});
+
+ContainerConversionContent.displayName = "ContainerConversionContent";
 
 interface FilterState {
   customer: string;
@@ -252,6 +401,26 @@ export default function AllCustomerPricingPage() {
   const [priceHeaderLoading, setPriceHeaderLoading] = useState(false);
   const [isCreatingNewHeader, setIsCreatingNewHeader] = useState(false);
   const [newHeaderName, setNewHeaderName] = useState("");
+  const [containerConversionModalOpen, setContainerConversionModalOpen] =
+    useState(false);
+  const [customConversionRules, setCustomConversionRules] = useState<
+    Array<{
+      id: string;
+      fromSize: string;
+      toSize: string;
+      multiplier: string;
+    }>
+  >([
+    { id: "1", fromSize: "1G", toSize: "5G", multiplier: "0.35" },
+    { id: "2", fromSize: "6G", toSize: "15G", multiplier: "0.5" },
+    { id: "3", fromSize: "16G", toSize: "30G", multiplier: "0.75" },
+    { id: "4", fromSize: "31G", toSize: "55G", multiplier: "1.00" },
+    { id: "5", fromSize: "56G", toSize: "85G", multiplier: "1.5" },
+    { id: "6", fromSize: "86G", toSize: "220G", multiplier: "4" },
+    { id: "7", fromSize: "221G", toSize: "275G", multiplier: "5" },
+    { id: "8", fromSize: "276G", toSize: "350G", multiplier: "6" },
+  ]);
+  const containerConversionRef = useRef<{ handleSave: () => void }>(null);
 
   // State to store the current price change configuration
   const [currentPriceChangeConfig, setCurrentPriceChangeConfig] = useState<{
@@ -6275,7 +6444,7 @@ export default function AllCustomerPricingPage() {
                     <MenuItem value="Standard Monthly">
                       Standard Monthly
                     </MenuItem>
-                    <MenuItem value="Custom Rate">Custom Rate</MenuItem>
+                    <MenuItem value="Custom Rate">Custom</MenuItem>
                     <MenuItem value="None">None</MenuItem>
                   </Select>
                   {isCreatingNewHeader && !priceHeaderData.fuelSurcharge && (
@@ -6284,6 +6453,134 @@ export default function AllCustomerPricingPage() {
                     </div>
                   )}
                 </FormControl>
+
+                {/* Container Conversion */}
+                <div>
+                  <FormControl
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    error={
+                      isCreatingNewHeader &&
+                      !priceHeaderData.containerConversion
+                    }
+                  >
+                    <InputLabel>
+                      Container Breakdown Type {isCreatingNewHeader && "*"}
+                    </InputLabel>
+                    <Select
+                      value={
+                        priceHeaderData.containerConversion ||
+                        (isCreatingNewHeader ? "" : "Standard Conversion 1")
+                      }
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === "Custom Conversion") {
+                          // Initialize with existing rules if any, otherwise start with empty
+                          // Only reset if all rules are empty (this shouldn't happen with default values)
+                          if (
+                            customConversionRules.every(
+                              (rule) =>
+                                !rule.fromSize &&
+                                !rule.toSize &&
+                                !rule.multiplier
+                            )
+                          ) {
+                            // Reset to default if no rules configured
+                            setCustomConversionRules([
+                              {
+                                id: "1",
+                                fromSize: "1G",
+                                toSize: "5G",
+                                multiplier: "0.35",
+                              },
+                              {
+                                id: "2",
+                                fromSize: "6G",
+                                toSize: "15G",
+                                multiplier: "0.5",
+                              },
+                              {
+                                id: "3",
+                                fromSize: "16G",
+                                toSize: "30G",
+                                multiplier: "0.75",
+                              },
+                              {
+                                id: "4",
+                                fromSize: "31G",
+                                toSize: "55G",
+                                multiplier: "1.00",
+                              },
+                              {
+                                id: "5",
+                                fromSize: "56G",
+                                toSize: "85G",
+                                multiplier: "1.5",
+                              },
+                              {
+                                id: "6",
+                                fromSize: "86G",
+                                toSize: "220G",
+                                multiplier: "4",
+                              },
+                              {
+                                id: "7",
+                                fromSize: "221G",
+                                toSize: "275G",
+                                multiplier: "5",
+                              },
+                              {
+                                id: "8",
+                                fromSize: "276G",
+                                toSize: "350G",
+                                multiplier: "6",
+                              },
+                            ]);
+                          }
+                          setContainerConversionModalOpen(true);
+                        }
+                        setPriceHeaderData((prev) => ({
+                          ...prev,
+                          containerConversion: value,
+                        }));
+                      }}
+                      label={`Container Conversion ${
+                        isCreatingNewHeader ? "*" : ""
+                      }`}
+                    >
+                      <MenuItem value="Standard Conversion 1">
+                        Standard Conversion 1
+                      </MenuItem>
+                      <MenuItem value="Standard Conversion 2">
+                        Standard Conversion 2
+                      </MenuItem>
+                      <MenuItem value="Custom Conversion">
+                        Custom Conversion
+                      </MenuItem>
+                    </Select>
+                    {isCreatingNewHeader &&
+                      !priceHeaderData.containerConversion && (
+                        <div className="text-red-500 text-xs mt-1 ml-3">
+                          This field is required
+                        </div>
+                      )}
+                  </FormControl>
+
+                  {/* Edit Custom Conversion Button - Only show when Custom Conversion is selected */}
+                  {priceHeaderData.containerConversion ===
+                    "Custom Conversion" && (
+                    <div className="mt-2">
+                      <SecondaryButton
+                        onClick={() => setContainerConversionModalOpen(true)}
+                        startIcon={<Edit className="h-4 w-4" />}
+                        size="small"
+                      >
+                        Edit Custom Conversion
+                      </SecondaryButton>
+                    </div>
+                  )}
+                </div>
 
                 {/* Invoice Minimum */}
                 <TextField
@@ -6302,7 +6599,7 @@ export default function AllCustomerPricingPage() {
                   variant="outlined"
                   size="small"
                   fullWidth
-                  inputProps={{ min: 0, step: 1 }}
+                  inputProps={{ min: 0, step: 1.0 }}
                   error={
                     isCreatingNewHeader &&
                     (!priceHeaderData.invoiceMinimum ||
@@ -6315,52 +6612,12 @@ export default function AllCustomerPricingPage() {
                       ? "This field is required"
                       : ""
                   }
+                  InputProps={{
+                    startAdornment: (
+                      <span className="text-gray-500 mr-2">$</span>
+                    ),
+                  }}
                 />
-
-                {/* Container Conversion */}
-                <FormControl
-                  variant="outlined"
-                  size="small"
-                  fullWidth
-                  error={
-                    isCreatingNewHeader && !priceHeaderData.containerConversion
-                  }
-                >
-                  <InputLabel>
-                    Container Breakdown Type {isCreatingNewHeader && "*"}
-                  </InputLabel>
-                  <Select
-                    value={
-                      priceHeaderData.containerConversion ||
-                      (isCreatingNewHeader ? "" : "Standard Conversion 1")
-                    }
-                    onChange={(e) =>
-                      setPriceHeaderData((prev) => ({
-                        ...prev,
-                        containerConversion: e.target.value,
-                      }))
-                    }
-                    label={`Container Conversion ${
-                      isCreatingNewHeader ? "*" : ""
-                    }`}
-                  >
-                    <MenuItem value="Standard Conversion 1">
-                      Standard Conversion 1
-                    </MenuItem>
-                    <MenuItem value="Standard Conversion 2">
-                      Standard Conversion 2
-                    </MenuItem>
-                    <MenuItem value="Custom Conversion">
-                      Custom Conversion
-                    </MenuItem>
-                  </Select>
-                  {isCreatingNewHeader &&
-                    !priceHeaderData.containerConversion && (
-                      <div className="text-red-500 text-xs mt-1 ml-3">
-                        This field is required
-                      </div>
-                    )}
-                </FormControl>
 
                 {/* Global Container Minimum */}
                 <TextField
@@ -6710,6 +6967,70 @@ export default function AllCustomerPricingPage() {
             </SecondaryButton>
             <PrimaryButton onClick={handleSavePriceHeader}>
               {isCreatingNewHeader ? "Create Header" : "Save Changes"}
+            </PrimaryButton>
+          </DialogActions>
+        </Dialog>
+
+        {/* Container Conversion Modal */}
+        <Dialog
+          open={containerConversionModalOpen}
+          onClose={() => setContainerConversionModalOpen(false)}
+          maxWidth="lg"
+          fullWidth
+          PaperProps={{
+            sx: {
+              height: "90vh",
+              maxHeight: "90vh",
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              m: 0,
+              p: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Typography variant="h6">
+              Custom Container Breakdown Configuration
+            </Typography>
+            <IconButton
+              onClick={() => setContainerConversionModalOpen(false)}
+              sx={{ color: "grey.500" }}
+            >
+              <X />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent sx={{ p: 0, overflow: "hidden" }}>
+            <div style={{ height: "100%", overflow: "auto" }}>
+              <ContainerConversionContent
+                ref={containerConversionRef}
+                onClose={() => setContainerConversionModalOpen(false)}
+                initialConversions={customConversionRules}
+                onSave={(conversions) => {
+                  setCustomConversionRules(conversions);
+                  // You can also save to localStorage or API here
+                  console.log("Saving custom conversion rules:", conversions);
+                }}
+              />
+            </div>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, gap: 2 }}>
+            <SecondaryButton
+              onClick={() => setContainerConversionModalOpen(false)}
+            >
+              Cancel
+            </SecondaryButton>
+            <PrimaryButton
+              onClick={() => {
+                if (containerConversionRef.current) {
+                  containerConversionRef.current.handleSave();
+                }
+              }}
+            >
+              Save Conversions
             </PrimaryButton>
           </DialogActions>
         </Dialog>

@@ -12,6 +12,18 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   FileText,
   DollarSign,
   TrendingUp,
@@ -27,6 +39,7 @@ import {
   Search,
   ChevronRight,
   AlertTriangle,
+  Filter,
   CheckCircle2,
   Clock2,
   FileSpreadsheet,
@@ -507,8 +520,45 @@ const draftInvoices = [
 export default function InvoiceDashboard() {
   const router = useRouter();
 
-  // Use mockInvoices directly (no filtering for now)
-  const filteredInvoices = mockInvoices;
+  // Filter state
+  const [filters, setFilters] = React.useState({
+    customer: "all",
+    facility: "all",
+    csr: "all",
+  });
+
+  // Get unique values for filter dropdowns
+  const uniqueCustomers = [
+    ...new Set(mockInvoices.map((inv) => inv.customer)),
+  ].sort();
+  const uniqueFacilities = [
+    ...new Set(mockInvoices.map((inv) => inv.facility)),
+  ].sort();
+  const uniqueCSRs = [...new Set(mockInvoices.map((inv) => inv.csr))].sort();
+
+  // Apply filters to invoices
+  const filteredInvoices = mockInvoices.filter((invoice) => {
+    return (
+      (filters.customer === "all" || invoice.customer === filters.customer) &&
+      (filters.facility === "all" || invoice.facility === filters.facility) &&
+      (filters.csr === "all" || invoice.csr === filters.csr)
+    );
+  });
+
+  // Reset filters function
+  const resetFilters = () => {
+    setFilters({
+      customer: "all",
+      facility: "all",
+      csr: "all",
+    });
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters =
+    filters.customer !== "all" ||
+    filters.facility !== "all" ||
+    filters.csr !== "all";
 
   // Calculate top customers by active invoice amount
   const getTopCustomersByActiveInvoices = (invoices: typeof mockInvoices) => {
@@ -706,22 +756,147 @@ export default function InvoiceDashboard() {
                 Comprehensive overview of invoice pipeline and financial metrics
               </p>
             </div>
-            <div className="flex space-x-3">
-              <Button
-                variant="secondary"
-                onClick={() => router.push("/invoice-search")}
-                className="flex items-center space-x-2 border-slate-300 text-slate-700 hover:bg-slate-50"
-              >
-                <Search className="h-4 w-4" />
-                <span>Search Invoices</span>
-              </Button>
-              <Button
-                onClick={() => router.push("/invoice-search")}
-                className="flex items-center space-x-2 bg-slate-900 hover:bg-slate-800"
-              >
-                <span>View All Invoices</span>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center space-x-3">
+              {/* Filter Button with Popover */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    className="flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50"
+                  >
+                    <Filter className="h-4 w-4" />
+                    <span>Filters</span>
+                    {hasActiveFilters && (
+                      <Badge variant="secondary" className="ml-1 text-xs">
+                        {[
+                          filters.customer !== "all" ? 1 : 0,
+                          filters.facility !== "all" ? 1 : 0,
+                          filters.csr !== "all" ? 1 : 0,
+                        ].reduce((sum, count) => sum + count, 0)}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-4" align="start">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-slate-900">
+                        Filter Options
+                      </h4>
+                      {hasActiveFilters && (
+                        <Button
+                          variant="secondary"
+                          onClick={resetFilters}
+                          className="text-xs text-slate-600 hover:text-slate-800"
+                        >
+                          Clear All
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Customer Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">
+                        Customer
+                      </label>
+                      <Select
+                        value={filters.customer}
+                        onValueChange={(value) =>
+                          setFilters((prev) => ({ ...prev, customer: value }))
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="All Customers" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Customers</SelectItem>
+                          {uniqueCustomers.map((customer) => (
+                            <SelectItem key={customer} value={customer}>
+                              {customer}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Facility Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">
+                        Facility
+                      </label>
+                      <Select
+                        value={filters.facility}
+                        onValueChange={(value) =>
+                          setFilters((prev) => ({ ...prev, facility: value }))
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="All Facilities" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Facilities</SelectItem>
+                          {uniqueFacilities.map((facility) => (
+                            <SelectItem key={facility} value={facility}>
+                              {facility}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* CSR Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">
+                        Customer Service Rep
+                      </label>
+                      <Select
+                        value={filters.csr}
+                        onValueChange={(value) =>
+                          setFilters((prev) => ({ ...prev, csr: value }))
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="All CSRs" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All CSRs</SelectItem>
+                          {uniqueCSRs.map((csr) => (
+                            <SelectItem key={csr} value={csr}>
+                              {csr}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Active Filters Summary */}
+                    {hasActiveFilters && (
+                      <div className="pt-3 border-t border-slate-200">
+                        <p className="text-xs text-slate-600 mb-2">
+                          Active filters:
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {filters.customer !== "all" && (
+                            <Badge variant="secondary" className="text-xs">
+                              {filters.customer}
+                            </Badge>
+                          )}
+                          {filters.facility !== "all" && (
+                            <Badge variant="secondary" className="text-xs">
+                              {filters.facility}
+                            </Badge>
+                          )}
+                          {filters.csr !== "all" && (
+                            <Badge variant="secondary" className="text-xs">
+                              {filters.csr}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </div>
@@ -729,6 +904,37 @@ export default function InvoiceDashboard() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Filter Results Summary */}
+        {hasActiveFilters && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <BarChart3 className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-blue-900">
+                    Filtered Results: {filteredInvoices.length} of{" "}
+                    {mockInvoices.length} invoices
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    Total Value: $
+                    {filteredInvoices
+                      .reduce((sum, inv) => sum + inv.amount, 0)
+                      .toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                onClick={resetFilters}
+                className="text-blue-700 hover:text-blue-900"
+              >
+                View All
+              </Button>
+            </div>
+          </div>
+        )}
         {/* Key Performance Indicators */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <Card className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-shadow">

@@ -87,6 +87,15 @@ interface CreateRequestModalState {
   attachments: File[];
 }
 
+interface ValidationErrors {
+  subject?: string;
+  description?: string;
+  requestType?: string;
+  customerId?: string;
+  priority?: string;
+  assignedTo?: string;
+}
+
 // Mock service for price change requests
 class PriceChangeRequestService {
   async getPriceChangeRequests(): Promise<PriceChangeRequest[]> {
@@ -292,6 +301,11 @@ export default function PriceChangeRequestsPage() {
     attachments: [],
   });
 
+  // Validation errors state
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
+    {}
+  );
+
   useEffect(() => {
     const loadRequests = async () => {
       setIsLoading(true);
@@ -377,10 +391,42 @@ export default function PriceChangeRequestsPage() {
   };
 
   const handleCreateSubmit = async () => {
-    if (!createModal.subject.trim() || !createModal.assignedTo) {
+    // Validate all required fields
+    const errors: ValidationErrors = {};
+
+    if (!createModal.subject.trim()) {
+      errors.subject = "Subject is required";
+    }
+
+    if (!createModal.description.trim()) {
+      errors.description = "Description is required";
+    }
+
+    if (!createModal.requestType) {
+      errors.requestType = "Request type is required";
+    }
+
+    if (!createModal.customerId) {
+      errors.customerId = "Customer is required";
+    }
+
+    if (!createModal.priority) {
+      errors.priority = "Priority is required";
+    }
+
+    if (!createModal.assignedTo) {
+      errors.assignedTo = "Assigned to is required";
+    }
+
+    // If there are validation errors, set them and return
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
       toast.error("Please fill in all required fields");
       return;
     }
+
+    // Clear validation errors if validation passes
+    setValidationErrors({});
 
     try {
       const customer = CUSTOMERS.find((c) => c.id === createModal.customerId);
@@ -431,6 +477,7 @@ export default function PriceChangeRequestsPage() {
       assignedTo: "",
       attachments: [],
     });
+    setValidationErrors({});
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -768,20 +815,22 @@ export default function PriceChangeRequestsPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="font-['Roboto:Medium',_sans-serif] font-medium text-[32px] leading-[40px] text-[#1c1b1f] mb-2">
-                Price Requests
-              </h1>
-              <div className="flex items-center space-x-4 my-2">
-                <span className="inline-flex items-center bg-[rgba(101,178,48,0.1)] text-[#2e7d32] rounded-full px-3 py-1 text-sm font-['Roboto:Medium',_sans-serif] font-medium">
-                  {
-                    requests.filter((r) => r.assignedTo === "Sarah Johnson")
-                      .length
-                  }{" "}
-                  assigned to me
-                </span>
-                <span className="inline-flex items-center bg-[rgba(25,118,210,0.1)] text-[#1976d2] rounded-full px-3 py-1 text-sm font-['Roboto:Medium',_sans-serif] font-medium">
-                  {requests.length} total requests
-                </span>
+              <div className="flex items-center gap-4 mb-2">
+                <h1 className="font-['Roboto:Medium',_sans-serif] font-medium text-[32px] leading-[40px] text-[#1c1b1f]">
+                  Price Requests
+                </h1>
+                <div className="flex items-center space-x-4">
+                  <span className="inline-flex items-center bg-[rgba(101,178,48,0.1)] text-[#2e7d32] rounded-full px-3 py-1 text-sm font-['Roboto:Medium',_sans-serif] font-medium">
+                    {
+                      requests.filter((r) => r.assignedTo === "Sarah Johnson")
+                        .length
+                    }{" "}
+                    assigned to me
+                  </span>
+                  <span className="inline-flex items-center bg-[rgba(25,118,210,0.1)] text-[#1976d2] rounded-full px-3 py-1 text-sm font-['Roboto:Medium',_sans-serif] font-medium">
+                    {requests.length} total requests
+                  </span>
+                </div>
               </div>
               <p className="font-['Roboto:Regular',_sans-serif] font-normal text-[16px] leading-[22.86px] text-[#49454f]">
                 Create and manage formal requests for pricing changes across
@@ -1148,12 +1197,21 @@ export default function PriceChangeRequestsPage() {
                   variant="outlined"
                   fullWidth
                   value={createModal.subject}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setCreateModal((prev) => ({
                       ...prev,
                       subject: e.target.value,
-                    }))
-                  }
+                    }));
+                    // Clear validation error when user starts typing
+                    if (validationErrors.subject) {
+                      setValidationErrors((prev) => ({
+                        ...prev,
+                        subject: undefined,
+                      }));
+                    }
+                  }}
+                  error={!!validationErrors.subject}
+                  helperText={validationErrors.subject}
                   InputProps={{
                     style: {
                       fontVariationSettings: "'wdth' 100",
@@ -1169,12 +1227,21 @@ export default function PriceChangeRequestsPage() {
                   multiline
                   rows={4}
                   value={createModal.description}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setCreateModal((prev) => ({
                       ...prev,
                       description: e.target.value,
-                    }))
-                  }
+                    }));
+                    // Clear validation error when user starts typing
+                    if (validationErrors.description) {
+                      setValidationErrors((prev) => ({
+                        ...prev,
+                        description: undefined,
+                      }));
+                    }
+                  }}
+                  error={!!validationErrors.description}
+                  helperText={validationErrors.description}
                   InputProps={{
                     style: {
                       fontVariationSettings: "'wdth' 100",
@@ -1183,7 +1250,11 @@ export default function PriceChangeRequestsPage() {
                 />
 
                 {/* Request Type */}
-                <FormControl variant="outlined" fullWidth>
+                <FormControl
+                  variant="outlined"
+                  fullWidth
+                  error={!!validationErrors.requestType}
+                >
                   <InputLabel id="create-request-type-label">
                     Request Type *
                   </InputLabel>
@@ -1201,6 +1272,13 @@ export default function PriceChangeRequestsPage() {
                         ...prev,
                         requestType: value,
                       }));
+                      // Clear validation error when user makes selection
+                      if (validationErrors.requestType) {
+                        setValidationErrors((prev) => ({
+                          ...prev,
+                          requestType: undefined,
+                        }));
+                      }
                     }}
                     label="Request Type *"
                     style={{ fontVariationSettings: "'wdth' 100" }}
@@ -1213,20 +1291,36 @@ export default function PriceChangeRequestsPage() {
                     <MenuItem value="Price Decrease">Price Decrease</MenuItem>
                     <MenuItem value="Expire Pricing">Expire Pricing</MenuItem>
                   </Select>
+                  {validationErrors.requestType && (
+                    <div className="text-red-500 text-sm mt-1 ml-3">
+                      {validationErrors.requestType}
+                    </div>
+                  )}
                 </FormControl>
 
                 {/* Customer */}
-                <FormControl variant="outlined" fullWidth>
+                <FormControl
+                  variant="outlined"
+                  fullWidth
+                  error={!!validationErrors.customerId}
+                >
                   <InputLabel id="create-customer-label">Customer *</InputLabel>
                   <Select
                     labelId="create-customer-label"
                     value={createModal.customerId}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setCreateModal((prev) => ({
                         ...prev,
                         customerId: e.target.value as string,
-                      }))
-                    }
+                      }));
+                      // Clear validation error when user makes selection
+                      if (validationErrors.customerId) {
+                        setValidationErrors((prev) => ({
+                          ...prev,
+                          customerId: undefined,
+                        }));
+                      }
+                    }}
                     label="Customer *"
                     style={{ fontVariationSettings: "'wdth' 100" }}
                   >
@@ -1238,20 +1332,36 @@ export default function PriceChangeRequestsPage() {
                       </MenuItem>
                     ))}
                   </Select>
+                  {validationErrors.customerId && (
+                    <div className="text-red-500 text-sm mt-1 ml-3">
+                      {validationErrors.customerId}
+                    </div>
+                  )}
                 </FormControl>
 
                 {/* Priority */}
-                <FormControl variant="outlined" fullWidth>
+                <FormControl
+                  variant="outlined"
+                  fullWidth
+                  error={!!validationErrors.priority}
+                >
                   <InputLabel id="create-priority-label">Priority *</InputLabel>
                   <Select
                     labelId="create-priority-label"
                     value={createModal.priority}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setCreateModal((prev) => ({
                         ...prev,
                         priority: e.target.value as string,
-                      }))
-                    }
+                      }));
+                      // Clear validation error when user makes selection
+                      if (validationErrors.priority) {
+                        setValidationErrors((prev) => ({
+                          ...prev,
+                          priority: undefined,
+                        }));
+                      }
+                    }}
                     label="Priority *"
                     style={{ fontVariationSettings: "'wdth' 100" }}
                   >
@@ -1260,22 +1370,38 @@ export default function PriceChangeRequestsPage() {
                     <MenuItem value="high">High</MenuItem>
                     <MenuItem value="medium">Medium</MenuItem>
                   </Select>
+                  {validationErrors.priority && (
+                    <div className="text-red-500 text-sm mt-1 ml-3">
+                      {validationErrors.priority}
+                    </div>
+                  )}
                 </FormControl>
 
                 {/* Assigned To */}
-                <FormControl variant="outlined" fullWidth>
+                <FormControl
+                  variant="outlined"
+                  fullWidth
+                  error={!!validationErrors.assignedTo}
+                >
                   <InputLabel id="create-assigned-to-label">
                     Assigned To
                   </InputLabel>
                   <Select
                     labelId="create-assigned-to-label"
                     value={createModal.assignedTo}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setCreateModal((prev) => ({
                         ...prev,
                         assignedTo: e.target.value as string,
-                      }))
-                    }
+                      }));
+                      // Clear validation error when user makes selection
+                      if (validationErrors.assignedTo) {
+                        setValidationErrors((prev) => ({
+                          ...prev,
+                          assignedTo: undefined,
+                        }));
+                      }
+                    }}
                     label="Assigned To"
                     style={{ fontVariationSettings: "'wdth' 100" }}
                   >
@@ -1286,6 +1412,11 @@ export default function PriceChangeRequestsPage() {
                       </MenuItem>
                     ))}
                   </Select>
+                  {validationErrors.assignedTo && (
+                    <div className="text-red-500 text-sm mt-1 ml-3">
+                      {validationErrors.assignedTo}
+                    </div>
+                  )}
                 </FormControl>
 
                 {/* Attachments */}

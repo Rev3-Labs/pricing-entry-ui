@@ -517,6 +517,30 @@ const draftInvoices = [
   },
 ];
 
+// Mock data for Task Distribution by Team
+const taskDistributionByTeam = [
+  {
+    team: "Credit & Collections",
+    taskCount: 3,
+    isYourTeam: false,
+  },
+  {
+    team: "Tax Department",
+    taskCount: 1,
+    isYourTeam: false,
+  },
+  {
+    team: "Launch",
+    taskCount: 6,
+    isYourTeam: true,
+  },
+  {
+    team: "Pricing Admin",
+    taskCount: 1,
+    isYourTeam: false,
+  },
+];
+
 export default function InvoiceDashboard() {
   const router = useRouter();
 
@@ -743,7 +767,7 @@ export default function InvoiceDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="bg-slate-50 w-full">
       {/* Header Section */}
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -1431,6 +1455,95 @@ export default function InvoiceDashboard() {
           </Card>
         </div>
 
+        {/* Task Distribution by Team */}
+        <div className="mb-10">
+          <Card className="bg-white border-slate-200 shadow-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-3 text-lg font-semibold text-slate-900">
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                  <Building2 className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <div>Task Distribution by Team</div>
+                  <div className="text-sm font-normal text-slate-500">
+                    Workload across departments
+                  </div>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={taskDistributionByTeam}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                    <XAxis
+                      dataKey="team"
+                      tick={{ fontSize: 12, fill: "#64748B" }}
+                      axisLine={{ stroke: "#CBD5E1" }}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 12, fill: "#64748B" }}
+                      axisLine={{ stroke: "#CBD5E1" }}
+                      domain={[0, 8]}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => [
+                        `${value} tasks`,
+                        "Task Count",
+                      ]}
+                      labelFormatter={(label) => `Team: ${label}`}
+                      contentStyle={{
+                        backgroundColor: "white",
+                        border: "1px solid #E2E8F0",
+                        borderRadius: "8px",
+                        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+                      }}
+                    />
+                    <Bar
+                      dataKey="taskCount"
+                      name="taskCount"
+                      radius={[4, 4, 0, 0]}
+                    >
+                      {taskDistributionByTeam.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.isYourTeam ? "#10B981" : "#14B8A6"}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Legend */}
+              <div className="flex justify-end mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <span className="text-sm text-slate-600">
+                    Launch (Your Team)
+                  </span>
+                </div>
+              </div>
+
+              {/* Total Tasks */}
+              <div className="text-center">
+                <div className="text-3xl font-bold text-slate-900">
+                  {taskDistributionByTeam.reduce(
+                    (sum, item) => sum + item.taskCount,
+                    0
+                  )}
+                </div>
+                <div className="text-sm text-slate-500 font-medium">
+                  Total Tasks
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Draft Invoice Management */}
         <div className="mb-10">
           <Card className="bg-white border-slate-200 shadow-sm">
@@ -1679,6 +1792,9 @@ export default function InvoiceDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Bottom padding to ensure scrolling works properly */}
+      <div className="h-20"></div>
     </div>
   );
 }

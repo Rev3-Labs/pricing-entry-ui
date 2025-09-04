@@ -14,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body style={{ overflow: "auto", height: "auto" }}>{children}</body>
     </html>
   );
 }

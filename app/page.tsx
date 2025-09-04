@@ -12,6 +12,7 @@ import {
   Users,
   DollarSign,
   ArrowRight,
+  Grid3X3,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -27,6 +28,10 @@ export default function LandingPage() {
 
   const handleViewInvoiceDashboard = () => {
     router.push("/invoice-dashboard");
+  };
+
+  const handleViewComponentShowcase = () => {
+    router.push("/component-showcase");
   };
 
   return (
@@ -82,6 +87,31 @@ export default function LandingPage() {
                     <CardTitle className="text-xl">Pricing Entry</CardTitle>
                     <p className="text-sm text-gray-500 mt-1">
                       View Pricing Entry Flow
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="h-5 w-5 text-gray-400" />
+              </div>
+            </CardHeader>
+          </Card>
+
+          {/* DataGrid Showcase Card */}
+          <Card
+            className="hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+            onClick={handleViewComponentShowcase}
+          >
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <Grid3X3 className="h-6 w-6 text-indigo-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">
+                      Component Documentation
+                    </CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">
+                      View UI Components & Validation Patterns
                     </p>
                   </div>
                 </div>

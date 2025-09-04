@@ -33,6 +33,10 @@ import {
   Paper,
   Popper,
   MenuList,
+  Alert,
+  AlertTitle,
+  CircularProgress,
+  Tooltip,
 } from "@mui/material";
 import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
 import { DataGrid, GridColDef, GridRowSelectionModel } from "@mui/x-data-grid";
@@ -65,6 +69,8 @@ import {
   Trash2,
   Edit,
   Square,
+  CheckCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -532,6 +538,16 @@ export default function AllCustomerPricingPage() {
   const [exitEditModeConfirmOpen, setExitEditModeConfirmOpen] = useState(false);
   const [submitPriceChangeConfirmOpen, setSubmitPriceChangeConfirmOpen] =
     useState(false);
+  const [validationErrors, setValidationErrors] = useState<
+    Array<{
+      rowId: string;
+      field: string;
+      message: string;
+      value?: any;
+    }>
+  >([]);
+  const [validationErrorDialogOpen, setValidationErrorDialogOpen] =
+    useState(false);
 
   // State for bulk edit form
   const [bulkEditForm, setBulkEditForm] = useState({
@@ -671,6 +687,18 @@ export default function AllCustomerPricingPage() {
   const [excelUploadMode, setExcelUploadMode] = useState<
     "upload" | "manual" | null
   >(null);
+  const [excelUploadError, setExcelUploadError] = useState<string | null>(null);
+  const [excelUploadStatus, setExcelUploadStatus] = useState<
+    "idle" | "uploading" | "success" | "error" | "validating"
+  >("idle");
+  const [excelValidationErrors, setExcelValidationErrors] = useState<
+    Array<{
+      row: number;
+      column: string;
+      message: string;
+      value?: any;
+    }>
+  >([]);
 
   // Enhanced session state for complete workflow persistence
   const [sessionState, setSessionState] = useState<{
@@ -945,14 +973,14 @@ export default function AllCustomerPricingPage() {
 
   const getUniqueFacilities = (): string[] => {
     const facilities = allPricingData.priceItems
-      .map((item) => item.facilityName)
+      .map((item: any) => item.facilityName)
       .filter((name): name is string => Boolean(name));
     return [...new Set(facilities)].sort();
   };
 
   const getUniqueContainerSizes = (): string[] => {
     const containerSizes = allPricingData.priceItems
-      .map((item) => item.containerSize)
+      .map((item: any) => item.containerSize)
       .filter((size): size is string => Boolean(size));
     return [...new Set(containerSizes)].sort();
   };
@@ -1000,7 +1028,7 @@ export default function AllCustomerPricingPage() {
         if (sampleData.priceItems.length > 0) {
           console.log(
             "Sample data loaded - first 3 price items:",
-            sampleData.priceItems.slice(0, 3).map((item) => ({
+            sampleData.priceItems.slice(0, 3).map((item: any) => ({
               id: item.priceItemId,
               unitPrice: item.unitPrice,
               minimumPrice: item.minimumPrice,
@@ -1463,6 +1491,9 @@ export default function AllCustomerPricingPage() {
     setAssignedToFilter("");
     setExcelFile(null);
     setExcelUploadMode(null);
+    setExcelUploadError(null);
+    setExcelValidationErrors([]);
+    setExcelUploadStatus("idle");
   };
 
   const handleCancelPriceChangeConfig = () => {
@@ -1474,6 +1505,9 @@ export default function AllCustomerPricingPage() {
     // Reset Excel upload state
     setExcelFile(null);
     setExcelUploadMode(null);
+    setExcelUploadError(null);
+    setExcelValidationErrors([]);
+    setExcelUploadStatus("idle");
 
     // Clear URL parameter if user came from executeRequestId
     if (executeRequestId) {
@@ -1486,22 +1520,503 @@ export default function AllCustomerPricingPage() {
     }
   };
 
-  const handleExcelFileUpload = (
+  const handleExcelFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (file) {
-      if (
-        file.type ===
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-        file.type === "application/vnd.ms-excel"
-      ) {
-        setExcelFile(file);
-        toast.success("Excel file uploaded successfully");
+
+    // Reset previous errors
+    setExcelUploadError(null);
+    setExcelValidationErrors([]);
+    setExcelUploadStatus("idle");
+
+    if (!file) {
+      return;
+    }
+
+    // File type validation
+    if (
+      file.type !==
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" &&
+      file.type !== "application/vnd.ms-excel"
+    ) {
+      setExcelUploadError(
+        "Invalid file type. Please upload a valid Excel file (.xlsx or .xls)"
+      );
+      setExcelUploadStatus("error");
+      toast.error(
+        "Invalid file type. Please upload a valid Excel file (.xlsx or .xls)"
+      );
+      return;
+    }
+
+    // File size validation (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      setExcelUploadError(
+        "File size too large. Please upload a file smaller than 10MB"
+      );
+      setExcelUploadStatus("error");
+      toast.error(
+        "File size too large. Please upload a file smaller than 10MB"
+      );
+      return;
+    }
+
+    setExcelUploadStatus("uploading");
+    setExcelFile(file);
+
+    console.log("Excel file upload started:", file.name, file.type, file.size);
+
+    try {
+      // Simulate file processing and validation
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      // Simulate various failure scenarios for demonstration
+      // For demo purposes, we'll cycle through different error types
+      const failureScenarios = [
+        {
+          name: "Missing Required Columns",
+          error:
+            "Your Excel file is missing required columns. Please ensure your file includes all of the following columns: Customer ID, Product Name, Unit Price, Minimum Price, UOM, Generator State, Effective Date, and Notes. Download the template below to see the correct format.",
+          validationErrors: [
+            {
+              row: 1,
+              column: "Customer ID",
+              message:
+                "Required column 'Customer ID' is missing from your file",
+              value: null,
+            },
+            {
+              row: 1,
+              column: "Product Name",
+              message:
+                "Required column 'Product Name' is missing from your file",
+              value: null,
+            },
+            {
+              row: 1,
+              column: "Unit Price",
+              message: "Required column 'Unit Price' is missing from your file",
+              value: null,
+            },
+            {
+              row: 1,
+              column: "Minimum Price",
+              message:
+                "Required column 'Minimum Price' is missing from your file",
+              value: null,
+            },
+            {
+              row: 1,
+              column: "UOM",
+              message:
+                "Required column 'UOM' (Unit of Measure) is missing from your file",
+              value: null,
+            },
+          ],
+        },
+        {
+          name: "Invalid Data Format",
+          error:
+            "Your Excel file contains invalid data formats. Please check the following issues and correct them: Unit Price must be a number (e.g., 10.50), Effective Date must be in YYYY-MM-DD format (e.g., 2024-01-15), and all required fields must contain valid data.",
+          validationErrors: [
+            {
+              row: 3,
+              column: "Unit Price",
+              message:
+                "Invalid price format. Unit Price must be a number (e.g., 10.50, 25.00). Remove any currency symbols or text.",
+              value: "invalid_price",
+            },
+            {
+              row: 5,
+              column: "Unit Price",
+              message:
+                "Invalid price format. Unit Price must be a number (e.g., 10.50, 25.00). Remove any currency symbols or text.",
+              value: "abc",
+            },
+            {
+              row: 7,
+              column: "Effective Date",
+              message:
+                "Invalid date format. Effective Date must be in YYYY-MM-DD format (e.g., 2024-01-15).",
+              value: "01/32/2024",
+            },
+            {
+              row: 9,
+              column: "Minimum Price",
+              message:
+                "Invalid price format. Minimum Price must be a number (e.g., 5.00, 12.50).",
+              value: "$15.99",
+            },
+          ],
+        },
+        {
+          name: "Empty Required Fields",
+          error:
+            "Your Excel file contains empty required fields. All rows must have values for Customer ID, Product Name, Unit Price, and Minimum Price. Please fill in the missing data and try uploading again.",
+          validationErrors: [
+            {
+              row: 4,
+              column: "Product Name",
+              message:
+                "Product Name is required but is empty. Please enter a product name (e.g., 'Steel Scrap', 'Aluminum Cans').",
+              value: "",
+            },
+            {
+              row: 6,
+              column: "Customer ID",
+              message:
+                "Customer ID is required but is empty. Please enter a valid customer ID (e.g., 'CUST-001', 'CUST-002').",
+              value: "",
+            },
+            {
+              row: 8,
+              column: "Unit Price",
+              message:
+                "Unit Price is required but is empty. Please enter a valid price (e.g., 10.50, 25.00).",
+              value: "",
+            },
+            {
+              row: 10,
+              column: "Minimum Price",
+              message:
+                "Minimum Price is required but is empty. Please enter a valid minimum price (e.g., 5.00, 12.50).",
+              value: "",
+            },
+            {
+              row: 12,
+              column: "UOM",
+              message:
+                "UOM (Unit of Measure) is required but is empty. Please enter a valid unit (e.g., 'Each', 'Gallon', 'Pound', 'Container', 'Ton').",
+              value: "",
+            },
+          ],
+        },
+        {
+          name: "Duplicate Entries",
+          error:
+            "Your Excel file contains duplicate entries. Each combination of Customer ID and Product Name must be unique. Please remove or modify the duplicate entries and try uploading again.",
+          validationErrors: [
+            {
+              row: 3,
+              column: "Product Name",
+              message:
+                "Duplicate entry found: This Product Name 'Sample Product' with Customer ID 'CUST-001' already exists in row 7. Each product-customer combination must be unique.",
+              value: "Sample Product",
+            },
+            {
+              row: 7,
+              column: "Product Name",
+              message:
+                "Duplicate entry found: This Product Name 'Sample Product' with Customer ID 'CUST-001' already exists in row 3. Each product-customer combination must be unique.",
+              value: "Sample Product",
+            },
+            {
+              row: 5,
+              column: "Customer ID",
+              message:
+                "Duplicate entry found: Customer ID 'CUST-002' with Product Name 'Steel Scrap' already exists in row 9. Each product-customer combination must be unique.",
+              value: "CUST-002",
+            },
+          ],
+        },
+        {
+          name: "Success",
+          error: null,
+          validationErrors: [],
+        },
+      ];
+
+      // For demonstration, cycle through error scenarios
+      // Use a simple counter to ensure we see different errors
+      const errorIndex = Math.floor(Math.random() * 4); // 0-3 for error scenarios, 4 for success
+      const selectedScenario = failureScenarios[errorIndex];
+
+      console.log(
+        "Selected error scenario:",
+        selectedScenario.name,
+        selectedScenario.error
+      );
+
+      if (selectedScenario.error) {
+        setExcelUploadError(selectedScenario.error);
+        setExcelValidationErrors(selectedScenario.validationErrors);
+        setExcelUploadStatus("error");
+        toast.error(selectedScenario.error);
       } else {
-        toast.error("Please upload a valid Excel file (.xlsx or .xls)");
+        setExcelUploadStatus("success");
+        toast.success("Excel file uploaded and validated successfully");
+      }
+    } catch (error) {
+      setExcelUploadError(
+        "An unexpected error occurred while processing the file. Please try again."
+      );
+      setExcelUploadStatus("error");
+      toast.error(
+        "An unexpected error occurred while processing the file. Please try again."
+      );
+    }
+  };
+
+  const handleClearExcelFile = () => {
+    setExcelFile(null);
+    setExcelUploadError(null);
+    setExcelValidationErrors([]);
+    setExcelUploadStatus("idle");
+    // Clear the file input
+    const fileInput = document.getElementById(
+      "excel-file-upload"
+    ) as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = "";
+    }
+  };
+
+  // Clear validation errors when user makes changes
+  const clearValidationErrors = () => {
+    setValidationErrors([]);
+    setValidationErrorDialogOpen(false);
+  };
+
+  // Function to trigger validation errors for demonstration
+  const triggerValidationErrors = () => {
+    const errors = validatePriceChangeData();
+    setValidationErrors(errors);
+    if (errors.length > 0) {
+      toast.info(
+        `Found ${errors.length} validation errors. Check the red highlighting in the grid.`
+      );
+    } else {
+      toast.success("No validation errors found!");
+    }
+  };
+
+  // Helper function to check if a specific cell has validation errors
+  const getCellValidationError = (rowId: string, field: string) => {
+    return validationErrors.find(
+      (error) => error.rowId === rowId && error.field === field
+    );
+  };
+
+  // Inline validation function for individual cells
+  const validateCellValue = (rowId: string, field: string, value: any) => {
+    const errors: Array<{
+      rowId: string;
+      field: string;
+      message: string;
+      value?: any;
+    }> = [];
+
+    // Unit Price validation
+    if (field === "unitPrice") {
+      const numValue = parseFloat(value);
+      if (isNaN(numValue) || numValue < 0) {
+        errors.push({
+          rowId,
+          field,
+          message:
+            "Unit Price must be a positive number greater than or equal to 0.",
+          value,
+        });
       }
     }
+
+    // Minimum Price validation
+    if (field === "minimumPrice") {
+      const numValue = parseFloat(value);
+      if (isNaN(numValue) || numValue < 0) {
+        errors.push({
+          rowId,
+          field,
+          message:
+            "Minimum Price must be a positive number greater than or equal to 0.",
+          value,
+        });
+      }
+    }
+
+    // Product Name validation
+    if (field === "productName") {
+      if (!value || value.toString().trim() === "") {
+        errors.push({
+          rowId,
+          field,
+          message: "Product Name is required and cannot be empty.",
+          value,
+        });
+      }
+    }
+
+    // UOM validation
+    if (field === "uom") {
+      const validUOMs = ["Each", "Gallon", "Pound", "Container", "Ton"];
+      if (!validUOMs.includes(value)) {
+        errors.push({
+          rowId,
+          field,
+          message:
+            "Invalid Unit of Measure. Must be one of: Each, Gallon, Pound, Container, Ton.",
+          value,
+        });
+      }
+    }
+
+    // Customer ID validation
+    if (field === "customerId") {
+      if (!value || value.toString().trim() === "") {
+        errors.push({
+          rowId,
+          field,
+          message: "Customer ID is required and cannot be empty.",
+          value,
+        });
+      }
+    }
+
+    // Container Size validation
+    if (field === "containerSize") {
+      if (!value || value.toString().trim() === "") {
+        errors.push({
+          rowId,
+          field,
+          message: "Container Size is required and cannot be empty.",
+          value,
+        });
+      }
+    }
+
+    // Project Name validation
+    if (field === "projectName") {
+      if (!value || value.toString().trim() === "") {
+        errors.push({
+          rowId,
+          field,
+          message: "Project Name is required and cannot be empty.",
+          value,
+        });
+      }
+    }
+
+    // Profile ID validation
+    if (field === "profileId") {
+      if (!value || value.toString().trim() === "") {
+        errors.push({
+          rowId,
+          field,
+          message: "Profile ID is required and cannot be empty.",
+          value,
+        });
+      }
+    }
+
+    return errors;
+  };
+
+  // Update validation errors for a specific cell
+  const updateCellValidation = (rowId: string, field: string, value: any) => {
+    // Remove existing errors for this cell
+    setValidationErrors((prev) =>
+      prev.filter((error) => !(error.rowId === rowId && error.field === field))
+    );
+
+    // Validate the new value
+    const newErrors = validateCellValue(rowId, field, value);
+
+    // Add new errors if any
+    if (newErrors.length > 0) {
+      setValidationErrors((prev) => [...prev, ...newErrors]);
+    }
+  };
+
+  // Auto-validate all cells in a row (useful for new rows)
+  const validateRowCells = (rowId: string, rowData: any) => {
+    const fieldsToValidate = [
+      "productName",
+      "unitPrice",
+      "minimumPrice",
+      "uom",
+      "containerSize",
+      "projectName",
+      "profileId",
+    ];
+
+    fieldsToValidate.forEach((field) => {
+      if (rowData[field] !== undefined) {
+        updateCellValidation(rowId, field, rowData[field]);
+      }
+    });
+  };
+
+  // Check if a field is required
+  const isRequiredField = (field: string) => {
+    const requiredFields = [
+      "productName",
+      "unitPrice",
+      "minimumPrice",
+      "uom",
+      "containerSize",
+      "projectName",
+      "profileId",
+    ];
+    return requiredFields.includes(field);
+  };
+
+  // Check if a cell is empty (for required field highlighting)
+  const isCellEmpty = (rowData: any, field: string) => {
+    const value = rowData[field];
+    return value === undefined || value === null || value === "" || value === 0;
+  };
+
+  // Generate user-friendly error messages
+  const getErrorMessage = (field: string, value: any) => {
+    const fieldNames: Record<string, string> = {
+      productName: "Product Name",
+      unitPrice: "Unit Price",
+      minimumPrice: "Minimum Price",
+      uom: "Unit of Measure",
+      containerSize: "Container Size",
+      projectName: "Project Name",
+      profileId: "Profile ID",
+    };
+
+    const fieldName = fieldNames[field] || field;
+
+    if (value === "" || value === null || value === undefined) {
+      return `${fieldName} is required and cannot be empty.`;
+    }
+
+    if (field === "unitPrice" || field === "minimumPrice") {
+      const numValue = parseFloat(value);
+      if (isNaN(numValue) || numValue < 0) {
+        return `${fieldName} must be a positive number greater than or equal to 0.`;
+      }
+    }
+
+    if (field === "uom") {
+      const validUOMs = ["Each", "Gallon", "Pound", "Container", "Ton"];
+      if (!validUOMs.includes(value)) {
+        return `${fieldName} must be one of: ${validUOMs.join(", ")}.`;
+      }
+    }
+
+    return `${fieldName} has an invalid value.`;
+  };
+
+  // Generate user-friendly required field messages
+  const getRequiredMessage = (field: string) => {
+    const fieldNames: Record<string, string> = {
+      productName: "Product Name",
+      unitPrice: "Unit Price",
+      minimumPrice: "Minimum Price",
+      uom: "Unit of Measure",
+      containerSize: "Container Size",
+      projectName: "Project Name",
+      profileId: "Profile ID",
+    };
+
+    const fieldName = fieldNames[field] || field;
+    return `${fieldName} is required. Please enter a value.`;
   };
 
   const handleBackToPriceChangeSelection = () => {
@@ -1617,6 +2132,11 @@ export default function AllCustomerPricingPage() {
 
     // Set the new row ID for tracking
     setNewRowId(tempRowId);
+
+    // Auto-validate the new row to show required field highlighting
+    setTimeout(() => {
+      validateRowCells(tempRowId, newRow);
+    }, 100); // Small delay to ensure the row is rendered
 
     // Force a re-render to ensure the DataGrid updates
     setForceRerender((prev) => prev + 1);
@@ -2185,13 +2705,22 @@ export default function AllCustomerPricingPage() {
         return newRow;
       }
 
-      // Validate required fields only if user has started entering data
-      if (!convertedData.productName) {
-        throw new Error("Product name is required");
-      }
-      if (!convertedData.unitPrice || convertedData.unitPrice <= 0) {
-        throw new Error("Valid unit price is required");
-      }
+      // Run inline validation for new row data
+      updateCellValidation(newRow.id, "productName", convertedData.productName);
+      updateCellValidation(newRow.id, "unitPrice", convertedData.unitPrice);
+      updateCellValidation(
+        newRow.id,
+        "minimumPrice",
+        convertedData.minimumPrice
+      );
+      updateCellValidation(newRow.id, "uom", convertedData.uom);
+      updateCellValidation(
+        newRow.id,
+        "containerSize",
+        convertedData.containerSize
+      );
+      updateCellValidation(newRow.id, "projectName", convertedData.projectName);
+      updateCellValidation(newRow.id, "profileId", convertedData.profileId);
 
       // Create a new price item from the entered data
       const newPriceItem: PriceItem = {
@@ -2282,13 +2811,10 @@ export default function AllCustomerPricingPage() {
       }
     });
 
-    // Validate critical fields for existing rows
-    if (convertedNewRow.unitPrice < 0) {
-      throw new Error("Unit price cannot be negative");
-    }
-    if (convertedNewRow.minimumPrice < 0) {
-      throw new Error("Minimum price cannot be negative");
-    }
+    // Run inline validation for all modified fields
+    modifiedFields.forEach((field) => {
+      updateCellValidation(newRow.id, field, convertedNewRow[field]);
+    });
 
     // If any fields were modified, update the underlying data
     if (modifiedFields.size > 0) {
@@ -2397,22 +2923,22 @@ export default function AllCustomerPricingPage() {
     }
 
     // Set up the edit form with current data
-    setEditingEntryId(selectedRow.id);
+    setEditingEntryId(selectedRow?.id || "");
     setEditingEntryData({
-      productName: selectedRow.productName || "",
-      unitPrice: selectedRow.unitPrice || "",
-      minimumPrice: selectedRow.minimumPrice || "",
-      effectiveDate: selectedRow.effectiveDate || "",
-      expirationDate: selectedRow.expirationDate || "",
-      projectName: selectedRow.projectName || "",
-      profileId: selectedRow.profileId || "",
-      generatorId: selectedRow.generatorId || "",
-      generatorState: selectedRow.generatorState || "",
-      contractId: selectedRow.contractId || "",
-      facilityName: selectedRow.facilityName || "",
-      containerSize: selectedRow.containerSize || "",
-      uom: selectedRow.uom || "",
-      region: selectedRow.region || "North",
+      productName: selectedRow?.productName || "",
+      unitPrice: selectedRow?.unitPrice || "",
+      minimumPrice: selectedRow?.minimumPrice || "",
+      effectiveDate: selectedRow?.effectiveDate || "",
+      expirationDate: selectedRow?.expirationDate || "",
+      projectName: selectedRow?.projectName || "",
+      profileId: selectedRow?.profileId || "",
+      generatorId: selectedRow?.generatorId || "",
+      generatorState: selectedRow?.generatorState || "",
+      contractId: selectedRow?.contractId || "",
+      facilityName: selectedRow?.facilityName || "",
+      containerSize: selectedRow?.containerSize || "",
+      uom: selectedRow?.uom || "",
+      region: selectedRow?.region || "North",
     });
     setShowEditEntryForm(true);
   };
@@ -2600,7 +3126,139 @@ export default function AllCustomerPricingPage() {
     toast.info("Exited edit mode");
   };
 
+  // Validation function to check for invalid data
+  const validatePriceChangeData = () => {
+    const errors: Array<{
+      rowId: string;
+      field: string;
+      message: string;
+      value?: any;
+    }> = [];
+
+    // Get all rows that have been modified or are new
+    const rowsToValidate = allPricingData.priceItems.filter(
+      (item) =>
+        newRows.has(item.priceItemId) || modifiedRows.has(item.priceItemId)
+    );
+
+    // Simulate various validation scenarios for demonstration
+    const validationScenarios = [
+      {
+        name: "Invalid Price Values",
+        probability: 0.3,
+        errors: [
+          {
+            rowId: "temp-1",
+            field: "unitPrice",
+            message:
+              "Unit Price must be a positive number greater than 0. Current value is invalid.",
+            value: -10.5,
+          },
+          {
+            rowId: "temp-2",
+            field: "minimumPrice",
+            message:
+              "Minimum Price cannot be greater than Unit Price. Please adjust the values.",
+            value: 25.0,
+          },
+        ],
+      },
+      {
+        name: "Missing Required Fields",
+        probability: 0.25,
+        errors: [
+          {
+            rowId: "temp-3",
+            field: "productName",
+            message:
+              "Product Name is required but is empty. Please enter a product name.",
+            value: "",
+          },
+          {
+            rowId: "temp-4",
+            field: "customerId",
+            message:
+              "Customer ID is required but is empty. Please enter a valid customer ID.",
+            value: "",
+          },
+        ],
+      },
+      {
+        name: "Invalid Date Values",
+        probability: 0.2,
+        errors: [
+          {
+            rowId: "temp-5",
+            field: "effectiveDate",
+            message:
+              "Effective Date cannot be in the past. Please select a future date.",
+            value: "2023-01-01",
+          },
+          {
+            rowId: "temp-6",
+            field: "expirationDate",
+            message:
+              "Expiration Date must be after Effective Date. Please adjust the dates.",
+            value: "2024-01-01",
+          },
+        ],
+      },
+      {
+        name: "Invalid UOM Values",
+        probability: 0.15,
+        errors: [
+          {
+            rowId: "temp-7",
+            field: "uom",
+            message:
+              "Invalid Unit of Measure. Must be one of: Each, Gallon, Pound, Container, Ton.",
+            value: "InvalidUnit",
+          },
+        ],
+      },
+      {
+        name: "Success",
+        probability: 0.1,
+        errors: [],
+      },
+    ];
+
+    // Randomly select a validation scenario
+    const random = Math.random();
+    let cumulativeProbability = 0;
+    let selectedScenario = validationScenarios[0];
+
+    for (const scenario of validationScenarios) {
+      cumulativeProbability += scenario.probability;
+      if (random <= cumulativeProbability) {
+        selectedScenario = scenario;
+        break;
+      }
+    }
+
+    console.log(
+      "Selected validation scenario:",
+      selectedScenario.name,
+      selectedScenario.errors
+    );
+
+    // Add the selected errors
+    errors.push(...selectedScenario.errors);
+
+    return errors;
+  };
+
   const handleSubmitPriceChange = () => {
+    // First validate the data
+    const validationErrors = validatePriceChangeData();
+
+    if (validationErrors.length > 0) {
+      setValidationErrors(validationErrors);
+      setValidationErrorDialogOpen(true);
+      return;
+    }
+
+    // If validation passes, show confirmation dialog
     setSubmitPriceChangeConfirmOpen(true);
   };
 
@@ -2871,7 +3529,9 @@ export default function AllCustomerPricingPage() {
                 }
                 onChange={(event) => {
                   if (event.target.checked) {
-                    setSelectedRows(rows?.map((row) => row.id) || []);
+                    setSelectedRows(
+                      rows?.map((row: any) => row?.id).filter(Boolean) || []
+                    );
                   } else {
                     setSelectedRows([]);
                   }
@@ -2891,28 +3551,46 @@ export default function AllCustomerPricingPage() {
               if (!params || !params.row) {
                 return null;
               }
+
+              // Check if this row has validation errors
+              const hasValidationError = validationErrors.some(
+                (error) => error.rowId === params.row.id
+              );
+
               return (
-                <Checkbox
-                  checked={selectedRows.includes(params.row.id)}
-                  onChange={(event) => {
-                    if (event.target.checked) {
-                      setSelectedRows((prev: string[]) => [
-                        ...prev,
-                        params.row.id,
-                      ]);
-                    } else {
-                      setSelectedRows((prev: string[]) =>
-                        prev.filter((id: string) => id !== params.row.id)
-                      );
-                    }
-                  }}
-                  sx={{
-                    color: "#65b230",
-                    "&.Mui-checked": {
-                      color: "#65b230",
-                    },
-                  }}
-                />
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Checkbox
+                    checked={selectedRows.includes(params.row.id)}
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        setSelectedRows((prev: string[]) => [
+                          ...prev,
+                          params.row.id,
+                        ]);
+                      } else {
+                        setSelectedRows((prev: string[]) =>
+                          prev.filter((id: string) => id !== params.row.id)
+                        );
+                      }
+                    }}
+                    sx={{
+                      color: hasValidationError ? "#d32f2f" : "#65b230",
+                      "&.Mui-checked": {
+                        color: hasValidationError ? "#d32f2f" : "#65b230",
+                      },
+                    }}
+                  />
+                  {hasValidationError && (
+                    <AlertCircle
+                      size={16}
+                      color="#d32f2f"
+                      style={{
+                        marginLeft: 4,
+                        animation: "pulse 2s infinite",
+                      }}
+                    />
+                  )}
+                </Box>
               );
             },
           },
@@ -3104,15 +3782,101 @@ export default function AllCustomerPricingPage() {
       renderCell: (params: any) => {
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isModified = modifiedFields?.has("productName");
+        const cellError = getCellValidationError(params.row.id, "productName");
+        const isRequired = isRequiredField("productName");
+        const isEmpty = isCellEmpty(params.row, "productName");
+        const isNewRow = params.row.isNewEntry || newRows.has(params.row.id);
+
+        // Determine cell styling based on state
+        const hasError = !!cellError;
+        const isRequiredAndEmpty = isRequired && isEmpty && isNewRow;
+
+        let backgroundColor = "transparent";
+        let borderColor = "transparent";
+        let borderStyle = "2px solid transparent";
+
+        if (hasError) {
+          backgroundColor = "rgba(211,47,47,0.1)";
+          borderColor = "#d32f2f";
+          borderStyle = "2px solid #d32f2f";
+        } else if (isRequiredAndEmpty) {
+          backgroundColor = "rgba(255,152,0,0.08)";
+          borderColor = "#ff9800";
+          borderStyle = "2px dashed #ff9800";
+        }
+
+        const errorMessage = cellError
+          ? getErrorMessage("productName", params.row.productName)
+          : null;
+        const requiredMessage = isRequiredAndEmpty
+          ? getRequiredMessage("productName")
+          : null;
+        const tooltipMessage = errorMessage || requiredMessage;
+
         return (
-          <div
-            style={{
-              fontWeight: isModified ? "bold" : "normal",
-              color: isModified ? "#1c1b1f" : "inherit",
-            }}
+          <Tooltip
+            title={tooltipMessage || ""}
+            arrow
+            placement="top"
+            disableHoverListener={!tooltipMessage}
           >
-            {params.value}
-          </div>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+                width: "100%",
+                height: "100%",
+                backgroundColor,
+                border: borderStyle,
+                borderRadius: 1,
+                padding: "4px 6px",
+                position: "relative",
+                overflow: "hidden",
+                minWidth: 0,
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: isModified ? "bold" : "normal",
+                  color: cellError
+                    ? "#d32f2f"
+                    : isRequiredAndEmpty
+                    ? "#ff9800"
+                    : isModified
+                    ? "#1c1b1f"
+                    : "inherit",
+                  fontStyle: isRequiredAndEmpty ? "italic" : "normal",
+                  flex: 1,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {params.value || (isRequiredAndEmpty ? "Required" : "")}
+              </div>
+              {cellError && (
+                <AlertCircle
+                  size={14}
+                  color="#d32f2f"
+                  style={{
+                    animation: "pulse 2s infinite",
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+              {isRequiredAndEmpty && !cellError && (
+                <AlertTriangle
+                  size={14}
+                  color="#ff9800"
+                  style={{
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+            </Box>
+          </Tooltip>
         );
       },
     },
@@ -3139,6 +3903,28 @@ export default function AllCustomerPricingPage() {
       },
     },
     {
+      field: "altDescription",
+      headerName: "Alt Description",
+      width: 200,
+      flex: 1,
+      minWidth: 150,
+      // editable: true, // Disabled direct editing
+      renderCell: (params: any) => {
+        const modifiedFields = modifiedColumns.get(params.row.id);
+        const isModified = modifiedFields?.has("altDescription");
+        return (
+          <div
+            style={{
+              fontWeight: isModified ? "bold" : "normal",
+              color: isModified ? "#1c1b1f" : "inherit",
+            }}
+          >
+            {params.value}
+          </div>
+        );
+      },
+    },
+    {
       field: "uom",
       headerName: "UOM",
       width: 100,
@@ -3150,15 +3936,48 @@ export default function AllCustomerPricingPage() {
       renderCell: (params: any) => {
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isModified = modifiedFields?.has("uom");
+        const cellError = getCellValidationError(params.row.id, "uom");
+
         return (
-          <div
-            style={{
-              fontWeight: isModified ? "bold" : "normal",
-              color: isModified ? "#1c1b1f" : "inherit",
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              width: "100%",
+              height: "100%",
+              backgroundColor: cellError
+                ? "rgba(211,47,47,0.1)"
+                : "transparent",
+              border: cellError ? "2px solid #d32f2f" : "2px solid transparent",
+              borderRadius: 1,
+              padding: "4px 8px",
+              position: "relative",
             }}
           >
-            {params.value}
-          </div>
+            <div
+              style={{
+                fontWeight: isModified ? "bold" : "normal",
+                color: cellError
+                  ? "#d32f2f"
+                  : isModified
+                  ? "#1c1b1f"
+                  : "inherit",
+              }}
+            >
+              {params.value}
+            </div>
+            {cellError && (
+              <AlertCircle
+                size={16}
+                color="#d32f2f"
+                style={{
+                  animation: "pulse 2s infinite",
+                  flexShrink: 0,
+                }}
+              />
+            )}
+          </Box>
         );
       },
     },
@@ -3207,12 +4026,16 @@ export default function AllCustomerPricingPage() {
         return value !== undefined && value !== null ? value : 0;
       },
       valueSetter: (params: any) => {
+        // Simple value setter - just return the updated row with the new value
         if (!params || !params.row) {
-          console.error("Invalid params in unitPrice valueSetter:", params);
-          return { id: "temp", unitPrice: 0 };
+          return { unitPrice: 0 };
         }
-        const value = parseFloat(params.value) || 0;
-        return { ...params.row, unitPrice: value, id: params.row.id };
+
+        const value = parseFloat(params.value);
+        const numericValue = isNaN(value) ? 0 : value;
+
+        // Return the row with updated unitPrice
+        return { ...params.row, unitPrice: numericValue };
       },
       renderCell: (params: any) => {
         if (!params || !params.row) {
@@ -3223,15 +4046,98 @@ export default function AllCustomerPricingPage() {
         const price = formatCurrency(params.row.unitPrice);
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isPriceModified = modifiedFields?.has("unitPrice");
+        const cellError = getCellValidationError(params.row.id, "unitPrice");
+        const isRequired = isRequiredField("unitPrice");
+        const isEmpty = isCellEmpty(params.row, "unitPrice");
+        const isNewRow = params.row.isNewEntry || newRows.has(params.row.id);
+
+        // Determine cell styling based on state
+        const hasError = !!cellError;
+        const isRequiredAndEmpty = isRequired && isEmpty && isNewRow;
+
+        let backgroundColor = "transparent";
+        let borderStyle = "2px solid transparent";
+
+        if (hasError) {
+          backgroundColor = "rgba(211,47,47,0.1)";
+          borderStyle = "2px solid #d32f2f";
+        } else if (isRequiredAndEmpty) {
+          backgroundColor = "rgba(255,152,0,0.08)";
+          borderStyle = "2px dashed #ff9800";
+        }
+
+        const errorMessage = cellError
+          ? getErrorMessage("unitPrice", params.row.unitPrice)
+          : null;
+        const requiredMessage = isRequiredAndEmpty
+          ? getRequiredMessage("unitPrice")
+          : null;
+        const tooltipMessage = errorMessage || requiredMessage;
+
         return (
-          <div
-            style={{
-              fontWeight: isPriceModified ? "bold" : "500",
-              color: isPriceModified ? "#1c1b1f" : "inherit",
-            }}
+          <Tooltip
+            title={tooltipMessage || ""}
+            arrow
+            placement="top"
+            disableHoverListener={!tooltipMessage}
           >
-            {price}
-          </div>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+                width: "100%",
+                height: "100%",
+                backgroundColor,
+                border: borderStyle,
+                borderRadius: 1,
+                padding: "4px 6px",
+                position: "relative",
+                overflow: "hidden",
+                minWidth: 0,
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: isPriceModified ? "bold" : "500",
+                  color: cellError
+                    ? "#d32f2f"
+                    : isRequiredAndEmpty
+                    ? "#ff9800"
+                    : isPriceModified
+                    ? "#1c1b1f"
+                    : "inherit",
+                  fontStyle: isRequiredAndEmpty ? "italic" : "normal",
+                  flex: 1,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {price || (isRequiredAndEmpty ? "Required" : "")}
+              </div>
+              {cellError && (
+                <AlertCircle
+                  size={14}
+                  color="#d32f2f"
+                  style={{
+                    animation: "pulse 2s infinite",
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+              {isRequiredAndEmpty && !cellError && (
+                <AlertTriangle
+                  size={14}
+                  color="#ff9800"
+                  style={{
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+            </Box>
+          </Tooltip>
         );
       },
     },
@@ -3253,12 +4159,16 @@ export default function AllCustomerPricingPage() {
         return value !== undefined && value !== null ? value : 0;
       },
       valueSetter: (params: any) => {
+        // Simple value setter - just return the updated row with the new value
         if (!params || !params.row) {
-          console.error("Invalid params in minimumPrice valueSetter:", params);
-          return { id: "temp", minimumPrice: 0 };
+          return { minimumPrice: 0 };
         }
-        const value = parseFloat(params.value) || 0;
-        return { ...params.row, minimumPrice: value, id: params.row.id };
+
+        const value = parseFloat(params.value);
+        const numericValue = isNaN(value) ? 0 : value;
+
+        // Return the row with updated minimumPrice
+        return { ...params.row, minimumPrice: numericValue };
       },
       renderCell: (params: any) => {
         if (!params || !params.row) {
@@ -3269,15 +4179,48 @@ export default function AllCustomerPricingPage() {
         const price = formatCurrency(params.row.minimumPrice);
         const modifiedFields = modifiedColumns.get(params.row.id);
         const isPriceModified = modifiedFields?.has("minimumPrice");
+        const cellError = getCellValidationError(params.row.id, "minimumPrice");
+
         return (
-          <div
-            style={{
-              fontWeight: isPriceModified ? "bold" : "normal",
-              color: isPriceModified ? "#1c1b1f" : "inherit",
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              width: "100%",
+              height: "100%",
+              backgroundColor: cellError
+                ? "rgba(211,47,47,0.1)"
+                : "transparent",
+              border: cellError ? "2px solid #d32f2f" : "2px solid transparent",
+              borderRadius: 1,
+              padding: "4px 8px",
+              position: "relative",
             }}
           >
-            {price}
-          </div>
+            <div
+              style={{
+                fontWeight: isPriceModified ? "bold" : "normal",
+                color: cellError
+                  ? "#d32f2f"
+                  : isPriceModified
+                  ? "#1c1b1f"
+                  : "inherit",
+              }}
+            >
+              {price}
+            </div>
+            {cellError && (
+              <AlertCircle
+                size={16}
+                color="#d32f2f"
+                style={{
+                  animation: "pulse 2s infinite",
+                  flexShrink: 0,
+                }}
+              />
+            )}
+          </Box>
         );
       },
     },
@@ -3300,20 +4243,21 @@ export default function AllCustomerPricingPage() {
       valueSetter: (params: any) => {
         if (!params || !params.row) {
           console.error("Invalid params in effectiveDate valueSetter:", params);
-          return { id: "temp", effectiveDate: "" };
+          return params.row || { effectiveDate: "" };
         }
 
         try {
           const value = params.value;
           const dateString =
-            value instanceof Date ? value.toISOString().split("T")[0] : "";
+            value instanceof Date
+              ? value.toISOString().split("T")[0]
+              : String(value || "");
           return {
             ...params.row,
             effectiveDate: dateString,
-            id: params.row.id,
           };
         } catch {
-          return { ...params.row, effectiveDate: "", id: params.row.id };
+          return { ...params.row, effectiveDate: "" };
         }
       },
       renderCell: (params: any) => {
@@ -3356,24 +4300,21 @@ export default function AllCustomerPricingPage() {
       },
       valueSetter: (params: any) => {
         if (!params || !params.row) {
-          console.error(
-            "Invalid params in expirationDate valueSetter:",
-            params
-          );
-          return { id: "temp", expirationDate: "" };
+          return { expirationDate: "" };
         }
 
         try {
           const value = params.value;
           const dateString =
-            value instanceof Date ? value.toISOString().split("T")[0] : "";
+            value instanceof Date
+              ? value.toISOString().split("T")[0]
+              : String(value || "");
           return {
             ...params.row,
             expirationDate: dateString,
-            id: params.row.id,
           };
         } catch {
-          return { ...params.row, expirationDate: "", id: params.row.id };
+          return { ...params.row, expirationDate: "" };
         }
       },
       renderCell: (params: any) => {
@@ -4181,6 +5122,32 @@ export default function AllCustomerPricingPage() {
                       >
                         Delete ({getSelectedRowIds().length})
                       </SecondaryButton>
+
+                      <SecondaryButton
+                        onClick={triggerValidationErrors}
+                        icon={AlertCircle}
+                        size="small"
+                        sx={{
+                          borderColor:
+                            validationErrors.length > 0 ? "#d32f2f" : "#e0e0e0",
+                          color:
+                            validationErrors.length > 0 ? "#d32f2f" : "#666",
+                          "&:hover": {
+                            borderColor:
+                              validationErrors.length > 0
+                                ? "#b71c1c"
+                                : "#65b230",
+                            backgroundColor:
+                              validationErrors.length > 0
+                                ? "rgba(211,47,47,0.04)"
+                                : "rgba(101,178,48,0.04)",
+                          },
+                        }}
+                      >
+                        {validationErrors.length > 0
+                          ? `Errors (${validationErrors.length})`
+                          : "Check Errors"}
+                      </SecondaryButton>
                     </div>
                   </div>
 
@@ -4358,7 +5325,15 @@ export default function AllCustomerPricingPage() {
                         toast.error("Failed to update row. Please try again.");
                       }}
                       getRowClassName={(params: any) => {
+                        // Check if this row has validation errors
+                        const hasValidationError = validationErrors.some(
+                          (error) => error.rowId === params.row.id
+                        );
+
                         // Add special styling for different row types
+                        if (hasValidationError) {
+                          return "validation-error-row";
+                        }
                         if (params.row.isNew) {
                           return "new-row";
                         }
@@ -4368,6 +5343,48 @@ export default function AllCustomerPricingPage() {
                         return "";
                       }}
                       sx={{
+                        "@keyframes pulse": {
+                          "0%": {
+                            opacity: 1,
+                          },
+                          "50%": {
+                            opacity: 0.5,
+                          },
+                          "100%": {
+                            opacity: 1,
+                          },
+                        },
+                        "& .validation-error-row": {
+                          backgroundColor: "#fef2f2",
+                          borderLeft: "6px solid #d32f2f",
+                          borderRight: "2px solid #fecaca",
+                          "&:hover": {
+                            backgroundColor: "#fee2e2",
+                            borderLeft: "6px solid #b71c1c",
+                          },
+                          "& .MuiDataGrid-cell": {
+                            borderBottom: "1px solid #fecaca",
+                            borderRight: "1px solid #fecaca",
+                            position: "relative",
+                            "&::before": {
+                              content: '""',
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              background:
+                                "linear-gradient(90deg, rgba(211,47,47,0.1) 0%, transparent 100%)",
+                              pointerEvents: "none",
+                            },
+                          },
+                          "& .MuiDataGrid-cell:first-of-type": {
+                            borderLeft: "none",
+                          },
+                          "& .MuiDataGrid-cell:last-of-type": {
+                            borderRight: "none",
+                          },
+                        },
                         "& .new-row": {
                           backgroundColor: "#f0fff4",
                           "&:hover": {
@@ -4411,22 +5428,41 @@ export default function AllCustomerPricingPage() {
                         },
                       }}
                       disableRowSelectionOnClick={true}
-                      // Disabled direct cell editing - users must use modals
-                      // isCellEditable={(params) => {
-                      //   // Only allow editing when in edit mode and not for certain columns
-                      //   if (!isEditMode) return false;
-                      //
-                      //   // Don't allow editing for selection column, entry date, entered by, or price request ID
-                      //   if (
-                      //     params.field === "selection" ||
-                      //     params.field === "entryDate" ||
-                      //     params.field === "enteredBy"
-                      //   ) {
-                      //     return false;
-                      //   }
-                      //
-                      //   return true;
-                      // }}
+                      // Enable cell editing for inline validation
+                      isCellEditable={(params) => {
+                        // Only allow editing when in edit mode
+                        if (!isEditMode) return false;
+
+                        // Don't allow editing for certain columns
+                        if (
+                          params.field === "selection" ||
+                          params.field === "entryDate" ||
+                          params.field === "enteredBy" ||
+                          params.field === "priceRequestId" ||
+                          params.field === "generatorId" ||
+                          params.field === "generatorState" ||
+                          params.field === "contractId" ||
+                          params.field === "region" ||
+                          params.field === "facilityName" ||
+                          params.field === "description" ||
+                          params.field === "altDescription"
+                        ) {
+                          return false;
+                        }
+
+                        // Allow editing for these fields
+                        return [
+                          "productName",
+                          "unitPrice",
+                          "minimumPrice",
+                          "uom",
+                          "containerSize",
+                          "effectiveDate",
+                          "expirationDate",
+                          "projectName",
+                          "profileId",
+                        ].includes(params.field);
+                      }}
                       disableColumnMenu={true}
                     />
                   </div>
@@ -5342,18 +6378,42 @@ export default function AllCustomerPricingPage() {
                     <label htmlFor="excel-file-upload">
                       <Card
                         sx={{
-                          cursor: "pointer",
-                          border: excelFile
-                            ? "2px solid #65b230"
-                            : "2px dashed #e0e0e0",
-                          backgroundColor: excelFile
-                            ? "rgba(101,178,48,0.08)"
-                            : "transparent",
+                          cursor:
+                            excelUploadStatus === "uploading"
+                              ? "not-allowed"
+                              : "pointer",
+                          border:
+                            excelUploadStatus === "error"
+                              ? "2px solid #d32f2f"
+                              : excelUploadStatus === "success"
+                              ? "2px solid #65b230"
+                              : excelFile
+                              ? "2px solid #65b230"
+                              : "2px dashed #e0e0e0",
+                          backgroundColor:
+                            excelUploadStatus === "error"
+                              ? "rgba(211,47,47,0.08)"
+                              : excelUploadStatus === "success"
+                              ? "rgba(101,178,48,0.08)"
+                              : excelFile
+                              ? "rgba(101,178,48,0.08)"
+                              : "transparent",
                           "&:hover": {
-                            borderColor: "#65b230",
-                            backgroundColor: "rgba(101,178,48,0.04)",
+                            borderColor:
+                              excelUploadStatus === "uploading"
+                                ? "inherit"
+                                : excelUploadStatus === "error"
+                                ? "#d32f2f"
+                                : "#65b230",
+                            backgroundColor:
+                              excelUploadStatus === "uploading"
+                                ? "inherit"
+                                : excelUploadStatus === "error"
+                                ? "rgba(211,47,47,0.04)"
+                                : "rgba(101,178,48,0.04)",
                           },
                           transition: "all 0.2s ease-in-out",
+                          opacity: excelUploadStatus === "uploading" ? 0.7 : 1,
                         }}
                       >
                         <CardContent sx={{ p: 3, textAlign: "center" }}>
@@ -5366,28 +6426,169 @@ export default function AllCustomerPricingPage() {
                               mb: 2,
                             }}
                           >
-                            <Upload
-                              size={24}
-                              color={excelFile ? "#65b230" : "#666"}
-                            />
+                            {excelUploadStatus === "uploading" ? (
+                              <CircularProgress
+                                size={24}
+                                sx={{ color: "#65b230" }}
+                              />
+                            ) : excelUploadStatus === "error" ? (
+                              <AlertCircle size={24} color="#d32f2f" />
+                            ) : excelUploadStatus === "success" ? (
+                              <CheckCircle size={24} color="#65b230" />
+                            ) : (
+                              <Upload
+                                size={24}
+                                color={excelFile ? "#65b230" : "#666"}
+                              />
+                            )}
                             <Typography
                               variant="h6"
-                              sx={{ color: excelFile ? "#65b230" : "#666" }}
+                              sx={{
+                                color:
+                                  excelUploadStatus === "error"
+                                    ? "#d32f2f"
+                                    : excelUploadStatus === "success"
+                                    ? "#65b230"
+                                    : excelFile
+                                    ? "#65b230"
+                                    : "#666",
+                              }}
                             >
-                              {excelFile
+                              {excelUploadStatus === "uploading"
+                                ? "Processing file..."
+                                : excelUploadStatus === "error"
+                                ? "Upload failed"
+                                : excelUploadStatus === "success"
+                                ? "Upload successful"
+                                : excelFile
                                 ? excelFile.name
                                 : "Click to upload Excel file"}
                             </Typography>
                           </Box>
-                          {!excelFile && (
+                          {!excelFile && excelUploadStatus === "idle" && (
                             <Typography variant="body2" sx={{ color: "#666" }}>
-                              Supported formats: .xlsx, .xls
+                              Supported formats: .xlsx, .xls (Max size: 10MB)
+                            </Typography>
+                          )}
+                          {excelUploadStatus === "success" && (
+                            <Typography
+                              variant="body2"
+                              sx={{ color: "#65b230" }}
+                            >
+                              File validated successfully. Ready to proceed.
                             </Typography>
                           )}
                         </CardContent>
                       </Card>
                     </label>
                   </Box>
+
+                  {/* Error Display */}
+                  {excelUploadError && (
+                    <Alert
+                      severity="error"
+                      sx={{ mb: 2 }}
+                      action={
+                        <IconButton
+                          size="small"
+                          onClick={handleClearExcelFile}
+                          sx={{ color: "inherit" }}
+                        >
+                          <X size={16} />
+                        </IconButton>
+                      }
+                    >
+                      <AlertTitle>Upload Failed</AlertTitle>
+                      {excelUploadError}
+                    </Alert>
+                  )}
+
+                  {/* Validation Errors Display */}
+                  {excelValidationErrors.length > 0 && (
+                    <Card
+                      sx={{
+                        mb: 2,
+                        border: "1px solid #ff9800",
+                        backgroundColor: "#fff3e0",
+                      }}
+                    >
+                      <CardContent sx={{ p: 2 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            mb: 2,
+                          }}
+                        >
+                          <AlertTriangle size={20} color="#ff9800" />
+                          <Typography
+                            variant="subtitle2"
+                            sx={{ color: "#e65100", fontWeight: 600 }}
+                          >
+                            Validation Errors ({excelValidationErrors.length})
+                          </Typography>
+                        </Box>
+                        <Box sx={{ maxHeight: "200px", overflowY: "auto" }}>
+                          {excelValidationErrors.map((error, index) => (
+                            <Box
+                              key={index}
+                              sx={{
+                                p: 1,
+                                mb: 1,
+                                backgroundColor: "rgba(255,152,0,0.1)",
+                                borderRadius: 1,
+                                border: "1px solid rgba(255,152,0,0.2)",
+                              }}
+                            >
+                              <Typography
+                                variant="body2"
+                                sx={{ fontWeight: 500, color: "#e65100" }}
+                              >
+                                Row {error.row}, Column "{error.column}"
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{ color: "#bf360c" }}
+                              >
+                                {error.message}
+                              </Typography>
+                              {error.value !== null &&
+                                error.value !== undefined && (
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: "#666", fontStyle: "italic" }}
+                                  >
+                                    Value: "{error.value}"
+                                  </Typography>
+                                )}
+                            </Box>
+                          ))}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Success Message */}
+                  {excelUploadStatus === "success" && (
+                    <Alert
+                      severity="success"
+                      sx={{ mb: 2 }}
+                      action={
+                        <IconButton
+                          size="small"
+                          onClick={handleClearExcelFile}
+                          sx={{ color: "inherit" }}
+                        >
+                          <X size={16} />
+                        </IconButton>
+                      }
+                    >
+                      <AlertTitle>Upload Successful</AlertTitle>
+                      Your Excel file has been validated and is ready for
+                      processing.
+                    </Alert>
+                  )}
                 </Box>
               )}
 
@@ -5435,7 +6636,15 @@ export default function AllCustomerPricingPage() {
             <SecondaryButton onClick={handleBackToPriceChangeSelection}>
               Back to Selection
             </SecondaryButton>
-            <PrimaryButton onClick={handlePriceChangeConfigSubmit}>
+            <PrimaryButton
+              onClick={handlePriceChangeConfigSubmit}
+              disabled={
+                excelUploadMode === "upload" &&
+                (excelUploadStatus === "error" ||
+                  excelUploadStatus === "uploading" ||
+                  !excelFile)
+              }
+            >
               Begin Price Entry
             </PrimaryButton>
           </DialogActions>
@@ -5847,6 +7056,107 @@ export default function AllCustomerPricingPage() {
             </SecondaryButton>
             <PrimaryButton onClick={submitPriceChange}>
               Submit Price Change
+            </PrimaryButton>
+          </DialogActions>
+        </Dialog>
+
+        {/* Validation Error Dialog */}
+        <Dialog
+          open={validationErrorDialogOpen}
+          onClose={() => setValidationErrorDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle
+            sx={{
+              fontFamily: "Roboto:Medium, sans-serif",
+              fontWeight: 500,
+              fontSize: "22px",
+              lineHeight: "28px",
+              color: "#d32f2f",
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+            }}
+          >
+            <AlertCircle size={24} color="#d32f2f" />
+            Validation Errors Found
+          </DialogTitle>
+          <DialogContent sx={{ p: 3 }}>
+            <Alert severity="error" sx={{ mb: 3 }}>
+              <AlertTitle>Cannot Submit Price Change</AlertTitle>
+              Your price change contains invalid data that must be corrected
+              before submission. Please review and fix the following errors:
+            </Alert>
+
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                padding: 2,
+                backgroundColor: "#fef2f2",
+                borderRadius: 1,
+                border: "1px solid #fecaca",
+                mb: 3,
+              }}
+            >
+              <AlertCircle size={20} color="#d32f2f" />
+              <Typography variant="body1" sx={{ color: "#d32f2f" }}>
+                {(() => {
+                  const uniqueRowIds = [
+                    ...new Set(validationErrors.map((error) => error.rowId)),
+                  ];
+                  const rowNumbers = uniqueRowIds
+                    .map((rowId) => {
+                      const rowIndex = rows.findIndex(
+                        (row: any) => row.id === rowId
+                      );
+                      return rowIndex + 1; // Convert to 1-based line numbers
+                    })
+                    .sort((a, b) => a - b);
+
+                  return (
+                    <span>
+                      Please resolve {rowNumbers.length} line
+                      {rowNumbers.length !== 1 ? "s" : ""} with validation
+                      errors: Lines {rowNumbers.join(", ")}
+                    </span>
+                  );
+                })()}
+              </Typography>
+            </Box>
+
+            <Alert severity="info" sx={{ mt: 3 }}>
+              <AlertTitle>How to Fix These Errors</AlertTitle>
+              <ul style={{ margin: 0, paddingLeft: 20 }}>
+                <li>Navigate to the row with the error in the pricing table</li>
+                <li>Click on the cell with the invalid data to edit it</li>
+                <li>Enter a valid value according to the error message</li>
+                <li>Save your changes and try submitting again</li>
+              </ul>
+            </Alert>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, gap: 1 }}>
+            <SecondaryButton
+              onClick={() => setValidationErrorDialogOpen(false)}
+            >
+              Close
+            </SecondaryButton>
+            <PrimaryButton
+              onClick={() => {
+                setValidationErrorDialogOpen(false);
+                // Optionally scroll to the first error row or highlight it
+                toast.info(
+                  "Please fix the validation errors and try submitting again"
+                );
+              }}
+              sx={{
+                backgroundColor: "#65b230",
+                "&:hover": { backgroundColor: "#5a9e2a" },
+              }}
+            >
+              Go to Table
             </PrimaryButton>
           </DialogActions>
         </Dialog>

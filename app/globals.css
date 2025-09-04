@@ -103,5 +103,17 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    overflow: auto !important;
+    height: auto !important;
+  }
+  html {
+    overflow: auto !important;
+    height: auto !important;
+  }
+  .layout {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 }
